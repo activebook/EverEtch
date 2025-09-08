@@ -30,7 +30,6 @@
   "dependencies": {
     "marked": "^16.2.1",
     "openai": "^4.20.0",
-    "showdown": "^2.1.0",
     "sqlite3": "^5.1.6",
     "tailwindcss": "^3.4.0"
   }
