@@ -5,6 +5,7 @@ import { dirname } from 'path';
 import { DatabaseManager } from './database/DatabaseManager.js';
 import { ProfileManager } from './database/ProfileManager.js';
 import { AIModelClient } from './ai/AIModelClient.js';
+import { marked } from 'marked';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -158,4 +159,14 @@ ipcMain.handle('update-profile-config', async (event, config: any) => {
   const currentProfile = profileManager.getLastOpenedProfile();
   if (!currentProfile) return false;
   return await profileManager.updateProfileConfig(currentProfile, config);
+});
+
+// Markdown processing
+ipcMain.handle('process-markdown', async (event, markdown: string) => {
+  try {
+    return marked(markdown);
+  } catch (error) {
+    console.error('Error processing markdown:', error);
+    return markdown; // Return original markdown on error
+  }
 });

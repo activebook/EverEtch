@@ -1,5 +1,3 @@
-// showdown is loaded globally via script tag
-
 // Type definitions for Electron API
 declare global {
   interface Window {
@@ -18,15 +16,13 @@ declare global {
       getAssociatedWords: (tag: string) => Promise<any[]>;
       getProfileConfig: () => Promise<any>;
       updateProfileConfig: (config: any) => Promise<boolean>;
+      processMarkdown: (markdown: string) => Promise<string>;
       onStreamingContent: (callback: Function) => void;
       onToolResult: (callback: Function) => void;
       removeAllListeners: (event: string) => void;
     };
   }
 }
-
-// Declare showdown as a global variable (loaded via script tag)
-declare const showdown: any;
 
 export {}; // This makes the file a module
 
@@ -46,7 +42,6 @@ class EverEtchApp {
   private profiles: string[] = [];
   private currentProfile: string = '';
   private streamingContent: string = '';
-  private markdownConverter: any;
   private isResizing: boolean = false;
   private resizeHandle: HTMLElement | null = null;
   private startX: number = 0;
@@ -55,13 +50,6 @@ class EverEtchApp {
   private startRightWidth: number = 0;
 
   constructor() {
-    // Configure showdown for safe rendering
-    this.markdownConverter = new showdown.Converter({
-      breaks: true,
-      ghCodeBlocks: true,
-      simpleLineBreaks: true
-    });
-
     this.initializeApp();
   }
 
@@ -399,13 +387,13 @@ class EverEtchApp {
     });
   }
 
-  private renderWordDetails(word: WordDocument) {
+  private async renderWordDetails(word: WordDocument) {
     const wordDetails = document.getElementById('word-details')!;
     const isLoadingSummary = word.one_line_desc === 'Generating summary...';
     const isLoadingTags = word.tags.includes('Generating tags...');
 
-    // Render markdown content
-    const renderedDetails = this.markdownConverter.makeHtml(word.details || '');
+    // Process markdown content via IPC
+    const renderedDetails = await window.electronAPI.processMarkdown(word.details || '');
 
     wordDetails.innerHTML = `
       <div class="space-y-4">
@@ -553,11 +541,11 @@ class EverEtchApp {
     }
   }
 
-  private renderStreamingWordDetails(word: WordDocument) {
+  private async renderStreamingWordDetails(word: WordDocument) {
     const wordDetails = document.getElementById('word-details')!;
 
-    // Use showdown for streaming content as well
-    const formattedDetails = this.markdownConverter.makeHtml(word.details || '');
+    // Process markdown content via IPC
+    const formattedDetails = await window.electronAPI.processMarkdown(word.details || '');
 
     wordDetails.innerHTML = `
       <div class="space-y-4">

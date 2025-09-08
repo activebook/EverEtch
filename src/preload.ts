@@ -26,6 +26,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getProfileConfig: () => ipcRenderer.invoke('get-profile-config'),
   updateProfileConfig: (config: any) => ipcRenderer.invoke('update-profile-config', config),
 
+  // Markdown processing
+  processMarkdown: (markdown: string) => ipcRenderer.invoke('process-markdown', markdown),
+
   // Event listeners for streaming
   onStreamingContent: (callback: Function) => {
     ipcRenderer.on('streaming-content', (_event: any, content: string) => callback(content));
