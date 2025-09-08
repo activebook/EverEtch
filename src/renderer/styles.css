@@ -2,27 +2,105 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Modern Tag Button */
 .tag-button {
-    @apply inline-block px-2 py-1 m-1 text-xs font-medium rounded-full cursor-pointer transition-colors duration-200;
+    @apply inline-block px-3 py-1.5 m-1 text-xs font-medium rounded-full cursor-pointer transition-all duration-200 hover:scale-105 shadow-sm;
 }
 
+/* Enhanced Scrollbar */
 .scrollbar-thin {
     scrollbar-width: thin;
 }
 
 .scrollbar-thin::-webkit-scrollbar {
-    width: 6px;
+    width: 8px;
 }
 
 .scrollbar-thin::-webkit-scrollbar-track {
-    background: #f1f1f1;
+    background: rgba(148, 163, 184, 0.1);
+    border-radius: 10px;
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 3px;
+    background: linear-gradient(180deg, rgba(59, 130, 246, 0.6), rgba(147, 51, 234, 0.6));
+    border-radius: 10px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8;
+    background: linear-gradient(180deg, rgba(59, 130, 246, 0.8), rgba(147, 51, 234, 0.8));
+}
+
+/* Custom animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+}
+
+.animate-slide-in {
+    animation: slideIn 0.3s ease-out;
+}
+
+/* Word list item hover effects */
+.word-item {
+    @apply transition-all duration-200 hover:bg-slate-50/80 hover:shadow-sm hover:border-slate-200/60 cursor-pointer;
+}
+
+.word-item:hover {
+    transform: translateX(2px);
+}
+
+/* Panel resize handle styling */
+.resize-handle {
+    @apply absolute top-0 bottom-0 w-1 bg-gradient-to-r from-blue-400 to-purple-400 opacity-0 hover:opacity-100 transition-opacity duration-200 cursor-col-resize;
+}
+
+/* Loading animation for tags */
+@keyframes pulse-subtle {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+.animate-pulse-subtle {
+    animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Glassmorphism utilities */
+.glass {
+    background: rgba(255, 255, 255, 0.25);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.glass-dark {
+    background: rgba(0, 0, 0, 0.25);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
 }

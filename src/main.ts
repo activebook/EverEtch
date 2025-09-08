@@ -19,6 +19,7 @@ async function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
+    icon: path.join(__dirname, 'assets/icons/icon.png'), // or .ico on Windows
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

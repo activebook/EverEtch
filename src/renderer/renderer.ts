@@ -142,18 +142,29 @@ class EverEtchApp {
       }
     });
 
+    // Hide suggestions when clicking outside
+    document.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      const suggestionsDiv = document.getElementById('suggestions')!;
+      const wordInput = document.getElementById('word-input')!;
+
+      if (!suggestionsDiv.contains(target) && target !== wordInput) {
+        this.hideSuggestions();
+      }
+    });
+
+    // Hide suggestions when input loses focus (with a small delay to allow clicking on suggestions)
+    wordInput.addEventListener('blur', () => {
+      setTimeout(() => {
+        this.hideSuggestions();
+      }, 150);
+    });
+
     // Generate button
     const generateBtn = document.getElementById('generate-btn') as HTMLButtonElement;
     generateBtn.addEventListener('click', () => this.handleGenerate());
 
-    // Action buttons
-    const addBtn = document.getElementById('add-btn') as HTMLButtonElement;
-    const refreshBtn = document.getElementById('refresh-btn') as HTMLButtonElement;
-    const deleteBtn = document.getElementById('delete-btn') as HTMLButtonElement;
-
-    addBtn.addEventListener('click', () => this.handleAddWord());
-    refreshBtn.addEventListener('click', () => this.handleRefreshWord());
-    deleteBtn.addEventListener('click', () => this.handleDeleteWord());
+    // Action buttons are now handled dynamically in renderWordDetails() and renderStreamingWordDetails()
 
     // Enter key on input
     wordInput.addEventListener('keypress', (e) => {
@@ -162,6 +173,17 @@ class EverEtchApp {
       }
     });
 
+    // Add profile button
+    const addProfileBtn = document.getElementById('add-profile-btn') as HTMLButtonElement;
+    addProfileBtn.addEventListener('click', () => this.showAddProfileModal());
+
+    // Add profile modal buttons
+    const cancelAddProfileBtn = document.getElementById('cancel-add-profile') as HTMLButtonElement;
+    const createProfileBtn = document.getElementById('create-profile') as HTMLButtonElement;
+
+    cancelAddProfileBtn.addEventListener('click', () => this.hideAddProfileModal());
+    createProfileBtn.addEventListener('click', () => this.handleCreateProfile());
+
     // Settings button
     const settingsBtn = document.getElementById('settings-btn') as HTMLButtonElement;
     settingsBtn.addEventListener('click', () => this.showSettingsModal());
@@ -169,9 +191,11 @@ class EverEtchApp {
     // Settings modal buttons
     const cancelSettingsBtn = document.getElementById('cancel-settings') as HTMLButtonElement;
     const saveSettingsBtn = document.getElementById('save-settings') as HTMLButtonElement;
+    const deleteProfileBtn = document.getElementById('delete-profile-btn') as HTMLButtonElement;
 
     cancelSettingsBtn.addEventListener('click', () => this.hideSettingsModal());
     saveSettingsBtn.addEventListener('click', () => this.saveSettings());
+    deleteProfileBtn.addEventListener('click', () => this.handleDeleteProfile());
 
     // Resize functionality on main content area
     const mainContent = document.getElementById('main-content') as HTMLElement;
@@ -201,8 +225,12 @@ class EverEtchApp {
     }
 
     const generateBtn = document.getElementById('generate-btn') as HTMLButtonElement;
+    const generateIcon = document.getElementById('generate-icon') as unknown as SVGElement;
+    const loadingIcon = document.getElementById('loading-icon') as unknown as SVGElement;
+
     generateBtn.disabled = true;
-    generateBtn.textContent = 'Generating...';
+    generateIcon.classList.add('hidden');
+    loadingIcon.classList.remove('hidden');
 
     try {
       // Clear previous content and reset streaming
@@ -275,7 +303,8 @@ class EverEtchApp {
       this.showError('Failed to generate meaning. Please check your API configuration.');
     } finally {
       generateBtn.disabled = false;
-      generateBtn.textContent = 'Generate';
+      generateIcon.classList.remove('hidden');
+      loadingIcon.classList.add('hidden');
     }
   }
 
@@ -296,7 +325,16 @@ class EverEtchApp {
 
       const addedWord = await window.electronAPI.addWord(wordData);
       this.currentWord = addedWord;
-      await this.loadWords(); // Refresh word list
+
+      // Refresh word list and scroll to the newly added word
+      await this.loadWords();
+      this.scrollToWord(addedWord.id);
+
+      // Re-render word details with updated action buttons
+      if (this.currentWord) {
+        await this.renderWordDetails(this.currentWord);
+      }
+
       this.showSuccess('Word added successfully');
     } catch (error) {
       console.error('Error adding word:', error);
@@ -341,16 +379,150 @@ class EverEtchApp {
     }
   }
 
+  private async handleCopyWord() {
+    if (!this.currentWord) {
+      this.showError('No word to copy');
+      return;
+    }
+
+    try {
+      const wordText = `${this.currentWord.word}\n\n${this.currentWord.one_line_desc}\n\n${this.currentWord.details}`;
+      await navigator.clipboard.writeText(wordText);
+      this.showSuccess('Word copied to clipboard!');
+    } catch (error) {
+      console.error('Error copying word:', error);
+      this.showError('Failed to copy word to clipboard');
+    }
+  }
+
+  private showAddProfileModal() {
+    // Clear any previous input
+    const input = document.getElementById('new-profile-name') as HTMLInputElement;
+    if (input) {
+      input.value = '';
+    }
+
+    const modal = document.getElementById('add-profile-modal')!;
+    modal.classList.remove('hidden');
+
+    // Focus on the input field
+    setTimeout(() => {
+      if (input) {
+        input.focus();
+      }
+    }, 100);
+  }
+
+  private hideAddProfileModal() {
+    const modal = document.getElementById('add-profile-modal')!;
+    modal.classList.add('hidden');
+  }
+
+  private async handleCreateProfile() {
+    const input = document.getElementById('new-profile-name') as HTMLInputElement;
+    const profileName = input ? input.value.trim() : '';
+
+    if (!profileName) {
+      this.showError('Profile name cannot be empty');
+      return;
+    }
+
+    // Check if profile already exists
+    if (this.profiles.includes(profileName)) {
+      this.showError('A profile with this name already exists');
+      return;
+    }
+
+    try {
+      // For now, we'll just add it to the UI since we don't have backend API for creating profiles
+      // In a real implementation, this would call an API to create the profile
+      this.profiles.push(profileName);
+      this.currentProfile = profileName;
+
+      // Update the profile selector
+      const profileSelect = document.getElementById('profile-select') as HTMLSelectElement;
+      const option = document.createElement('option');
+      option.value = profileName;
+      option.textContent = profileName;
+      profileSelect.appendChild(option);
+      profileSelect.value = profileName;
+
+      // Clear current word list and details
+      this.clearWordDetails();
+      const wordList = document.getElementById('word-list')!;
+      wordList.innerHTML = '';
+
+      this.hideAddProfileModal();
+      this.showSuccess(`Profile "${profileName}" created successfully`);
+    } catch (error) {
+      console.error('Error creating profile:', error);
+      this.showError('Failed to create profile');
+    }
+  }
+
+  private async handleDeleteProfile() {
+    // Don't allow deletion if there's only one profile
+    if (this.profiles.length <= 1) {
+      this.showError('Cannot delete the last remaining profile');
+      return;
+    }
+
+    // Confirm deletion
+    const confirmed = confirm(`Are you sure you want to delete the profile "${this.currentProfile}"? This action cannot be undone and will delete all words in this profile.`);
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      // For now, we'll just remove it from the UI since we don't have backend API for deleting profiles
+      // In a real implementation, this would call an API to delete the profile and all its data
+
+      // Remove from profiles array
+      const profileIndex = this.profiles.indexOf(this.currentProfile);
+      this.profiles.splice(profileIndex, 1);
+
+      // Switch to another profile
+      const newProfile = this.profiles[0];
+      this.currentProfile = newProfile;
+
+      // Update the profile selector
+      const profileSelect = document.getElementById('profile-select') as HTMLSelectElement;
+      profileSelect.innerHTML = '';
+      this.profiles.forEach(profile => {
+        const option = document.createElement('option');
+        option.value = profile;
+        option.textContent = profile;
+        profileSelect.appendChild(option);
+      });
+      profileSelect.value = newProfile;
+
+      // Clear current word list and details
+      this.clearWordDetails();
+      const wordList = document.getElementById('word-list')!;
+      wordList.innerHTML = '';
+
+      // Load words for the new profile
+      await this.loadWords();
+
+      this.hideSettingsModal();
+      this.showSuccess(`Profile deleted successfully. Switched to "${newProfile}".`);
+    } catch (error) {
+      console.error('Error deleting profile:', error);
+      this.showError('Failed to delete profile');
+    }
+  }
+
   private renderWordList(words: WordDocument[]) {
     const wordList = document.getElementById('word-list')!;
     wordList.innerHTML = '';
 
     words.forEach(word => {
       const wordItem = document.createElement('div');
-      wordItem.className = 'p-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer rounded-md mb-2';
+      wordItem.className = 'word-item p-3 mb-2 bg-white/60 backdrop-blur-sm border border-slate-200/60 rounded-lg shadow-sm hover:shadow-md transition-all duration-200';
+      wordItem.setAttribute('data-word-id', word.id); // Add data attribute for scrolling
       wordItem.innerHTML = `
-        <div class="font-medium text-gray-800">${word.word}</div>
-        <div class="text-sm text-gray-600 truncate">${word.one_line_desc || 'No description'}</div>
+        <div class="font-semibold text-slate-800 text-base mb-0.5">${word.word}</div>
+        <div class="text-sm text-slate-600 line-clamp-2">${word.one_line_desc || 'No description'}</div>
       `;
 
       wordItem.addEventListener('click', () => {
@@ -361,30 +533,61 @@ class EverEtchApp {
     });
   }
 
+  private scrollToWord(wordId: string) {
+    // Find the word item in the word list
+    const wordItem = document.querySelector(`[data-word-id="${wordId}"]`) as HTMLElement;
+    if (wordItem) {
+      // Scroll the word item into view
+      wordItem.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center'
+      });
+
+      // Add a temporary highlight effect
+      wordItem.classList.add('ring-2', 'ring-blue-400', 'ring-opacity-75');
+      setTimeout(() => {
+        wordItem.classList.remove('ring-2', 'ring-blue-400', 'ring-opacity-75');
+      }, 2000);
+    }
+  }
+
   private renderSuggestions(suggestions: WordDocument[]) {
     const suggestionsDiv = document.getElementById('suggestions')!;
-    suggestionsDiv.innerHTML = '';
 
     if (suggestions.length === 0) {
-      suggestionsDiv.innerHTML = '<div class="text-gray-500 text-sm p-2">No suggestions found</div>';
+      this.hideSuggestions();
       return;
     }
 
+    suggestionsDiv.innerHTML = '';
+
     suggestions.forEach(word => {
       const suggestionItem = document.createElement('div');
-      suggestionItem.className = 'p-2 hover:bg-gray-100 cursor-pointer rounded';
+      suggestionItem.className = 'p-3 hover:bg-blue-50 cursor-pointer rounded-lg transition-colors duration-150 border-b border-slate-100/50 last:border-b-0';
       suggestionItem.innerHTML = `
-        <div class="font-medium text-gray-800">${word.word}</div>
-        <div class="text-sm text-gray-600">${word.one_line_desc || ''}</div>
+        <div class="font-medium text-slate-800 mb-1">${word.word}</div>
+        <div class="text-sm text-slate-600 line-clamp-2">${word.one_line_desc || 'No description'}</div>
       `;
 
       suggestionItem.addEventListener('click', () => {
         this.selectWord(word);
-        this.clearSuggestions();
+        this.hideSuggestions();
       });
 
       suggestionsDiv.appendChild(suggestionItem);
     });
+
+    this.showSuggestions();
+  }
+
+  private showSuggestions() {
+    const suggestionsDiv = document.getElementById('suggestions')!;
+    suggestionsDiv.classList.remove('hidden');
+  }
+
+  private hideSuggestions() {
+    const suggestionsDiv = document.getElementById('suggestions')!;
+    suggestionsDiv.classList.add('hidden');
   }
 
   private async renderWordDetails(word: WordDocument) {
@@ -396,20 +599,20 @@ class EverEtchApp {
     const renderedDetails = await window.electronAPI.processMarkdown(word.details || '');
 
     wordDetails.innerHTML = `
-      <div class="space-y-4">
+      <div class="space-y-6">
         <div>
-          <h3 class="text-2xl font-bold text-gray-800 mb-2">${word.word}</h3>
-          <p class="text-gray-600 mb-4 ${isLoadingSummary ? 'animate-pulse' : ''}">${word.one_line_desc || 'No description available'}</p>
+          <h3 class="text-2xl font-bold text-slate-800 mb-2">${word.word}</h3>
+          <p class="text-slate-600 mb-4 ${isLoadingSummary ? 'animate-pulse' : ''}">${word.one_line_desc || 'No description available'}</p>
         </div>
 
         <div>
-          <h4 class="text-lg font-semibold text-gray-800 mb-2">Details</h4>
-          <div class="text-gray-700 prose prose-sm max-w-none">${renderedDetails}</div>
+          <h4 class="text-lg font-semibold text-slate-800 mb-3">Details</h4>
+          <div class="text-slate-700 prose prose-sm max-w-none">${renderedDetails}</div>
         </div>
 
         <div>
-          <h4 class="text-lg font-semibold text-gray-800 mb-2">Tags</h4>
-          <div id="tags-container" class="flex flex-wrap">
+          <h4 class="text-lg font-semibold text-slate-800 mb-3">Tags</h4>
+          <div id="tags-container" class="flex flex-wrap gap-2 mb-4">
             ${word.tags.map(tag => {
               const isLoadingTags = tag === 'Generating tags...';
               return `
@@ -424,6 +627,9 @@ class EverEtchApp {
               `;
             }).join('')}
           </div>
+
+          <!-- Action buttons will be loaded separately after word details are complete -->
+          <div id="action-buttons-container"></div>
         </div>
       </div>
     `;
@@ -437,6 +643,82 @@ class EverEtchApp {
         await this.loadAssociatedWords(tag);
       });
     });
+
+    // Load action buttons only after word details are complete
+    if (!isLoadingSummary && !isLoadingTags) {
+      this.loadActionButtons(word);
+    }
+  }
+
+  private loadActionButtons(word: WordDocument) {
+    const actionButtonsContainer = document.getElementById('action-buttons-container')!;
+    const isNewWord = !word.id || word.id === 'temp';
+
+    actionButtonsContainer.innerHTML = `
+      <!-- Action Buttons - Minimal, icon only -->
+      <div class="flex items-center space-x-1">
+        <button
+          id="copy-btn"
+          title="Copy to Clipboard"
+          class="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-all duration-200 hover:shadow-sm"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+          </svg>
+        </button>
+
+        ${isNewWord ? `
+          <button
+            id="add-btn"
+            title="Add Word"
+            class="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-all duration-200 hover:shadow-sm"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+            </svg>
+          </button>
+        ` : `
+          <button
+            id="delete-btn"
+            title="Delete"
+            class="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-all duration-200 hover:shadow-sm"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+            </svg>
+          </button>
+        `}
+
+        <button
+          id="refresh-btn"
+          title="Refresh"
+          class="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-all duration-200 hover:shadow-sm"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+          </svg>
+        </button>
+      </div>
+    `;
+
+    // Add click handlers for action buttons
+    const copyBtn = document.getElementById('copy-btn');
+    const addBtn = document.getElementById('add-btn');
+    const refreshBtn = document.getElementById('refresh-btn');
+    const deleteBtn = document.getElementById('delete-btn');
+
+    if (copyBtn) {
+      copyBtn.addEventListener('click', () => this.handleCopyWord());
+    }
+    if (addBtn) {
+      addBtn.addEventListener('click', () => this.handleAddWord());
+    }
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', () => this.handleRefreshWord());
+    }
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', () => this.handleDeleteWord());
+    }
   }
 
   private async loadAssociatedWords(tag: string) {
@@ -451,17 +733,22 @@ class EverEtchApp {
   private renderAssociatedList(words: WordDocument[], tag: string) {
     const associatedList = document.getElementById('associated-list')!;
     associatedList.innerHTML = `
-      <div class="mb-4">
-        <h4 class="font-semibold text-gray-800">Words tagged with "${tag}"</h4>
+      <div class="mb-4 p-3 bg-gradient-to-r from-purple-50/80 to-pink-50/80 rounded-lg border border-purple-200/60">
+        <h4 class="font-semibold text-slate-800 flex items-center text-sm">
+          <svg class="w-3 h-3 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+          </svg>
+          Words tagged with "${tag}"
+        </h4>
       </div>
     `;
 
     words.forEach(word => {
       const wordItem = document.createElement('div');
-      wordItem.className = 'p-2 border-b border-gray-100 hover:bg-gray-50 cursor-pointer rounded mb-2';
+      wordItem.className = 'word-item p-3 mb-2 bg-white/60 backdrop-blur-sm border border-slate-200/60 rounded-lg shadow-sm hover:shadow-md transition-all duration-200';
       wordItem.innerHTML = `
-        <div class="font-medium text-gray-800">${word.word}</div>
-        <div class="text-sm text-gray-600 truncate">${word.one_line_desc || ''}</div>
+        <div class="font-semibold text-slate-800 text-base mb-0.5">${word.word}</div>
+        <div class="text-sm text-slate-600 line-clamp-2">${word.one_line_desc || 'No description'}</div>
       `;
 
       wordItem.addEventListener('click', () => {
@@ -487,7 +774,7 @@ class EverEtchApp {
   private clearWordDetails() {
     const wordDetails = document.getElementById('word-details')!;
     wordDetails.innerHTML = `
-      <div class="text-center text-gray-500 mt-8">
+      <div class="text-center text-slate-500 mt-8">
         Select a word or enter a new one to get started
       </div>
     `;
@@ -496,16 +783,70 @@ class EverEtchApp {
   private clearSuggestions() {
     const suggestionsDiv = document.getElementById('suggestions')!;
     suggestionsDiv.innerHTML = '';
+    this.hideSuggestions();
+  }
+
+  private showToast(message: string, type: 'success' | 'error' = 'success') {
+    const toastContainer = document.getElementById('toast-container')!;
+    const toastId = `toast-${Date.now()}`;
+
+    const toastColors = {
+      success: 'bg-green-500',
+      error: 'bg-red-500'
+    };
+
+    const toastIcons = {
+      success: `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+      </svg>`,
+      error: `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+      </svg>`
+    };
+
+    const toastElement = document.createElement('div');
+    toastElement.id = toastId;
+    toastElement.className = `flex items-center space-x-3 px-4 py-3 ${toastColors[type]} text-white rounded-lg shadow-lg transform translate-x-full transition-all duration-300 ease-out max-w-sm`;
+    toastElement.innerHTML = `
+      <div class="flex-shrink-0">
+        ${toastIcons[type]}
+      </div>
+      <div class="flex-1 text-sm font-medium">
+        ${message}
+      </div>
+      <button class="flex-shrink-0 hover:bg-white/20 rounded-full p-1 transition-colors duration-200" onclick="this.parentElement.remove()">
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    `;
+
+    toastContainer.appendChild(toastElement);
+
+    // Trigger animation
+    setTimeout(() => {
+      toastElement.classList.remove('translate-x-full');
+      toastElement.classList.add('translate-x-0');
+    }, 10);
+
+    // Auto-dismiss after 3 seconds
+    setTimeout(() => {
+      if (toastElement.parentElement) {
+        toastElement.classList.remove('translate-x-0');
+        toastElement.classList.add('translate-x-full');
+        setTimeout(() => {
+          toastElement.remove();
+        }, 300);
+      }
+    }, 3000);
   }
 
   private showError(message: string) {
-    // Simple error display - could be enhanced with a toast notification
-    alert(`Error: ${message}`);
+    this.showToast(message, 'error');
   }
 
   private showSuccess(message: string) {
-    // Simple success display - could be enhanced with a toast notification
-    alert(`Success: ${message}`);
+    this.showToast(message, 'success');
   }
 
   private handleStreamingContent(content: string) {
@@ -537,6 +878,7 @@ class EverEtchApp {
       }
 
       // Re-render with updated data (use regular render, not streaming)
+      // This will automatically show the appropriate action buttons based on word state
       this.renderWordDetails(this.currentWord);
     }
   }
@@ -548,20 +890,20 @@ class EverEtchApp {
     const formattedDetails = await window.electronAPI.processMarkdown(word.details || '');
 
     wordDetails.innerHTML = `
-      <div class="space-y-4">
+      <div class="space-y-6">
         <div>
-          <h3 class="text-2xl font-bold text-gray-800 mb-2">${word.word}</h3>
-          <p class="text-gray-600 mb-4">${word.one_line_desc || 'No description available'}</p>
+          <h3 class="text-2xl font-bold text-slate-800 mb-2">${word.word}</h3>
+          <p class="text-slate-600 mb-4">${word.one_line_desc || 'No description available'}</p>
         </div>
 
         <div>
-          <h4 class="text-lg font-semibold text-gray-800 mb-2">Details</h4>
-          <div class="text-gray-700 prose prose-sm max-w-none">${formattedDetails}<span class="animate-pulse">|</span></div>
+          <h4 class="text-lg font-semibold text-slate-800 mb-3">Details</h4>
+          <div class="text-slate-700 prose prose-sm max-w-none">${formattedDetails}<span class="animate-pulse">|</span></div>
         </div>
 
         <div>
-          <h4 class="text-lg font-semibold text-gray-800 mb-2">Tags</h4>
-          <div id="tags-container" class="flex flex-wrap">
+          <h4 class="text-lg font-semibold text-slate-800 mb-3">Tags</h4>
+          <div id="tags-container" class="flex flex-wrap gap-2 mb-4">
             ${word.tags.map(tag => `
               <span
                 class="tag-button"
@@ -572,6 +914,9 @@ class EverEtchApp {
               </span>
             `).join('')}
           </div>
+
+          <!-- Action buttons will be loaded separately after word details are complete -->
+          <div id="action-buttons-container"></div>
         </div>
       </div>
     `;
@@ -585,12 +930,19 @@ class EverEtchApp {
         await this.loadAssociatedWords(tag);
       });
     });
+
+    // For streaming, we don't load action buttons since content is still being generated
+    // Action buttons will be loaded when renderWordDetails is called after generation completes
   }
 
   private async showSettingsModal() {
     try {
       const profileConfig = await window.electronAPI.getProfileConfig();
       if (profileConfig) {
+        const profileNameInput = document.getElementById('profile-name') as HTMLInputElement;
+        if (profileNameInput) {
+          profileNameInput.value = this.currentProfile || '';
+        }
         (document.getElementById('system-prompt') as HTMLTextAreaElement).value = profileConfig.system_prompt || '';
         (document.getElementById('model-provider') as HTMLSelectElement).value = profileConfig.model_config.provider || 'openai';
         (document.getElementById('model-name') as HTMLInputElement).value = profileConfig.model_config.model || '';
@@ -612,11 +964,18 @@ class EverEtchApp {
   }
 
   private async saveSettings() {
+    const profileNameInput = document.getElementById('profile-name') as HTMLInputElement;
+    const profileName = profileNameInput ? profileNameInput.value.trim() : '';
     const systemPrompt = (document.getElementById('system-prompt') as HTMLTextAreaElement).value;
     const modelProvider = (document.getElementById('model-provider') as HTMLSelectElement).value;
     const modelName = (document.getElementById('model-name') as HTMLInputElement).value;
     const apiEndpoint = (document.getElementById('api-endpoint') as HTMLInputElement).value;
     const apiKey = (document.getElementById('api-key') as HTMLInputElement).value;
+
+    if (!profileName) {
+      this.showError('Profile name cannot be empty');
+      return;
+    }
 
     const config = {
       system_prompt: systemPrompt,
@@ -631,6 +990,19 @@ class EverEtchApp {
     try {
       const success = await window.electronAPI.updateProfileConfig(config);
       if (success) {
+        // Update the profile name in the UI if it changed
+        if (profileName !== this.currentProfile) {
+          this.currentProfile = profileName;
+          // Update the profile selector dropdown
+          const profileSelect = document.getElementById('profile-select') as HTMLSelectElement;
+          const currentOption = profileSelect.querySelector(`option[value="${this.currentProfile}"]`) as HTMLOptionElement;
+          if (currentOption) {
+            currentOption.textContent = profileName;
+            currentOption.value = profileName;
+          }
+          profileSelect.value = profileName;
+        }
+
         this.showSuccess('Settings saved successfully');
         this.hideSettingsModal();
       } else {
