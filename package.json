@@ -3,14 +3,14 @@
   "version": "1.0.0",
   "type": "module",
   "description": "A slim word memo application",
-  "main": "dist/main.js",
+  "main": "lib/main.js",
   "scripts": {
     "start": "electron .",
     "dev": "tsc && npm run build-css && electron .",
     "build": "tsc && npm run build-css",
     "watch": "tsc --watch",
-    "build-css": "tailwindcss -i ./src/renderer/styles.css -o ./dist/renderer/styles.css",
-    "dev-css": "tailwindcss -i ./src/renderer/styles.css -o ./dist/renderer/styles.css --watch",
+    "build-css": "tailwindcss -i ./src/renderer/styles.css -o ./lib/renderer/styles.css",
+    "dev-css": "tailwindcss -i ./src/renderer/styles.css -o ./lib/renderer/styles.css --watch",
     "migrate-data": "node migrate-data.js",
     "dist": "npm run build && electron-builder",
     "dist:win": "npm run build && electron-builder --win",
@@ -31,24 +31,35 @@
     "@types/showdown": "^2.0.6",
     "electron": "^28.0.0",
     "electron-builder": "^26.0.12",
+    "electron-rebuild": "^3.2.9",
     "typescript": "^5.9.2"
   },
   "dependencies": {
     "marked": "^16.2.1",
     "openai": "^4.20.0",
     "sqlite3": "^5.1.6",
-    "tailwindcss": "^3.4.0"
+    "tailwindcss": "^3.4.0",
+    "undici": "^7.15.0"
   },
   "build": {
+    "asar": true,
+    "asarUnpack": [],
     "appId": "com.everetch.app",
     "productName": "EverEtch",
     "directories": {
       "output": "dist-electron"
     },
     "files": [
-      "dist/**/*",
+      "assets/**/*",
+      "lib/**/*",
       "node_modules/**/*",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "assets",
+        "to": "assets"
+      }
     ],
     "mac": {
       "category": "public.app-category.productivity",
