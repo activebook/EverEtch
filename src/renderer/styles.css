@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.tag-button {
+    @apply inline-block px-2 py-1 m-1 text-xs font-medium rounded-full cursor-pointer transition-colors duration-200;
+}
+
+.scrollbar-thin {
+    scrollbar-width: thin;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}

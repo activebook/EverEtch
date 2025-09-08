@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EverEtch - Word Memo</title>
+    <link href="../../dist/renderer/styles.css" rel="stylesheet">
+    <script src="./js/showdown.min.js"></script>
+</head>
+<body class="bg-gray-100 h-screen overflow-hidden">
+    <div id="app" class="h-full flex flex-col">
+        <!-- Header with Profile Selector -->
+        <header class="bg-white shadow-sm px-4 py-2 flex items-center justify-between">
+            <h1 class="text-xl font-bold text-gray-800">EverEtch</h1>
+            <div class="flex items-center space-x-2">
+                <label class="text-sm text-gray-600">Profile:</label>
+                <select id="profile-select" class="px-3 py-1 border border-gray-300 rounded-md text-sm">
+                    <option value="">Loading...</option>
+                </select>
+                <button id="settings-btn" class="px-3 py-1 bg-gray-500 text-white rounded-md hover:bg-gray-600 text-sm">
+                    Settings
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <div id="main-content" class="flex-1 flex overflow-hidden">
+            <!-- Left Panel: Word List -->
+            <div id="left-panel" class="bg-white border-r border-gray-200 flex flex-col" style="width: 25%; min-width: 200px;">
+                <div class="p-4 border-b border-gray-200">
+                    <h2 class="text-lg font-semibold text-gray-800">Words</h2>
+                </div>
+                <div id="word-list" class="flex-1 overflow-y-auto scrollbar-thin p-2">
+                    <!-- Word items will be populated here -->
+                </div>
+            </div>
+
+            <!-- Middle Panel: Operate Panel -->
+            <div id="middle-panel" class="bg-white flex flex-col min-h-0" style="width: 50%; min-width: 300px;">
+                <!-- Upper Panel: Word Details -->
+                <div class="flex-1 p-4 border-b border-gray-200 overflow-y-auto">
+                    <div id="word-details" class="h-full">
+                        <div class="text-center text-gray-500 mt-8">
+                            Select a word or enter a new one to get started
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Lower Panel: Input/Search -->
+                <div class="p-4 border-t border-gray-200 flex-shrink-0">
+                    <div class="flex items-center space-x-2">
+                        <input
+                            type="text"
+                            id="word-input"
+                            placeholder="Enter a word..."
+                            class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                        <button
+                            id="generate-btn"
+                            class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                        >
+                            Generate
+                        </button>
+                    </div>
+                    <div id="suggestions" class="mt-2 max-h-32 overflow-y-auto scrollbar-thin">
+                        <!-- Search suggestions will appear here -->
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex justify-end space-x-2 p-4 border-t border-gray-200 flex-shrink-0">
+                    <button
+                        id="add-btn"
+                        class="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    >
+                        Add
+                    </button>
+                    <button
+                        id="refresh-btn"
+                        class="px-4 py-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                    >
+                        Refresh
+                    </button>
+                    <button
+                        id="delete-btn"
+                        class="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
+                    >
+                        Delete
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right Panel: Associated List -->
+            <div id="right-panel" class="bg-white border-l border-gray-200 flex flex-col" style="width: 25%; min-width: 200px;">
+                <div class="p-4 border-b border-gray-200">
+                    <h2 class="text-lg font-semibold text-gray-800">Associated Words</h2>
+                </div>
+                <div id="associated-list" class="flex-1 overflow-y-auto scrollbar-thin p-2">
+                    <!-- Associated words will be populated here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Modal -->
+        <div id="settings-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+            <div class="flex items-center justify-center min-h-screen p-4">
+                <div class="bg-white rounded-lg shadow-xl max-w-md w-full">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-800">Profile Settings</h3>
+                    </div>
+                    <div class="px-6 py-4 space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">System Prompt</label>
+                            <textarea
+                                id="system-prompt"
+                                rows="4"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="Enter system prompt..."
+                            ></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Model Provider</label>
+                            <select
+                                id="model-provider"
+                                title="Select AI model provider"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                                <option value="openai">OpenAI</option>
+                                <option value="anthropic">Anthropic</option>
+                                <option value="google">Google</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Model Name</label>
+                            <input
+                                type="text"
+                                id="model-name"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="e.g., gpt-4, claude-3-sonnet"
+                            >
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">API Endpoint</label>
+                            <input
+                                type="text"
+                                id="api-endpoint"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="https://api.openai.com/v1/chat/completions"
+                            >
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">API Key</label>
+                            <input
+                                type="password"
+                                id="api-key"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="Enter your API key"
+                            >
+                        </div>
+                    </div>
+                    <div class="px-6 py-4 border-t border-gray-200 flex justify-end space-x-2">
+                        <button
+                            id="cancel-settings"
+                            class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            id="save-settings"
+                            class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            Save
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="../../dist/renderer/renderer.js"></script>
+</body>
+</html>
