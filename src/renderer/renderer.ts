@@ -966,7 +966,7 @@ class EverEtchApp {
         ` : `
           <button
             id="delete-btn"
-            title="Delete"
+            title="Delete it"
             class="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-all duration-200 hover:shadow-sm"
           >
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -977,7 +977,7 @@ class EverEtchApp {
 
         <button
           id="refresh-btn"
-          title="Refresh"
+          title="Regenerate meaning"
           class="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-all duration-200 hover:shadow-sm"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EverEtch - Word Memo</title>
+    <title>EverEtch - A slim Word Memo</title>
     <link href="../../lib/renderer/styles.css" rel="stylesheet">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,8 +12,11 @@
 <body class="bg-gradient-to-br from-slate-50 to-blue-50 h-screen overflow-hidden font-['Inter']">
     <div id="app" class="h-full flex flex-col">
         <!-- Modern Header -->
-        <header class="bg-white/80 backdrop-blur-md shadow-lg border-b border-white/20 px-6 py-4 flex items-center justify-between">
-            <h1 class="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">EverEtch</h1>
+        <header class="bg-white/80 backdrop-blur-md shadow-lg border-b border-white/20 pl-3 pr-6 py-2 flex items-center justify-between">
+            <h1 class="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent flex items-center">
+                <svg t="1757400859266" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="26108" width="32" height="32"><path d="M386.327273 828.509091l374.690909-374.690909h-214.109091L600.436364 186.181818 279.272727 560.872727h214.109091l-107.054545 267.636364z" fill="#8C24FF" p-id="26111"></path></svg>
+                EverEtch
+            </h1>
             <div class="flex items-center space-x-4">
                 <div class="flex items-center space-x-2">
                     <label for="profile-select" class="text-sm font-medium text-slate-600 flex items-center">
@@ -211,7 +214,6 @@
                                 class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white/80 backdrop-blur-sm text-slate-700 text-sm"
                             >
                                 <option value="openai">OpenAI</option>
-                                <option value="anthropic">Anthropic</option>
                                 <option value="google">Google</option>
                                 <option value="custom">Custom</option>
                             </select>

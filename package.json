@@ -6,11 +6,12 @@
   "main": "lib/main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "tsc && npm run build-css && electron .",
-    "build": "tsc && npm run build-css",
+    "dev": "tsc && npm run build-css && npm run copy-html && electron .",
+    "build": "tsc && npm run build-css && npm run copy-html",
     "watch": "tsc --watch",
     "build-css": "tailwindcss -i ./src/renderer/styles.css -o ./lib/renderer/styles.css",
     "dev-css": "tailwindcss -i ./src/renderer/styles.css -o ./lib/renderer/styles.css --watch",
+    "copy-html": "mkdir -p lib/renderer && cp src/renderer/index.html lib/renderer/ && sed -i '' 's|../../lib/renderer/|./|g' lib/renderer/index.html",
     "migrate-data": "node migrate-data.js",
     "dist": "npm run build && electron-builder",
     "dist:win": "npm run build && electron-builder --win",
@@ -47,7 +48,8 @@
     "appId": "com.everetch.app",
     "productName": "EverEtch",
     "directories": {
-      "output": "dist-electron"
+      "output": "dist",
+      "buildResources": "assets/icons"
     },
     "files": [
       "assets/**/*",
@@ -63,19 +65,18 @@
     ],
     "mac": {
       "category": "public.app-category.productivity",
-      "icon": "src/assets/icons/icon.icns",
+      "icon": "icon.icns",
       "target": [
         {
           "target": "dmg",
           "arch": [
-            "x64",
-            "arm64"
+            "x64"
           ]
         }
       ]
     },
     "win": {
-      "icon": "src/assets/icons/icon.ico",
+      "icon": "icon.ico",
       "target": [
         {
           "target": "nsis",
@@ -87,7 +88,7 @@
       ]
     },
     "linux": {
-      "icon": "src/assets/icons/icon.png",
+      "icon": "icon_512x512.png",
       "target": [
         {
           "target": "AppImage",
