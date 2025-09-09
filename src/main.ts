@@ -88,6 +88,10 @@ ipcMain.handle('get-words', async () => {
   return await dbManager.getWords();
 });
 
+ipcMain.handle('get-words-paginated', async (event, offset: number, limit: number) => {
+  return await dbManager.getWordsPaginated(offset, limit);
+});
+
 ipcMain.handle('search-words', async (event, query: string) => {
   return await dbManager.searchWords(query);
 });
@@ -164,6 +168,10 @@ ipcMain.handle('delete-word', async (event, wordId: string) => {
 
 ipcMain.handle('get-associated-words', async (event, tag: string) => {
   return await dbManager.getAssociatedWords(tag);
+});
+
+ipcMain.handle('get-associated-words-paginated', async (event, tag: string, offset: number, limit: number) => {
+  return await dbManager.getAssociatedWordsPaginated(tag, offset, limit);
 });
 
 // Profile config operations

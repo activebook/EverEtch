@@ -103,6 +103,38 @@ export class DatabaseManager {
     });
   }
 
+  // Paginated word loading for lazy loading
+  getWordsPaginated(offset: number, limit: number): Promise<{words: WordDocument[], hasMore: boolean, total: number}> {
+    return new Promise((resolve, reject) => {
+      if (!this.db) {
+        resolve({words: [], hasMore: false, total: 0});
+        return;
+      }
+
+      // Get paginated results with total count in one query
+      const query = `
+        SELECT data, COUNT(*) OVER() as total_count
+        FROM documents
+        WHERE type = 'word'
+        ORDER BY updated_at DESC, created_at DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `;
+
+      this.db!.all(query, (err, rows: { data: string, total_count: number }[]) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+
+        const words = rows.map(row => JSON.parse(row.data));
+        const total = rows.length > 0 ? rows[0].total_count : 0;
+        const hasMore = offset + limit < total;
+
+        resolve({words, hasMore, total});
+      });
+    });
+  }
+
   searchWords(query: string): Promise<WordDocument[]> {
     return new Promise((resolve, reject) => {
       if (!this.db) {
@@ -110,47 +142,32 @@ export class DatabaseManager {
         return;
       }
 
-      // First, search for words starting with query
-      if (!this.db) {
-        resolve([]);
-        return;
-      }
+      // Use a single query with UNION to avoid duplicates
+      // First priority: words starting with query
+      // Second priority: words containing query (but not starting with it)
+      const sql = `
+        SELECT data FROM (
+          SELECT data,
+                 CASE
+                   WHEN json_extract(data, '$.word') LIKE ? THEN 1
+                   ELSE 2
+                 END as priority
+          FROM documents
+          WHERE type = 'word'
+          AND json_extract(data, '$.word') LIKE ?
+        ) as results
+        ORDER BY priority, json_extract(data, '$.word')
+        LIMIT 5
+      `;
 
-      this.db.all(
-        `SELECT data FROM documents WHERE type = 'word' AND json_extract(data, '$.word') LIKE ? ORDER BY json_extract(data, '$.word') LIMIT 5`,
-        [`${query}%`],
-        (err, startsWith: { data: string }[]) => {
-          if (err) {
-            reject(err);
-            return;
-          }
-
-          if (startsWith.length >= 5) {
-            resolve(startsWith.map(row => JSON.parse(row.data)));
-            return;
-          }
-
-          // If less than 5, also search for words containing the query
-          if (!this.db) {
-            resolve(startsWith.map(row => JSON.parse(row.data)));
-            return;
-          }
-
-          this.db.all(
-            `SELECT data FROM documents WHERE type = 'word' AND json_extract(data, '$.word') LIKE ? ORDER BY json_extract(data, '$.word') LIMIT ?`,
-            [`%${query}%`, 5 - startsWith.length],
-            (err, contains: { data: string }[]) => {
-              if (err) {
-                reject(err);
-                return;
-              }
-
-              const allResults = [...startsWith, ...contains];
-              resolve(allResults.map(row => JSON.parse(row.data)));
-            }
-          );
+      this.db.all(sql, [`${query}%`, `%${query}%`], (err, rows: { data: string }[]) => {
+        if (err) {
+          reject(err);
+          return;
         }
-      );
+
+        resolve(rows.map(row => JSON.parse(row.data)));
+      });
     });
   }
 
@@ -171,34 +188,85 @@ export class DatabaseManager {
     });
   }
 
-  addWord(wordData: Omit<WordDocument, 'id' | 'created_at' | 'updated_at'>): Promise<WordDocument> {
+  // Helper method to find word by name
+  getWordByName(wordName: string): Promise<WordDocument | null> {
     return new Promise((resolve, reject) => {
+      if (!this.db) {
+        resolve(null);
+        return;
+      }
+
+      this.db.get(
+        'SELECT data FROM documents WHERE type = ? AND json_extract(data, \'$.word\') = ?',
+        ['word', wordName],
+        (err, row: { data: string } | undefined) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+          resolve(row ? JSON.parse(row.data) : null);
+        }
+      );
+    });
+  }
+
+  addWord(wordData: Omit<WordDocument, 'id' | 'created_at' | 'updated_at'>): Promise<WordDocument> {
+    return new Promise(async (resolve, reject) => {
       if (!this.db) {
         reject(new Error('Database not initialized'));
         return;
       }
 
-      const id = generateId('word');
-      const now = formatDate();
+      try {
+        // Check if word already exists
+        const existingWord = await this.getWordByName(wordData.word);
 
-      const wordDoc: WordDocument = {
-        id,
-        ...wordData,
-        created_at: now,
-        updated_at: now
-      };
+        if (existingWord) {
+          // Update existing word
+          const updatedWord: WordDocument = {
+            ...existingWord,
+            ...wordData,
+            updated_at: formatDate()
+          };
 
-      this.db.run(
-        'INSERT INTO documents (id, type, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
-        [id, 'word', JSON.stringify(wordDoc), now, now],
-        function(err) {
-          if (err) {
-            reject(err);
-          } else {
-            resolve(wordDoc);
-          }
+          this.db.run(
+            'UPDATE documents SET data = ?, updated_at = ? WHERE id = ?',
+            [JSON.stringify(updatedWord), updatedWord.updated_at, existingWord.id],
+            function(err) {
+              if (err) {
+                reject(err);
+              } else {
+                resolve(updatedWord);
+              }
+            }
+          );
+        } else {
+          // Create new word
+          const id = generateId('word');
+          const now = formatDate();
+
+          const wordDoc: WordDocument = {
+            id,
+            ...wordData,
+            created_at: now,
+            updated_at: now
+          };
+
+          this.db.run(
+            'INSERT INTO documents (id, type, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+            [id, 'word', JSON.stringify(wordDoc), now, now],
+            function(err) {
+              if (err) {
+                reject(err);
+              } else {
+                resolve(wordDoc);
+              }
+            }
+          );
         }
-      );
+      } catch (err) {
+        reject(err);
+      }
     });
   }
 
@@ -275,6 +343,38 @@ export class DatabaseManager {
           resolve(rows.map(row => JSON.parse(row.data)));
         }
       );
+    });
+  }
+
+  // Paginated associated words loading for lazy loading
+  getAssociatedWordsPaginated(tag: string, offset: number, limit: number): Promise<{words: WordDocument[], hasMore: boolean, total: number}> {
+    return new Promise((resolve, reject) => {
+      if (!this.db) {
+        resolve({words: [], hasMore: false, total: 0});
+        return;
+      }
+
+      // Get paginated results with total count in one query
+      const query = `
+        SELECT data, COUNT(*) OVER() as total_count
+        FROM documents
+        WHERE type = 'word' AND json_extract(data, '$.tags') LIKE ?
+        ORDER BY json_extract(data, '$.word')
+        LIMIT ${limit} OFFSET ${offset}
+      `;
+
+      this.db!.all(query, [`%${tag}%`], (err, rows: { data: string, total_count: number }[]) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+
+        const words = rows.map(row => JSON.parse(row.data));
+        const total = rows.length > 0 ? rows[0].total_count : 0;
+        const hasMore = offset + limit < total;
+
+        resolve({words, hasMore, total});
+      });
     });
   }
 

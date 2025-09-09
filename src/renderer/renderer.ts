@@ -8,6 +8,7 @@ declare global {
       createProfile: (profileName: string) => Promise<boolean>;
       renameProfile: (oldName: string, newName: string) => Promise<boolean>;
       getWords: () => Promise<any[]>;
+      getWordsPaginated: (offset: number, limit: number) => Promise<{ words: any[], hasMore: boolean, total: number }>;
       searchWords: (query: string) => Promise<any[]>;
       getWord: (wordId: string) => Promise<any>;
       addWord: (wordData: any) => Promise<any>;
@@ -17,6 +18,7 @@ declare global {
       generateTagsAndSummary: (word: string, meaning: string) => Promise<any>;
       generateMeaning: (word: string) => Promise<string>;
       getAssociatedWords: (tag: string) => Promise<any[]>;
+      getAssociatedWordsPaginated: (tag: string, offset: number, limit: number) => Promise<{ words: any[], hasMore: boolean, total: number }>;
       getProfileConfig: () => Promise<any>;
       updateProfileConfig: (config: any) => Promise<boolean>;
       processMarkdown: (markdown: string) => Promise<string>;
@@ -27,7 +29,7 @@ declare global {
   }
 }
 
-export {}; // This makes the file a module
+export { }; // This makes the file a module
 
 interface WordDocument {
   id: string;
@@ -51,6 +53,26 @@ class EverEtchApp {
   private startLeftWidth: number = 0;
   private startMiddleWidth: number = 0;
   private startRightWidth: number = 0;
+
+  // Lazy loading state
+  private words: WordDocument[] = [];
+  private currentOffset: number = 0;
+  private pageSize: number = 5;
+  private isLoading: boolean = false;
+  private hasMoreWords: boolean = true;
+  private totalWords: number = 0;
+  private scrollObserver: IntersectionObserver | null = null;
+
+  // Associated words lazy loading state
+  private associatedWords: WordDocument[] = [];
+  private associatedCurrentOffset: number = 0;
+  private associatedPageSize: number = 5;
+  private associatedIsLoading: boolean = false;
+  private associatedHasMore: boolean = true;
+  private associatedScrollObserver: IntersectionObserver | null = null;
+  private currentTag: string = '';
+  private isSearchMode: boolean = false;
+  private isGenerating: boolean = false;
 
   constructor() {
     this.initializeApp();
@@ -105,10 +127,144 @@ class EverEtchApp {
 
   private async loadWords() {
     try {
-      const words = await window.electronAPI.getWords();
-      this.renderWordList(words);
+      // Reset pagination state
+      this.words = [];
+      this.currentOffset = 0;
+      this.hasMoreWords = true;
+      this.isLoading = false;
+
+      // Clean up existing observer
+      if (this.scrollObserver) {
+        this.scrollObserver.disconnect();
+        this.scrollObserver = null;
+      }
+
+      // Setup scroll observer for lazy loading
+      this.setupScrollObserver();
+
+      // Load first page
+      await this.loadMoreWords();
+
     } catch (error) {
       console.error('Error loading words:', error);
+    }
+  }
+
+  private async loadMoreWords() {
+    if (this.isLoading || !this.hasMoreWords) return;
+
+    this.isLoading = true;
+    this.showLoadingIndicator();
+
+    try {
+      const result = await window.electronAPI.getWordsPaginated(this.currentOffset, this.pageSize);
+
+      // Filter out duplicates based on word ID
+      const existingIds = new Set(this.words.map(word => word.id));
+      const newWords = result.words.filter(word => !existingIds.has(word.id));
+
+      // Add new words to our collection (only non-duplicates)
+      this.words.push(...newWords);
+      this.hasMoreWords = result.hasMore;
+      this.totalWords = result.total;
+      this.currentOffset += this.pageSize;
+
+      // Render the new words (only non-duplicates)
+      if (newWords.length > 0) {
+        this.renderWordListIncremental(newWords);
+      }
+
+      // Update word count display
+      this.updateWordCount();
+    } catch (error) {
+      console.error('Error loading more words:', error);
+      this.showError('Failed to load more words');
+    } finally {
+      this.isLoading = false;
+      this.updateLoadingIndicator();
+    }
+  }
+
+  private setupScrollObserver() {
+    // Create loading indicator element if it doesn't exist
+    let loadingIndicator = document.getElementById('loading-indicator');
+    if (!loadingIndicator) {
+      loadingIndicator = document.createElement('div');
+      loadingIndicator.id = 'loading-indicator';
+      loadingIndicator.className = 'flex justify-center items-center py-4 text-slate-500';
+      loadingIndicator.innerHTML = `
+        <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-slate-500"></div>
+        <span class="ml-2 text-sm">Loading more words...</span>
+      `;
+      loadingIndicator.style.display = 'none';
+
+      const wordList = document.getElementById('word-list')!;
+      wordList.appendChild(loadingIndicator);
+    }
+
+    // Setup intersection observer
+    this.scrollObserver = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && this.hasMoreWords && !this.isLoading) {
+          this.loadMoreWords();
+        }
+      },
+      {
+        root: document.getElementById('word-list')?.parentElement,
+        rootMargin: '0px',
+        threshold: 0.8 // Trigger when 90% of the indicator is visible
+      }
+    );
+
+    // Observe the loading indicator
+    this.scrollObserver.observe(loadingIndicator);
+  }
+
+  private showLoadingIndicator() {
+    const loadingIndicator = document.getElementById('loading-indicator');
+    if (loadingIndicator) {
+      loadingIndicator.style.display = 'flex';
+    }
+  }
+
+  private hideLoadingIndicator() {
+    const loadingIndicator = document.getElementById('loading-indicator');
+    if (loadingIndicator) {
+      loadingIndicator.style.display = 'none';
+    }
+  }
+
+  private updateLoadingIndicator() {
+    const loadingIndicator = document.getElementById('loading-indicator');
+    if (!loadingIndicator) return;
+
+    // Update the indicator based on loading state and whether there are more words
+    if (this.isLoading) {
+      // Currently loading - show spinner and loading text
+      loadingIndicator.innerHTML = `
+        <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-slate-500"></div>
+        <span class="ml-2 text-sm text-slate-500">Loading more words...</span>
+      `;
+    } else if (!this.hasMoreWords) {
+      // No more words to load - show different message without spinner
+      loadingIndicator.innerHTML = `
+        <div class="rounded-full h-6 w-6 border-2 border-slate-300 flex items-center justify-center">
+          <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+          </svg>
+        </div>
+        <span class="ml-2 text-sm text-slate-400">No more words to load</span>
+      `;
+    } else {
+      // Ready for next load - show ready state
+      loadingIndicator.innerHTML = `
+        <div class="rounded-full h-6 w-6 border-2 border-slate-400 flex items-center justify-center">
+          <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+          </svg>
+        </div>
+        <span class="ml-2 text-sm text-slate-400">Scroll for more words</span>
+      `;
     }
   }
 
@@ -132,6 +288,15 @@ class EverEtchApp {
         const success = await window.electronAPI.switchProfile(newProfile);
         if (success) {
           this.currentProfile = newProfile;
+
+          // Clear the word list UI before loading new words
+          const wordList = document.getElementById('word-list')!;
+          wordList.innerHTML = '';
+
+          // Clear the associated words list as well
+          const associatedList = document.getElementById('associated-list')!;
+          associatedList.innerHTML = '';
+
           await this.loadWords();
           this.clearWordDetails();
         }
@@ -143,6 +308,7 @@ class EverEtchApp {
     wordInput.addEventListener('input', (e) => {
       const target = e.target as HTMLInputElement;
       const query = target.value.trim();
+      this.updateGenerateBtnState(query);
       if (query.length > 0) {
         this.handleSearchInput(query);
       } else {
@@ -170,14 +336,33 @@ class EverEtchApp {
 
     // Generate button
     const generateBtn = document.getElementById('generate-btn') as HTMLButtonElement;
-    generateBtn.addEventListener('click', () => this.handleGenerate());
+    generateBtn.addEventListener('click', () => {
+      if (this.isSearchMode) {
+        this.handleSearchExistingWord();
+      } else {
+        this.handleGenerate();
+      }
+    });
+
+    // Initially disable the generate button
+    generateBtn.disabled = true;
 
     // Action buttons are now handled dynamically in renderWordDetails() and renderStreamingWordDetails()
 
     // Enter key on input
     wordInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') {
-        this.handleGenerate();
+        // Prevent Enter key from working if generation is in progress or button is disabled
+        const generateBtn = document.getElementById('generate-btn') as HTMLButtonElement;
+        if (this.isGenerating || (generateBtn && generateBtn.disabled)) {
+          return;
+        }
+
+        if (this.isSearchMode) {
+          this.handleSearchExistingWord();
+        } else {
+          this.handleGenerate();
+        }
       }
     });
 
@@ -218,6 +403,12 @@ class EverEtchApp {
     try {
       const suggestions = await window.electronAPI.searchWords(query);
       this.renderSuggestions(suggestions);
+
+      // Check if there's an exact match and update button accordingly
+      const hasExactMatch = suggestions.some(word =>
+        word.word.toLowerCase() === query.toLowerCase()
+      );
+      this.updateGenerateBtnState(query, hasExactMatch);
     } catch (error) {
       console.error('Error searching words:', error);
     }
@@ -236,6 +427,8 @@ class EverEtchApp {
     const generateIcon = document.getElementById('generate-icon') as unknown as SVGElement;
     const loadingIcon = document.getElementById('loading-icon') as unknown as SVGElement;
 
+    // Set generation flag to prevent duplicate requests
+    this.isGenerating = true;
     generateBtn.disabled = true;
     generateIcon.classList.add('hidden');
     loadingIcon.classList.remove('hidden');
@@ -310,6 +503,8 @@ class EverEtchApp {
       console.error('Error generating meaning:', error);
       this.showError('Failed to generate meaning. Please check your API configuration.');
     } finally {
+      // Clear generation flag
+      this.isGenerating = false;
       generateBtn.disabled = false;
       generateIcon.classList.remove('hidden');
       loadingIcon.classList.add('hidden');
@@ -334,14 +529,38 @@ class EverEtchApp {
       const addedWord = await window.electronAPI.addWord(wordData);
       this.currentWord = addedWord;
 
-      // Refresh word list and scroll to the newly added word
-      await this.loadWords();
-      this.scrollToWord(addedWord.id);
+      // Disconnect scroll observer to prevent interference
+      if (this.scrollObserver) {
+        this.scrollObserver.disconnect();
+        this.scrollObserver = null;
+      }
+
+      // Clear the current word list UI and reset pagination state
+      const wordList = document.getElementById('word-list')!;
+      wordList.innerHTML = '';
+      this.words = [];
+      this.currentOffset = 0;
+      this.hasMoreWords = true;
+      this.isLoading = false;
+
+      // Re-setup scroll observer for lazy loading
+      this.setupScrollObserver();
+
+      // Load fresh data from the database
+      await this.loadMoreWords();      
+
+      // Scroll to and highlight the newly added word
+      setTimeout(() => {
+        this.scrollToWord(addedWord.id);
+      }, 100);
 
       // Re-render word details with updated action buttons
       if (this.currentWord) {
         await this.renderWordDetails(this.currentWord);
       }
+
+      // Since the word is now in the database, switch to search mode
+      this.updateGenerateBtnState(addedWord.word, true);
 
       this.showSuccess('Word added successfully');
     } catch (error) {
@@ -374,9 +593,28 @@ class EverEtchApp {
     try {
       const success = await window.electronAPI.deleteWord(this.currentWord.id);
       if (success) {
+        const deletedWordId = this.currentWord.id;
+
+        // Remove word from the words array
+        this.words = this.words.filter(word => word.id !== deletedWordId);
+
+        // Remove word item from DOM
+        const wordItem = document.querySelector(`[data-word-id="${deletedWordId}"]`) as HTMLElement;
+        if (wordItem) {
+          wordItem.remove();
+        }
+
+        // Update total words count
+        this.totalWords = Math.max(0, this.totalWords - 1);
+        this.updateWordCount();
+
+        // Clear word details if it was the selected word
         this.currentWord = null;
         this.clearWordDetails();
-        await this.loadWords();
+
+        // Update loading indicator in case the deletion affects pagination state
+        this.updateLoadingIndicator();
+
         this.showSuccess('Word deleted successfully');
       } else {
         this.showError('Failed to delete word');
@@ -527,20 +765,47 @@ class EverEtchApp {
     wordList.innerHTML = '';
 
     words.forEach(word => {
-      const wordItem = document.createElement('div');
-      wordItem.className = 'word-item p-3 mb-2 bg-white/60 backdrop-blur-sm border border-slate-200/60 rounded-lg shadow-sm hover:shadow-md transition-all duration-200';
-      wordItem.setAttribute('data-word-id', word.id); // Add data attribute for scrolling
-      wordItem.innerHTML = `
-        <div class="font-semibold text-slate-800 text-base mb-0.5">${word.word}</div>
-        <div class="text-sm text-slate-600 line-clamp-2">${word.one_line_desc || 'No description'}</div>
-      `;
-
-      wordItem.addEventListener('click', () => {
-        this.selectWord(word);
-      });
-
+      const wordItem = this.createWordItem(word);
       wordList.appendChild(wordItem);
     });
+  }
+
+  private renderWordListIncremental(newWords: WordDocument[]) {
+    const wordList = document.getElementById('word-list')!;
+
+    // Ensure loading indicator is at the end
+    const loadingIndicator = document.getElementById('loading-indicator');
+    if (loadingIndicator) {
+      // Remove and re-append loading indicator to ensure it's at the end
+      loadingIndicator.remove();
+      wordList.appendChild(loadingIndicator);
+    }
+
+    newWords.forEach(word => {
+      const wordItem = this.createWordItem(word);
+      // Insert before loading indicator if it exists, otherwise append
+      if (loadingIndicator && wordList.contains(loadingIndicator)) {
+        wordList.insertBefore(wordItem, loadingIndicator);
+      } else {
+        wordList.appendChild(wordItem);
+      }
+    });
+  }
+
+  private createWordItem(word: WordDocument): HTMLElement {
+    const wordItem = document.createElement('div');
+    wordItem.className = 'word-item p-3 mb-2 bg-white/60 backdrop-blur-sm border border-slate-200/60 rounded-lg shadow-sm hover:shadow-md transition-all duration-200';
+    wordItem.setAttribute('data-word-id', word.id); // Add data attribute for scrolling
+    wordItem.innerHTML = `
+      <div class="font-semibold text-slate-800 text-base mb-0.5">${word.word}</div>
+      <div class="text-sm text-slate-600 line-clamp-2">${word.one_line_desc || 'No description'}</div>
+    `;
+
+    wordItem.addEventListener('click', () => {
+      this.selectWord(word);
+    });
+
+    return wordItem;
   }
 
   private scrollToWord(wordId: string) {
@@ -580,7 +845,18 @@ class EverEtchApp {
       `;
 
       suggestionItem.addEventListener('click', () => {
-        this.selectWord(word);
+        const wordInput = document.getElementById('word-input') as HTMLInputElement;
+        const currentInput = wordInput.value.trim();
+
+        // If the clicked word matches exactly what user typed, show existing word details
+        if (currentInput.toLowerCase() === word.word.toLowerCase()) {
+          this.selectWord(word);
+        } else {
+          // Otherwise, just select the word in input field
+          wordInput.value = word.word;
+          this.updateGenerateBtnState(word.word);
+        }
+
         this.hideSuggestions();
       });
 
@@ -624,8 +900,8 @@ class EverEtchApp {
           <h4 class="text-lg font-semibold text-slate-800 mb-3">Tags</h4>
           <div id="tags-container" class="flex flex-wrap gap-2 mb-4">
             ${word.tags.map(tag => {
-              const isLoadingTags = tag === 'Generating tags...';
-              return `
+      const isLoadingTags = tag === 'Generating tags...';
+      return `
                 <span
                   class="tag-button ${isLoadingTags ? 'animate-pulse' : ''}"
                   style="background-color: ${word.tag_colors[tag] || '#e5e7eb'}; color: white;"
@@ -635,7 +911,7 @@ class EverEtchApp {
                   ${tag}
                 </span>
               `;
-            }).join('')}
+    }).join('')}
           </div>
 
           <!-- Action buttons will be loaded separately after word details are complete -->
@@ -732,11 +1008,65 @@ class EverEtchApp {
   }
 
   private async loadAssociatedWords(tag: string) {
+    // Clear the associated list DOM first
+    const associatedList = document.getElementById('associated-list')!;
+    associatedList.innerHTML = '';
+
+    // Reset associated words pagination state
+    this.associatedWords = [];
+    this.associatedCurrentOffset = 0;
+    this.associatedHasMore = true;
+    this.associatedIsLoading = false;
+    this.currentTag = tag;
+
+    // Clean up existing observer
+    if (this.associatedScrollObserver) {
+      this.associatedScrollObserver.disconnect();
+      this.associatedScrollObserver = null;
+    }
+
+    // Setup scroll observer for lazy loading
+    this.setupAssociatedScrollObserver();
+
+    // Load first page
+    await this.loadMoreAssociatedWords();
+  }
+
+  private async loadMoreAssociatedWords() {
+    if (this.associatedIsLoading || !this.associatedHasMore) return;
+
+    this.associatedIsLoading = true;
+    this.showAssociatedLoadingIndicator();
+
     try {
-      const associatedWords = await window.electronAPI.getAssociatedWords(tag);
-      this.renderAssociatedList(associatedWords, tag);
+      const result = await window.electronAPI.getAssociatedWordsPaginated(
+        this.currentTag,
+        this.associatedCurrentOffset,
+        this.associatedPageSize
+      );
+
+      // Filter out duplicates based on word ID
+      const existingIds = new Set(this.associatedWords.map(word => word.id));
+      const newWords = result.words.filter(word => !existingIds.has(word.id));
+
+      // Add new words to our collection (only non-duplicates)
+      this.associatedWords.push(...newWords);
+      this.associatedHasMore = result.hasMore;
+      this.associatedCurrentOffset += this.associatedPageSize;
+
+      // Render the new words (only non-duplicates)
+      if (newWords.length > 0) {
+        this.renderAssociatedListIncremental(newWords);
+      }
+
+      // Update associated count
+      this.updateAssociatedCount(result.total);
     } catch (error) {
-      console.error('Error loading associated words:', error);
+      console.error('Error loading more associated words:', error);
+      this.showError('Failed to load more associated words');
+    } finally {
+      this.associatedIsLoading = false;
+      this.updateAssociatedLoadingIndicator();
     }
   }
 
@@ -767,6 +1097,9 @@ class EverEtchApp {
 
       associatedList.appendChild(wordItem);
     });
+
+    // Update the associated count
+    this.updateAssociatedCount(words.length);
   }
 
   private selectWord(word: WordDocument) {
@@ -779,6 +1112,9 @@ class EverEtchApp {
 
     // Clear suggestions
     this.clearSuggestions();
+
+    // Update button state for the input value and switch to search mode
+    this.updateGenerateBtnState(word.word, true);
   }
 
   private clearWordDetails() {
@@ -1126,6 +1462,189 @@ class EverEtchApp {
     // Restore normal cursor and text selection
     document.body.style.userSelect = '';
     document.body.style.cursor = '';
+  }
+
+  private updateWordCount() {
+    const wordCountElement = document.getElementById('word-count') as HTMLElement;
+    if (wordCountElement) {
+      wordCountElement.textContent = this.totalWords.toString();
+    }
+  }
+
+  private updateAssociatedCount(count: number) {
+    const associatedCountElement = document.getElementById('associated-count') as HTMLElement;
+    if (associatedCountElement) {
+      associatedCountElement.textContent = count.toString();
+    }
+  }
+
+  private updateGenerateBtnState(query: string, hasExactMatch?: boolean) {
+    const generateBtn = document.getElementById('generate-btn') as HTMLButtonElement;
+    const generateIcon = document.getElementById('generate-icon') as unknown as SVGElement;
+
+    if (!generateBtn || !generateIcon) return;
+
+    // Update enabled/disabled state based on input content
+    generateBtn.disabled = query.length === 0;
+
+    // If we have exact match info, update the mode and icon
+    if (hasExactMatch !== undefined) {
+      this.isSearchMode = hasExactMatch;
+
+      if (hasExactMatch) {
+        // Change to search icon when there's an exact match
+        generateBtn.title = 'View Existing Word';
+        generateIcon.innerHTML = `
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+        `;
+      } else {
+        // Change back to send/generate icon when no exact match
+        generateBtn.title = 'Generate';
+        generateIcon.innerHTML = `
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+        `;
+      }
+    }
+  }
+
+  private async handleSearchExistingWord() {
+    const wordInput = document.getElementById('word-input') as HTMLInputElement;
+    const query = wordInput.value.trim().toLowerCase();
+
+    if (!query) {
+      this.showError('Please enter a word');
+      return;
+    }
+
+    try {
+      // Search for the exact word
+      const suggestions = await window.electronAPI.searchWords(query);
+
+      // Find the exact match
+      const exactMatch = suggestions.find(word =>
+        word.word.toLowerCase() === query
+      );
+
+      if (exactMatch) {
+        // Show the existing word details
+        this.selectWord(exactMatch);
+        this.clearSuggestions();
+      } else {
+        // This shouldn't happen if button state is managed correctly, but handle it
+        this.showError('Word not found. Try generating it instead.');
+      }
+    } catch (error) {
+      console.error('Error searching for existing word:', error);
+      this.showError('Failed to find existing word');
+    }
+  }
+
+  private setupAssociatedScrollObserver() {
+    // Create loading indicator element if it doesn't exist
+    let loadingIndicator = document.getElementById('associated-loading-indicator');
+    if (!loadingIndicator) {
+      loadingIndicator = document.createElement('div');
+      loadingIndicator.id = 'associated-loading-indicator';
+      loadingIndicator.className = 'flex justify-center items-center py-4 text-slate-500';
+      loadingIndicator.innerHTML = `
+        <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-slate-500"></div>
+        <span class="ml-2 text-sm">Loading more words...</span>
+      `;
+      loadingIndicator.style.display = 'none';
+
+      const associatedList = document.getElementById('associated-list')!;
+      associatedList.appendChild(loadingIndicator);
+    }
+
+    // Setup intersection observer
+    this.associatedScrollObserver = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && this.associatedHasMore && !this.associatedIsLoading) {
+          this.loadMoreAssociatedWords();
+        }
+      },
+      {
+        root: document.getElementById('associated-list')?.parentElement,
+        rootMargin: '0px',
+        threshold: 0.8 // Trigger when 90% of the indicator is visible
+      }
+    );
+
+    // Observe the loading indicator
+    this.associatedScrollObserver.observe(loadingIndicator);
+  }
+
+  private showAssociatedLoadingIndicator() {
+    const loadingIndicator = document.getElementById('associated-loading-indicator');
+    if (loadingIndicator) {
+      loadingIndicator.style.display = 'flex';
+    }
+  }
+
+  private updateAssociatedLoadingIndicator() {
+    const loadingIndicator = document.getElementById('associated-loading-indicator');
+    if (!loadingIndicator) return;
+
+    // Update the indicator based on loading state and whether there are more words
+    if (this.associatedIsLoading) {
+      // Currently loading - show spinner and loading text
+      loadingIndicator.innerHTML = `
+        <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-slate-500"></div>
+        <span class="ml-2 text-sm text-slate-500">Loading more words...</span>
+      `;
+    } else if (!this.associatedHasMore) {
+      // No more words to load - show different message without spinner
+      loadingIndicator.innerHTML = `
+        <div class="rounded-full h-6 w-6 border-2 border-slate-300 flex items-center justify-center">
+          <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+          </svg>
+        </div>
+        <span class="ml-2 text-sm text-slate-400">No more words to load</span>
+      `;
+    } else {
+      // Ready for next load - show ready state
+      loadingIndicator.innerHTML = `
+        <div class="rounded-full h-6 w-6 border-2 border-slate-400 flex items-center justify-center">
+          <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+          </svg>
+        </div>
+        <span class="ml-2 text-sm text-slate-400">Scroll for more words</span>
+      `;
+    }
+  }
+
+  private renderAssociatedListIncremental(newWords: WordDocument[]) {
+    const associatedList = document.getElementById('associated-list')!;
+
+    // Ensure loading indicator is at the end
+    const loadingIndicator = document.getElementById('associated-loading-indicator');
+    if (loadingIndicator) {
+      // Remove and re-append loading indicator to ensure it's at the end
+      loadingIndicator.remove();
+      associatedList.appendChild(loadingIndicator);
+    }
+
+    newWords.forEach(word => {
+      const wordItem = document.createElement('div');
+      wordItem.className = 'word-item p-3 mb-2 bg-white/60 backdrop-blur-sm border border-slate-200/60 rounded-lg shadow-sm hover:shadow-md transition-all duration-200';
+      wordItem.innerHTML = `
+        <div class="font-semibold text-slate-800 text-base mb-0.5">${word.word}</div>
+        <div class="text-sm text-slate-600 line-clamp-2">${word.one_line_desc || 'No description'}</div>
+      `;
+
+      wordItem.addEventListener('click', () => {
+        this.selectWord(word);
+      });
+
+      // Insert before loading indicator if it exists, otherwise append
+      if (loadingIndicator && associatedList.contains(loadingIndicator)) {
+        associatedList.insertBefore(wordItem, loadingIndicator);
+      } else {
+        associatedList.appendChild(wordItem);
+      }
+    });
   }
 }
 
