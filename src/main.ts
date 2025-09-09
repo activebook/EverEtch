@@ -1,5 +1,6 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import * as path from 'path';
+import * as fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 //import { getAndSetProxyEnvironment } from './sys_proxy.js';
@@ -7,6 +8,7 @@ import { DatabaseManager } from './database/DatabaseManager.js';
 import { ProfileManager } from './database/ProfileManager.js';
 import { AIModelClient } from './ai/AIModelClient.js';
 import { marked } from 'marked';
+import { getDatabasePath, getDataPath, ensureDataDirectory } from './utils.js';
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -82,6 +84,10 @@ ipcMain.handle('create-profile', async (event, profileName: string) => {
 
 ipcMain.handle('rename-profile', async (event, oldName: string, newName: string) => {
   return await profileManager.renameProfile(oldName, newName);
+});
+
+ipcMain.handle('delete-profile', async (event, profileName: string) => {
+  return await profileManager.deleteProfile(profileName);
 });
 
 ipcMain.handle('get-words', async () => {
@@ -192,5 +198,123 @@ ipcMain.handle('process-markdown', async (event, markdown: string) => {
   } catch (error) {
     console.error('Error processing markdown:', error);
     return markdown; // Return original markdown on error
+  }
+});
+
+// Profile import/export operations
+ipcMain.handle('export-profile', async () => {
+  try {
+    const currentProfile = profileManager.getLastOpenedProfile();
+    if (!currentProfile) {
+      throw new Error('No current profile selected');
+    }
+
+    // Show save dialog to let user choose export location
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: 'Export Profile Database',
+      defaultPath: `${currentProfile}.db`,
+      filters: [
+        { name: 'SQLite Database', extensions: ['db'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    });
+
+    if (result.canceled || !result.filePath) {
+      return { success: false, message: 'Export cancelled' };
+    }
+
+    // Copy the current profile's database to the selected location
+    const sourcePath = getDatabasePath(currentProfile);
+    const targetPath = result.filePath;
+
+    // Ensure source database exists
+    if (!fs.existsSync(sourcePath)) {
+      throw new Error('Current profile database not found');
+    }
+
+    // Copy the database file
+    fs.copyFileSync(sourcePath, targetPath);
+
+    return {
+      success: true,
+      message: `Profile "${currentProfile}" exported successfully to ${targetPath}`
+    };
+
+  } catch (error) {
+    console.error('Error exporting profile:', error);
+    return {
+      success: false,
+      message: `Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+});
+
+ipcMain.handle('import-profile', async () => {
+  try {
+    // Show open dialog to let user select database file
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Import Profile Database',
+      properties: ['openFile'],
+      filters: [
+        { name: 'SQLite Database', extensions: ['db'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    });
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return { success: false, message: 'Import cancelled' };
+    }
+
+    const sourcePath = result.filePaths[0];
+    const fileName = path.basename(sourcePath, '.db');
+
+    // Validate the database format
+    const isValid = await DatabaseManager.validateDatabaseFormat(sourcePath);
+    if (!isValid) {
+      return {
+        success: false,
+        message: 'Invalid database format. The selected file is not a valid EverEtch profile database.'
+      };
+    }
+
+    // Generate unique profile name if needed
+    let profileName = fileName;
+    const existingProfiles = profileManager.getProfiles();
+    let counter = 1;
+
+    while (existingProfiles.includes(profileName)) {
+      profileName = `${fileName}_${counter}`;
+      counter++;
+    }
+
+    // Copy database to profile directory
+    const targetPath = getDatabasePath(profileName);
+    ensureDataDirectory();
+    fs.copyFileSync(sourcePath, targetPath);
+
+    // Add profile to profile manager
+    const success = await profileManager.createProfile(profileName);
+    if (!success) {
+      // Clean up the copied file if profile creation failed
+      try {
+        fs.unlinkSync(targetPath);
+      } catch (cleanupError) {
+        console.error('Error cleaning up failed import:', cleanupError);
+      }
+      return { success: false, message: 'Failed to create profile' };
+    }
+
+    return {
+      success: true,
+      message: `Profile "${profileName}" imported successfully`,
+      profileName
+    };
+
+  } catch (error) {
+    console.error('Error importing profile:', error);
+    return {
+      success: false,
+      message: `Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
   }
 });

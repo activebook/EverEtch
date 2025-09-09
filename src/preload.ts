@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   switchProfile: (profileName: string) => ipcRenderer.invoke('switch-profile', profileName),
   createProfile: (profileName: string) => ipcRenderer.invoke('create-profile', profileName),
   renameProfile: (oldName: string, newName: string) => ipcRenderer.invoke('rename-profile', oldName, newName),
+  deleteProfile: (profileName: string) => ipcRenderer.invoke('delete-profile', profileName),
 
   // Word operations
   getWords: () => ipcRenderer.invoke('get-words'),
@@ -33,6 +34,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Markdown processing
   processMarkdown: (markdown: string) => ipcRenderer.invoke('process-markdown', markdown),
+
+  // Profile import/export
+  exportProfile: () => ipcRenderer.invoke('export-profile'),
+  importProfile: () => ipcRenderer.invoke('import-profile'),
 
   // Event listeners for streaming
   onStreamingContent: (callback: Function) => {

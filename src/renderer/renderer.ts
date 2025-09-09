@@ -5,8 +5,9 @@ declare global {
       getProfiles: () => Promise<string[]>;
       getCurrentProfileName: () => Promise<string | null>;
       switchProfile: (profileName: string) => Promise<boolean>;
-      createProfile: (profileName: string) => Promise<boolean>;
-      renameProfile: (oldName: string, newName: string) => Promise<boolean>;
+  createProfile: (profileName: string) => Promise<boolean>;
+  renameProfile: (oldName: string, newName: string) => Promise<boolean>;
+  deleteProfile: (profileName: string) => Promise<boolean>;
       getWords: () => Promise<any[]>;
       getWordsPaginated: (offset: number, limit: number) => Promise<{ words: any[], hasMore: boolean, total: number }>;
       searchWords: (query: string) => Promise<any[]>;
@@ -22,6 +23,11 @@ declare global {
       getProfileConfig: () => Promise<any>;
       updateProfileConfig: (config: any) => Promise<boolean>;
       processMarkdown: (markdown: string) => Promise<string>;
+
+      // Profile import/export
+      exportProfile: () => Promise<any>;
+      importProfile: () => Promise<any>;
+
       onStreamingContent: (callback: Function) => void;
       onToolResult: (callback: Function) => void;
       removeAllListeners: (event: string) => void;
@@ -745,38 +751,36 @@ class EverEtchApp {
     }
 
     try {
-      // For now, we'll just remove it from the UI since we don't have backend API for deleting profiles
-      // In a real implementation, this would call an API to delete the profile and all its data
+      // Call backend API to delete the profile
+      const success = await window.electronAPI.deleteProfile(this.currentProfile);
 
-      // Remove from profiles array
-      const profileIndex = this.profiles.indexOf(this.currentProfile);
-      this.profiles.splice(profileIndex, 1);
+      if (success) {
+        // Refresh the profile list from backend
+        await this.loadProfiles();
 
-      // Switch to another profile
-      const newProfile = this.profiles[0];
-      this.currentProfile = newProfile;
+        // Switch to the first available profile (backend should have switched to another profile)
+        const currentProfileName = await window.electronAPI.getCurrentProfileName();
+        if (currentProfileName) {
+          this.currentProfile = currentProfileName;
 
-      // Update the profile selector
-      const profileSelect = document.getElementById('profile-select') as HTMLSelectElement;
-      profileSelect.innerHTML = '';
-      this.profiles.forEach(profile => {
-        const option = document.createElement('option');
-        option.value = profile;
-        option.textContent = profile;
-        profileSelect.appendChild(option);
-      });
-      profileSelect.value = newProfile;
+          // Update the profile selector
+          const profileSelect = document.getElementById('profile-select') as HTMLSelectElement;
+          profileSelect.value = this.currentProfile;
 
-      // Clear current word list and details
-      this.clearWordDetails();
-      const wordList = document.getElementById('word-list')!;
-      wordList.innerHTML = '';
+          // Clear current word list and details since we're switching to a different profile
+          this.clearWordDetails();
+          const wordList = document.getElementById('word-list')!;
+          wordList.innerHTML = '';
 
-      // Load words for the new profile
-      await this.loadWords();
+          // Load words for the new current profile
+          await this.loadWords();
+        }
 
-      this.hideSettingsModal();
-      this.showSuccess(`Profile deleted successfully. Switched to "${newProfile}".`);
+        this.hideSettingsModal();
+        this.showSuccess(`Profile "${this.currentProfile}" deleted successfully.`);
+      } else {
+        this.showError('Failed to delete profile');
+      }
     } catch (error) {
       console.error('Error deleting profile:', error);
       this.showError('Failed to delete profile');
@@ -1638,13 +1642,65 @@ class EverEtchApp {
   }
 
   private async handleExportProfile() {
-    // TODO: Implement export functionality
-    this.showSuccess('Export feature coming soon!');
+    try {
+      const result = await window.electronAPI.exportProfile();
+
+      if (result.success) {
+        this.showSuccess(result.message);
+      } else {
+        this.showError(result.message);
+      }
+    } catch (error) {
+      console.error('Error exporting profile:', error);
+      this.showError('Failed to export profile');
+    }
   }
 
   private async handleImportProfile() {
-    // TODO: Implement import functionality
-    this.showSuccess('Import feature coming soon!');
+    try {
+      const result = await window.electronAPI.importProfile();
+
+      if (result.success) {
+        this.showSuccess(result.message);
+
+        // If import was successful and we have a new profile name, refresh the profiles
+        if (result.profileName) {
+          // Refresh the profile list to include the new imported profile
+          const profiles = await window.electronAPI.getProfiles();
+          const profileSelect = document.getElementById('profile-select') as HTMLSelectElement;
+
+          // Clear existing options
+          profileSelect.innerHTML = '';
+
+          // Add all profiles
+          profiles.forEach(profile => {
+            const option = document.createElement('option');
+            option.value = profile;
+            option.textContent = profile;
+            profileSelect.appendChild(option);
+          });
+
+          // Switch to the newly imported profile
+          const switchSuccess = await window.electronAPI.switchProfile(result.profileName);
+          if (switchSuccess) {
+            profileSelect.value = result.profileName;
+
+            // Clear current word list and details since we're switching to imported profile
+            this.clearWordDetails();
+            const wordList = document.getElementById('word-list')!;
+            wordList.innerHTML = '';
+
+            // Load words for the imported profile
+            await this.loadWords();
+          }
+        }
+      } else {
+        this.showError(result.message);
+      }
+    } catch (error) {
+      console.error('Error importing profile:', error);
+      this.showError('Failed to import profile');
+    }
   }
 
   private setupAssociatedScrollObserver() {

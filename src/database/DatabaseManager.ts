@@ -478,4 +478,44 @@ export class DatabaseManager {
       }
     });
   }
+
+  /**
+   * Validate if a database file is a valid EverEtch profile database
+   * @param dbPath Path to the database file to validate
+   * @returns Promise<boolean> True if valid, false otherwise
+   */
+  static async validateDatabaseFormat(dbPath: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      try {
+        const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READONLY, (err: any) => {
+          if (err) {
+            resolve(false);
+            return;
+          }
+
+          // Check if required tables exist
+          db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='documents'", (err: any, row: any) => {
+            if (err || !row) {
+              db.close();
+              resolve(false);
+              return;
+            }
+
+            // Check if profile_config exists
+            db.get("SELECT data FROM documents WHERE type='profile_config' LIMIT 1", (err: any, row: any) => {
+              db.close();
+              if (err || !row) {
+                resolve(false);
+              } else {
+                resolve(true);
+              }
+            });
+          });
+        });
+      } catch (error) {
+        console.error('Error validating database:', error);
+        resolve(false);
+      }
+    });
+  }
 }
