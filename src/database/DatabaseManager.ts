@@ -70,17 +70,108 @@ export class DatabaseManager {
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
 
+        -- Basic indexes
         CREATE INDEX IF NOT EXISTS idx_type ON documents(type);
+        CREATE INDEX IF NOT EXISTS idx_created_at ON documents(created_at);
+        CREATE INDEX IF NOT EXISTS idx_updated_at ON documents(updated_at);
+
+        -- Word-specific indexes
         CREATE INDEX IF NOT EXISTS idx_word_lookup ON documents(type, json_extract(data, '$.word'));
+        CREATE INDEX IF NOT EXISTS idx_word_desc ON documents(json_extract(data, '$.one_line_desc')) WHERE type = 'word';
+        CREATE INDEX IF NOT EXISTS idx_word_details ON documents(json_extract(data, '$.details')) WHERE type = 'word';
+
+        -- Tag-specific indexes
         CREATE INDEX IF NOT EXISTS idx_tag_lookup ON documents(type, json_extract(data, '$.tag'));
+
+        -- Full-text search virtual table for words
+        CREATE VIRTUAL TABLE IF NOT EXISTS words_fts USING fts5(
+          id UNINDEXED,
+          word,
+          one_line_desc,
+          details,
+          tags,
+          tokenize = 'porter unicode61'
+        );
+
+        -- Triggers to keep FTS table in sync
+        CREATE TRIGGER IF NOT EXISTS words_fts_insert AFTER INSERT ON documents
+        WHEN NEW.type = 'word'
+        BEGIN
+          INSERT INTO words_fts(id, word, one_line_desc, details, tags)
+          VALUES (
+            NEW.id,
+            json_extract(NEW.data, '$.word'),
+            json_extract(NEW.data, '$.one_line_desc'),
+            json_extract(NEW.data, '$.details'),
+            json_extract(NEW.data, '$.tags')
+          );
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS words_fts_update AFTER UPDATE ON documents
+        WHEN NEW.type = 'word'
+        BEGIN
+          UPDATE words_fts SET
+            word = json_extract(NEW.data, '$.word'),
+            one_line_desc = json_extract(NEW.data, '$.one_line_desc'),
+            details = json_extract(NEW.data, '$.details'),
+            tags = json_extract(NEW.data, '$.tags')
+          WHERE id = NEW.id;
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS words_fts_delete AFTER DELETE ON documents
+        WHEN OLD.type = 'word'
+        BEGIN
+          DELETE FROM words_fts WHERE id = OLD.id;
+        END;
       `;
 
       this.db.exec(sql, (err) => {
         if (err) {
           reject(err);
         } else {
-          resolve();
+          // Populate FTS table for existing words if it's empty
+          this.populateFTSTable().then(resolve).catch(reject);
         }
+      });
+    });
+  }
+
+  /**
+   * Populate FTS table with existing words (for migration)
+   */
+  private populateFTSTable(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (!this.db) {
+        resolve();
+        return;
+      }
+
+      // Check if FTS table is empty
+      this.db.get('SELECT COUNT(*) as count FROM words_fts', (err, row: { count: number } | undefined) => {
+        if (err || (row && row.count > 0)) {
+          resolve();
+          return;
+        }
+
+        // Populate FTS table with existing words
+        const sql = `
+          INSERT INTO words_fts(id, word, one_line_desc, details, tags)
+          SELECT
+            id,
+            json_extract(data, '$.word'),
+            json_extract(data, '$.one_line_desc'),
+            json_extract(data, '$.details'),
+            json_extract(data, '$.tags')
+          FROM documents
+          WHERE type = 'word'
+        `;
+
+        this.db!.run(sql, (err) => {
+          if (err) {
+            console.error('Error populating FTS table:', err);
+          }
+          resolve();
+        });
       });
     });
   }
@@ -105,37 +196,90 @@ export class DatabaseManager {
 
   // Paginated word loading for lazy loading
   getWordsPaginated(offset: number, limit: number): Promise<{words: WordDocument[], hasMore: boolean, total: number}> {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       if (!this.db) {
         resolve({words: [], hasMore: false, total: 0});
         return;
       }
 
-      // Get paginated results with total count in one query
-      const query = `
-        SELECT data, COUNT(*) OVER() as total_count
-        FROM documents
-        WHERE type = 'word'
-        ORDER BY updated_at DESC, created_at DESC
-        LIMIT ${limit} OFFSET ${offset}
-      `;
+      try {
+        // Get total count using index (guaranteed optimization)
+        const totalResult = await new Promise<{ total: number }>((resolveCount, rejectCount) => {
+          this.db!.get('SELECT COUNT(*) as total FROM documents WHERE type = ?', ['word'], (err, row: { total: number } | undefined) => {
+            if (err) {
+              rejectCount(err);
+              return;
+            }
+            resolveCount({ total: row?.total || 0 });
+          });
+        });
 
-      this.db!.all(query, (err, rows: { data: string, total_count: number }[]) => {
-        if (err) {
-          reject(err);
-          return;
-        }
+        // Get paginated data using indexes (guaranteed optimization)
+        const dataResult = await new Promise<{ data: string }[]>((resolveData, rejectData) => {
+          const query = `
+            SELECT data FROM documents
+            WHERE type = 'word'
+            ORDER BY updated_at DESC, created_at DESC
+            LIMIT ${limit} OFFSET ${offset}
+          `;
 
-        const words = rows.map(row => JSON.parse(row.data));
-        const total = rows.length > 0 ? rows[0].total_count : 0;
+          this.db!.all(query, (err, rows: { data: string }[]) => {
+            if (err) {
+              rejectData(err);
+              return;
+            }
+            resolveData(rows);
+          });
+        });
+
+        const words = dataResult.map(row => JSON.parse(row.data));
+        const total = totalResult.total;
         const hasMore = offset + limit < total;
 
         resolve({words, hasMore, total});
-      });
+      } catch (err) {
+        reject(err);
+      }
     });
   }
 
   searchWords(query: string): Promise<WordDocument[]> {
+    return new Promise((resolve, reject) => {
+      if (!this.db) {
+        resolve([]);
+        return;
+      }
+
+      // Use FTS for fast full-text search with ranking
+      const ftsQuery = `"${query}"*`; // Prefix search for better performance
+
+      const sql = `
+        SELECT d.data, fts.rank as search_rank
+        FROM words_fts fts
+        JOIN documents d ON fts.id = d.id
+        WHERE words_fts MATCH ?
+        ORDER BY fts.rank, d.updated_at DESC
+        LIMIT 10
+      `;
+
+      this.db.all(sql, [ftsQuery], (err, rows: { data: string, search_rank: number }[]) => {
+        if (err) {
+          // Fallback to traditional LIKE search if FTS fails
+          console.warn('FTS search failed, falling back to LIKE search:', err);
+          this.fallbackSearchWords(query).then(resolve).catch(reject);
+          return;
+        }
+
+        const words = rows.map(row => JSON.parse(row.data));
+        resolve(words);
+      });
+    });
+  }
+
+  /**
+   * Fallback search method using traditional LIKE queries
+   */
+  private fallbackSearchWords(query: string): Promise<WordDocument[]> {
     return new Promise((resolve, reject) => {
       if (!this.db) {
         resolve([]);
@@ -332,6 +476,36 @@ export class DatabaseManager {
         return;
       }
 
+      // Use json_each for efficient array searching
+      const sql = `
+        SELECT DISTINCT d.data
+        FROM documents d, json_each(d.data, '$.tags') as t
+        WHERE d.type = 'word' AND t.value = ?
+        ORDER BY json_extract(d.data, '$.word')
+      `;
+
+      this.db.all(sql, [tag], (err, rows: { data: string }[]) => {
+        if (err) {
+          // Fallback to LIKE search if json_each fails
+          console.warn('JSON array search failed, falling back to LIKE search:', err);
+          this.fallbackGetAssociatedWords(tag).then(resolve).catch(reject);
+          return;
+        }
+        resolve(rows.map(row => JSON.parse(row.data)));
+      });
+    });
+  }
+
+  /**
+   * Fallback method for tag search using LIKE
+   */
+  private fallbackGetAssociatedWords(tag: string): Promise<WordDocument[]> {
+    return new Promise((resolve, reject) => {
+      if (!this.db) {
+        resolve([]);
+        return;
+      }
+
       this.db.all(
         `SELECT data FROM documents WHERE type = 'word' AND json_extract(data, '$.tags') LIKE ? ORDER BY json_extract(data, '$.word')`,
         [`%${tag}%`],
@@ -348,6 +522,42 @@ export class DatabaseManager {
 
   // Paginated associated words loading for lazy loading
   getAssociatedWordsPaginated(tag: string, offset: number, limit: number): Promise<{words: WordDocument[], hasMore: boolean, total: number}> {
+    return new Promise((resolve, reject) => {
+      if (!this.db) {
+        resolve({words: [], hasMore: false, total: 0});
+        return;
+      }
+
+      // Use json_each for efficient array searching with pagination
+      const query = `
+        SELECT DISTINCT d.data, COUNT(*) OVER() as total_count
+        FROM documents d, json_each(d.data, '$.tags') as t
+        WHERE d.type = 'word' AND t.value = ?
+        ORDER BY json_extract(d.data, '$.word')
+        LIMIT ${limit} OFFSET ${offset}
+      `;
+
+      this.db!.all(query, [tag], (err, rows: { data: string, total_count: number }[]) => {
+        if (err) {
+          // Fallback to LIKE search if json_each fails
+          console.warn('JSON array search failed, falling back to LIKE search:', err);
+          this.fallbackGetAssociatedWordsPaginated(tag, offset, limit).then(resolve).catch(reject);
+          return;
+        }
+
+        const words = rows.map(row => JSON.parse(row.data));
+        const total = rows.length > 0 ? rows[0].total_count : 0;
+        const hasMore = offset + limit < total;
+
+        resolve({words, hasMore, total});
+      });
+    });
+  }
+
+  /**
+   * Fallback method for paginated tag search using LIKE
+   */
+  private fallbackGetAssociatedWordsPaginated(tag: string, offset: number, limit: number): Promise<{words: WordDocument[], hasMore: boolean, total: number}> {
     return new Promise((resolve, reject) => {
       if (!this.db) {
         resolve({words: [], hasMore: false, total: 0});
