@@ -366,9 +366,32 @@ class EverEtchApp {
       }
     });
 
-    // Add profile button
+    // More button and inline actions
+    const moreBtn = document.getElementById('more-btn') as HTMLButtonElement;
+    const inlineActions = document.getElementById('inline-actions') as HTMLElement;
+
+    moreBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleInlineActions();
+    });
+
+    // Add profile button (now inline)
     const addProfileBtn = document.getElementById('add-profile-btn') as HTMLButtonElement;
-    addProfileBtn.addEventListener('click', () => this.showAddProfileModal());
+    addProfileBtn.addEventListener('click', () => {
+      this.showAddProfileModal();
+    });
+
+    // Export button
+    const exportBtn = document.getElementById('export-profile-btn') as HTMLButtonElement;
+    exportBtn.addEventListener('click', () => {
+      this.handleExportProfile();
+    });
+
+    // Import button
+    const importBtn = document.getElementById('import-profile-btn') as HTMLButtonElement;
+    importBtn.addEventListener('click', () => {
+      this.handleImportProfile();
+    });
 
     // Add profile modal buttons
     const cancelAddProfileBtn = document.getElementById('cancel-add-profile') as HTMLButtonElement;
@@ -1553,6 +1576,75 @@ class EverEtchApp {
       console.error('Error searching for existing word:', error);
       this.showError('Failed to find existing word');
     }
+  }
+
+  private toggleInlineActions() {
+    const inlineActions = document.getElementById('inline-actions') as HTMLElement;
+    if (inlineActions) {
+      const isVisible = inlineActions.classList.contains('w-0');
+
+      if (isVisible) {
+        // Show the inline actions - calculate the natural width
+        inlineActions.classList.remove('w-0', 'pointer-events-none');
+        inlineActions.classList.add('w-auto', 'pointer-events-auto');
+      } else {
+        // Hide the inline actions
+        inlineActions.classList.remove('w-auto', 'pointer-events-auto');
+        inlineActions.classList.add('w-0', 'pointer-events-none');
+      }
+    }
+  }
+
+  private expandMoreActions() {
+    const expandedActions = document.getElementById('expanded-actions') as HTMLElement;
+    const portal = document.getElementById('more-actions-portal') as HTMLElement;
+    const moreBtn = document.getElementById('more-btn') as HTMLElement;
+
+    if (expandedActions && portal && moreBtn) {
+      // Move to portal for proper layering
+      portal.appendChild(expandedActions);
+
+      // Position the dropdown relative to the more button
+      const rect = moreBtn.getBoundingClientRect();
+      expandedActions.style.position = 'fixed';
+      expandedActions.style.top = `${rect.bottom + 8}px`;
+      expandedActions.style.left = `${rect.right - expandedActions.offsetWidth}px`;
+      expandedActions.style.zIndex = '10000';
+
+      // Show with animation
+      expandedActions.classList.remove('opacity-0', 'scale-95', 'pointer-events-none');
+      expandedActions.classList.add('opacity-100', 'scale-100', 'pointer-events-auto');
+    }
+  }
+
+  private collapseMoreActions() {
+    const expandedActions = document.getElementById('expanded-actions') as HTMLElement;
+    const container = document.getElementById('more-actions-container') as HTMLElement;
+
+    if (expandedActions && container) {
+      // Move back to original container
+      container.appendChild(expandedActions);
+
+      // Reset positioning
+      expandedActions.style.position = '';
+      expandedActions.style.top = '';
+      expandedActions.style.left = '';
+      expandedActions.style.zIndex = '';
+
+      // Hide with animation
+      expandedActions.classList.remove('opacity-100', 'scale-100', 'pointer-events-auto');
+      expandedActions.classList.add('opacity-0', 'scale-95', 'pointer-events-none');
+    }
+  }
+
+  private async handleExportProfile() {
+    // TODO: Implement export functionality
+    this.showSuccess('Export feature coming soon!');
+  }
+
+  private async handleImportProfile() {
+    // TODO: Implement import functionality
+    this.showSuccess('Import feature coming soon!');
   }
 
   private setupAssociatedScrollObserver() {
