@@ -16,7 +16,7 @@ declare global {
       updateWord: (wordId: string, wordData: any) => Promise<any>;
       deleteWord: (wordId: string) => Promise<boolean>;
       generateMeaningOnly: (word: string) => Promise<string>;
-      generateTagsAndSummary: (word: string, meaning: string) => Promise<any>;
+      generateTagsAndSummary: (word: string, meaning: string, generationId: string) => Promise<any>;
       generateMeaning: (word: string) => Promise<string>;
       getAssociatedWords: (tag: string) => Promise<any[]>;
       getAssociatedWordsPaginated: (tag: string, offset: number, limit: number) => Promise<{ words: any[], hasMore: boolean, total: number }>;
@@ -50,6 +50,7 @@ interface WordDocument {
 
 class EverEtchApp {
   private currentWord: WordDocument | null = null;
+  private currentGenerationId: string = '';
   private profiles: string[] = [];
   private currentProfile: string = '';
   private streamingContent: string = '';
@@ -456,6 +457,19 @@ class EverEtchApp {
     const generateIcon = document.getElementById('generate-icon') as unknown as SVGElement;
     const loadingIcon = document.getElementById('loading-icon') as unknown as SVGElement;
 
+    // Generate a unique ID for this generation request
+    const generationId = `gen_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    console.log('🔄 Renderer: Generated new generationId:', generationId);
+
+    // Defensive check: ensure generationId is valid
+    if (!generationId || typeof generationId !== 'string' || generationId.length === 0) {
+      console.error('❌ Renderer: Invalid generationId generated:', generationId);
+      this.showError('Failed to generate request ID. Please try again.');
+      return;
+    }
+
+    this.currentGenerationId = generationId;
+
     // Set generation flag to prevent duplicate requests
     this.isGenerating = true;
     generateBtn.disabled = true;
@@ -498,12 +512,15 @@ class EverEtchApp {
       // Second call: Generate tags and summary using the meaning
       try {
         console.log('Starting generateTagsAndSummary call...');
-        const tagsResult = await window.electronAPI.generateTagsAndSummary(word, meaning);
+        const tagsResult = await window.electronAPI.generateTagsAndSummary(word, meaning, generationId);
         console.log('generateTagsAndSummary completed:', tagsResult);
 
         // Set a timeout to ensure UI updates even if event is delayed
         setTimeout(() => {
-          if (this.currentWord && this.currentWord.tags.includes('Generating tags...')) {
+          // Only update if this is still the current generation and word has loading states
+          if (this.currentGenerationId === generationId &&
+              this.currentWord &&
+              this.currentWord.tags.includes('Generating tags...')) {
             console.log('Tool result timeout - forcing UI update');
             // Force update with fallback data
             this.currentWord.one_line_desc = `Summary for: ${word}`;
@@ -516,8 +533,8 @@ class EverEtchApp {
       } catch (error) {
         console.error('Error in generateTagsAndSummary:', error);
         this.showError('Failed to generate tags and summary. Please check your API configuration.');
-        // Clear loading states on error
-        if (this.currentWord) {
+        // Clear loading states on error (only if this is still the current generation)
+        if (this.currentGenerationId === generationId && this.currentWord) {
           this.currentWord.one_line_desc = 'Failed to generate summary';
           this.currentWord.tags = ['Failed to generate tags'];
           this.currentWord.tag_colors = { 'Failed to generate tags': '#ef4444' };
@@ -599,14 +616,65 @@ class EverEtchApp {
   }
 
   private async handleRefreshWord() {
-    if (!this.currentWord) {
+    if (!this.currentWord || this.currentWord.id === 'temp') {
       this.showError('No word selected');
       return;
     }
 
-    const wordInput = document.getElementById('word-input') as HTMLInputElement;
-    wordInput.value = this.currentWord.word;
-    await this.handleGenerate();
+    const originalWordId = this.currentWord.id;
+    const originalCreatedAt = this.currentWord.created_at;
+
+    try {
+      // Generate new content
+      const wordInput = document.getElementById('word-input') as HTMLInputElement;
+      wordInput.value = this.currentWord.word;
+
+      // Generate new content (this will create a temp word)
+      await this.handleGenerate();
+
+      // After generation completes, update the database with the new content
+      if (this.currentWord && this.currentWord.id === 'temp') {
+        const updatedWordData = {
+          word: this.currentWord.word,
+          one_line_desc: this.currentWord.one_line_desc,
+          details: this.currentWord.details,
+          tags: this.currentWord.tags,
+          tag_colors: this.currentWord.tag_colors
+        };
+
+        // Update the word in database
+        const updatedWord = await window.electronAPI.updateWord(originalWordId, updatedWordData);
+
+        // Restore original metadata
+        updatedWord.id = originalWordId;
+        updatedWord.created_at = originalCreatedAt;
+        updatedWord.updated_at = new Date().toISOString();
+
+        // Update current word reference
+        this.currentWord = updatedWord;
+
+        // Update the word in the words array
+        const wordIndex = this.words.findIndex(word => word.id === originalWordId);
+        if (wordIndex !== -1) {
+          // Update the existing object in place to preserve references in click handlers
+          Object.assign(this.words[wordIndex], updatedWord);
+          console.log('Updated word in words array:', this.words[wordIndex]);
+        }
+
+        // Re-render word details with updated content
+        if (this.currentWord) {
+          this.renderWordDetails(this.currentWord);
+        
+          // Update the word item in the list
+          this.updateWordInList(originalWordId, this.currentWord);
+        }
+
+        this.showSuccess('Word refreshed successfully');
+      }
+    } catch (error) {
+      console.error('Error refreshing word:', error);
+      this.showError('Failed to refresh word');
+    }
   }
 
   private async handleDeleteWord() {
@@ -888,18 +956,8 @@ class EverEtchApp {
       `;
 
       suggestionItem.addEventListener('click', () => {
-        const wordInput = document.getElementById('word-input') as HTMLInputElement;
-        const currentInput = wordInput.value.trim();
-
-        // If the clicked word matches exactly what user typed, show existing word details
-        if (currentInput.toLowerCase() === word.word.toLowerCase()) {
-          this.selectWord(word);
-        } else {
-          // Otherwise, just select the word in input field
-          wordInput.value = word.word;
-          this.updateGenerateBtnState(word.word, true); // Since it's from search results, it's an exact match
-        }
-
+        // Always show the word details directly when clicking a suggestion
+        this.selectWord(word);
         this.hideSuggestions();
       });
 
@@ -931,7 +989,7 @@ class EverEtchApp {
       <div class="space-y-6">
         <div>
           <h3 class="text-2xl font-bold text-slate-800 mb-2">${word.word}</h3>
-          <p class="text-slate-600 mb-4 ${isLoadingSummary ? 'animate-pulse' : ''}">${word.one_line_desc || 'No description available'}</p>
+          <p class="text-slate-600 mb-4 ${isLoadingSummary ? 'animate-pulse' : ''}">${word.one_line_desc}</p>
         </div>
 
         <div>
@@ -1254,21 +1312,63 @@ class EverEtchApp {
   }
 
   private handleToolResult(toolData: any) {
-    if (this.currentWord && toolData) {
-      // Update the current word with tool data
-      if (toolData.summary) {
-        this.currentWord.one_line_desc = toolData.summary;
-      }
-      if (toolData.tags) {
-        this.currentWord.tags = toolData.tags;
-      }
-      if (toolData.tag_colors) {
-        this.currentWord.tag_colors = toolData.tag_colors;
-      }
+    console.log('📨 Renderer: Received tool result event:', toolData);
+    console.log('📨 Renderer: Current generation ID:', this.currentGenerationId);
+    console.log('📨 Renderer: Tool data generation ID:', toolData?.generationId);
 
-      // Re-render with updated data (use regular render, not streaming)
-      // This will automatically show the appropriate action buttons based on word state
-      this.renderWordDetails(this.currentWord);
+    // Defensive checks: ensure toolData is valid
+    if (!toolData) {
+      console.error('❌ Renderer: Received null/undefined toolData');
+      return;
+    }
+
+    if (!toolData.generationId || typeof toolData.generationId !== 'string') {
+      console.error('❌ Renderer: Invalid generationId in toolData:', toolData.generationId);
+      return;
+    }
+
+    if (!this.currentWord) {
+      console.error('❌ Renderer: No current word to update');
+      return;
+    }
+
+    // CRITICAL: Only process tool results for the current generation
+    // This prevents old tool results from updating the current word
+    if (toolData.generationId === this.currentGenerationId) {
+      console.log('✅ Renderer: Processing tool result for current generation');
+
+      // Double-check that this tool result is for the current word
+      // This prevents race conditions where the word changed but generationId didn't
+      if (this.currentWord.id === 'temp') {
+        console.log('✅ Renderer: Current word is temp, proceeding with update');
+
+        // Update the current word with tool data
+        if (toolData.summary) {
+          console.log('📝 Renderer: Updating summary:', toolData.summary);
+          this.currentWord.one_line_desc = toolData.summary;
+        }
+        if (toolData.tags) {
+          console.log('🏷️ Renderer: Updating tags:', toolData.tags);
+          this.currentWord.tags = toolData.tags;
+        }
+        if (toolData.tag_colors) {
+          console.log('🎨 Renderer: Updating tag colors:', toolData.tag_colors);
+          this.currentWord.tag_colors = toolData.tag_colors;
+        }
+
+        console.log('🔄 Renderer: Re-rendering word details');
+        // Re-render with updated data (use regular render, not streaming)
+        // This will automatically show the appropriate action buttons based on word state
+        if (this.currentWord) {
+          this.renderWordDetails(this.currentWord);
+        }
+      } else {
+        console.log('⚠️ Renderer: Current word is not temp, skipping tool result update');
+      }
+    } else {
+      console.log('❌ Renderer: Ignoring tool result - generation ID mismatch');
+      console.log('❌ Renderer: Expected:', this.currentGenerationId, 'Got:', toolData.generationId);
+      console.log('❌ Renderer: Current word ID:', this.currentWord?.id);
     }
   }
 
@@ -1282,7 +1382,7 @@ class EverEtchApp {
       <div class="space-y-6">
         <div>
           <h3 class="text-2xl font-bold text-slate-800 mb-2">${word.word}</h3>
-          <p class="text-slate-600 mb-4">${word.one_line_desc || 'No description available'}</p>
+          <p class="text-slate-600 mb-4">${word.one_line_desc}</p>
         </div>
 
         <div>
@@ -1519,6 +1619,29 @@ class EverEtchApp {
     if (associatedCountElement) {
       associatedCountElement.textContent = count.toString();
     }
+  }
+
+  private updateWordInList(wordId: string, updatedWord: WordDocument) {
+    // Find the word item in the DOM
+    const wordItem = document.querySelector(`[data-word-id="${wordId}"]`) as HTMLElement;
+    if (!wordItem) {
+      console.warn('Word item not found in DOM:', wordId);
+      return;
+    }
+
+    // Update the word item content
+    const wordElement = wordItem.querySelector('.font-semibold') as HTMLElement;
+    const descElement = wordItem.querySelector('.text-sm') as HTMLElement;
+
+    if (wordElement) {
+      wordElement.textContent = updatedWord.word;
+    }
+
+    if (descElement) {
+      descElement.textContent = updatedWord.one_line_desc || 'No description';
+    }
+
+    console.log('Updated word item in list:', wordId, updatedWord.word);
   }
 
   private updateGenerateBtnState(query: string, hasExactMatch?: boolean) {

@@ -119,41 +119,66 @@ ipcMain.handle('generate-meaning-only', async (event, word: string) => {
   return meaning;
 });
 
-ipcMain.handle('generate-tags-summary', async (event, word: string, meaning: string) => {
-  const profile = await profileManager.getCurrentProfile();
-  if (!profile) {
+ipcMain.handle('generate-tags-summary', async (event, word: string, meaning: string, generationId: string) => {
+  console.log('🔄 Main process: generate-tags-summary called with generationId:', generationId);
+
+  // Defensive check: ensure generationId is valid
+  if (!generationId || typeof generationId !== 'string' || generationId.length === 0) {
+    console.error('❌ Main process: Invalid generationId received:', generationId);
     const fallbackData = {
       summary: `A word: ${word}`,
       tags: ['general'],
-      tag_colors: { 'general': '#6b7280' }
+      tag_colors: { 'general': '#6b7280' },
+      generationId: 'fallback_' + Date.now()
     };
+    console.log('📤 Main process: Sending fallback tool result with fallback generationId:', fallbackData);
+    mainWindow.webContents.send('tool-result', fallbackData);
+    return fallbackData;
+  }
+
+  const profile = await profileManager.getCurrentProfile();
+  if (!profile) {
+    console.log('❌ Main process: No profile found');
+    const fallbackData = {
+      summary: `A word: ${word}`,
+      tags: ['general'],
+      tag_colors: { 'general': '#6b7280' },
+      generationId: generationId
+    };
+    console.log('📤 Main process: Sending fallback tool result to renderer:', fallbackData);
     mainWindow.webContents.send('tool-result', fallbackData);
     return fallbackData;
   }
 
   try {
+    console.log('🚀 Main process: Calling aiClient.generateTagsAndSummary');
     const toolData = await aiClient.generateTagsAndSummary(word, meaning, profile);
+    console.log('✅ Main process: AI client returned:', toolData);
 
     // Ensure we have valid data to send
     const safeToolData = {
       summary: toolData.summary || `A word: ${word}`,
       tags: toolData.tags || ['general'],
-      tag_colors: toolData.tag_colors || { 'general': '#6b7280' }
+      tag_colors: toolData.tag_colors || { 'general': '#6b7280' },
+      generationId: generationId  // Explicitly include generationId
     };
 
+    console.log('📤 Main process: Sending tool result to renderer:', safeToolData);
     // Send tool data to renderer
     mainWindow.webContents.send('tool-result', safeToolData);
 
     return safeToolData;
   } catch (error) {
-    console.error('Error in generate-tags-summary:', error);
+    console.error('❌ Main process: Error in generate-tags-summary:', error);
 
     // Send fallback data on error
     const fallbackData = {
       summary: `A word: ${word}`,
       tags: ['general'],
-      tag_colors: { 'general': '#6b7280' }
+      tag_colors: { 'general': '#6b7280' },
+      generationId: generationId
     };
+    console.log('📤 Main process: Sending error fallback to renderer:', fallbackData);
     mainWindow.webContents.send('tool-result', fallbackData);
 
     return fallbackData;

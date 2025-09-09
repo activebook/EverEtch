@@ -250,23 +250,25 @@ export class DatabaseManager {
         return;
       }
 
-      // Use FTS for fast full-text search with ranking
-      const ftsQuery = `"${query}"*`; // Prefix search for better performance
-
+      // Use LIKE for reliable substring search in word field only
       const sql = `
-        SELECT d.data, fts.rank as search_rank
-        FROM words_fts fts
-        JOIN documents d ON fts.id = d.id
-        WHERE words_fts MATCH ?
-        ORDER BY fts.rank, d.updated_at DESC
+        SELECT data FROM documents
+        WHERE type = 'word'
+        AND json_extract(data, '$.word') LIKE ?
+        ORDER BY
+          CASE WHEN json_extract(data, '$.word') LIKE ? THEN 1 ELSE 2 END,
+          json_extract(data, '$.word')
         LIMIT 10
       `;
 
-      this.db.all(sql, [ftsQuery], (err, rows: { data: string, search_rank: number }[]) => {
+      // Search for substring anywhere in word
+      const searchPattern = `%${query}%`;
+      // Prioritize words that start with the query
+      const prefixPattern = `${query}%`;
+
+      this.db.all(sql, [searchPattern, prefixPattern], (err, rows: { data: string }[]) => {
         if (err) {
-          // Fallback to traditional LIKE search if FTS fails
-          console.warn('FTS search failed, falling back to LIKE search:', err);
-          this.fallbackSearchWords(query).then(resolve).catch(reject);
+          reject(err);
           return;
         }
 

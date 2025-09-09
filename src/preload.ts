@@ -22,7 +22,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // AI operations
   generateMeaningOnly: (word: string) => ipcRenderer.invoke('generate-meaning-only', word),
-  generateTagsAndSummary: (word: string, meaning: string) => ipcRenderer.invoke('generate-tags-summary', word, meaning),
+  generateTagsAndSummary: (word: string, meaning: string, generationId: string) => ipcRenderer.invoke('generate-tags-summary', word, meaning, generationId),
 
   // Associated words
   getAssociatedWords: (tag: string) => ipcRenderer.invoke('get-associated-words', tag),

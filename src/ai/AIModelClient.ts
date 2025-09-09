@@ -81,7 +81,10 @@ export class AIModelClient {
   }
 
   async generateTagsAndSummary(word: string, meaning: string, profile: ProfileConfig): Promise<ProcessedToolData> {
+    console.log('🔄 generateTagsAndSummary called with word:', word, 'meaning length:', meaning.length);
+
     if (!profile.model_config.api_key) {
+      console.error('❌ API key not configured for this profile');
       throw new Error('API key not configured for this profile');
     }
 
@@ -90,36 +93,57 @@ export class AIModelClient {
       baseURL: profile.model_config.endpoint || undefined,
     });
 
-    const toolData: ProcessedToolData = {};
+    console.log('✅ OpenAI client initialized');
 
     try {
-      // First, generate summary
-      console.log('Generating summary...');
-      const summaryData = await this.generateSummaryOnly(word, meaning, profile);
-      toolData.summary = summaryData.summary;
+      console.log('🚀 Starting parallel generation of summary and tags...');
 
-      // Then, generate tags
-      console.log('Generating tags...');
-      const tagsData = await this.generateTagsOnly(word, meaning, profile);
-      toolData.tags = tagsData.tags;
-      toolData.tag_colors = tagsData.tag_colors;
+      // Run both API calls in parallel and wait for both to complete
+      const [summaryResult, tagsResult] = await Promise.all([
+        this.generateSummaryOnly(word, meaning, profile),
+        this.generateTagsOnly(word, meaning, profile)
+      ]);
+
+      console.log('✅ Both API calls completed successfully');
+      console.log('📝 Summary result:', summaryResult);
+      console.log('🏷️ Tags result:', tagsResult);
+
+      const finalResult = {
+        summary: summaryResult.summary,
+        tags: tagsResult.tags,
+        tag_colors: tagsResult.tag_colors
+      };
+
+      console.log('🎯 Final result:', finalResult);
+      return finalResult;
 
     } catch (error) {
-      console.error('Error in generateTagsAndSummary:', error);
-      // Provide fallbacks
-      if (!toolData.summary) {
-        toolData.summary = `A word: ${word}`;
-      }
-      if (!toolData.tags) {
-        toolData.tags = ['general'];
-        toolData.tag_colors = { 'general': '#6b7280' };
-      }
-    }
+      console.error('❌ Error in generateTagsAndSummary:', error);
+      console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
 
-    return toolData;
+      // Provide fallbacks if any call fails
+      const fallbackResult = {
+        summary: `A word: ${word}`,
+        tags: ['general'],
+        tag_colors: { 'general': '#6b7280' }
+      };
+
+      console.log('🔄 Returning fallback result:', fallbackResult);
+      return fallbackResult;
+    }
   }
 
   private async generateSummaryOnly(word: string, meaning: string, profile: ProfileConfig): Promise<{ summary: string }> {
+    console.log('📝 generateSummaryOnly called for word:', word);
+
+    // Create a separate OpenAI instance for this call
+    const openai = new OpenAI({
+      apiKey: profile.model_config.api_key,
+      baseURL: profile.model_config.endpoint || undefined,
+    });
+
+    console.log('✅ Summary OpenAI client created');
+
     const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
       {
         role: 'system',
@@ -151,24 +175,56 @@ export class AIModelClient {
       }
     ];
 
-    const completion = await this.openai!.chat.completions.create({
-      model: profile.model_config.model,
-      messages,
-      tools,
-      tool_choice: { type: 'function', function: { name: 'add_summary' } } // Force specific tool
-    });
+    console.log('🚀 Making summary API call with model:', profile.model_config.model);
 
-    if (completion.choices[0]?.message?.tool_calls?.[0]) {
-      const toolCall = completion.choices[0].message.tool_calls[0];
-      const args = JSON.parse(toolCall.function.arguments);
-      return { summary: args.summary };
+    try {
+      const completion = await openai.chat.completions.create({
+        model: profile.model_config.model,
+        messages,
+        tools,
+        tool_choice: { type: 'function', function: { name: 'add_summary' } } // Force specific tool
+      });
+
+      console.log('✅ Summary API call completed');
+      console.log('📋 Completion response:', JSON.stringify(completion, null, 2));
+
+      if (completion.choices[0]?.message?.tool_calls?.[0]) {
+        const toolCall = completion.choices[0].message.tool_calls[0];
+        console.log('🔧 Summary tool call found:', toolCall);
+
+        const args = JSON.parse(toolCall.function.arguments);
+        console.log('📝 Parsed summary args:', args);
+
+        const result = { summary: args.summary };
+        console.log('🎯 Summary result:', result);
+        return result;
+      } else {
+        console.warn('⚠️ No tool calls found in summary completion');
+        console.log('📋 Full completion:', completion);
+      }
+    } catch (error) {
+      console.error('❌ Error in generateSummaryOnly API call:', error);
+      console.error('❌ Error details:', error instanceof Error ? error.message : 'Unknown error');
     }
 
     // Fallback if tool call fails
-    return { summary: `A word: ${word}` };
+    console.log('🔄 Using fallback for summary');
+    const fallback = { summary: `A word: ${word}` };
+    console.log('🔄 Fallback result:', fallback);
+    return fallback;
   }
 
   private async generateTagsOnly(word: string, meaning: string, profile: ProfileConfig): Promise<{ tags: string[], tag_colors: Record<string, string> }> {
+    console.log('🏷️ generateTagsOnly called for word:', word);
+
+    // Create a separate OpenAI instance for this call
+    const openai = new OpenAI({
+      apiKey: profile.model_config.api_key,
+      baseURL: profile.model_config.endpoint || undefined,
+    });
+
+    console.log('✅ Tags OpenAI client created');
+
     const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
       {
         role: 'system',
@@ -206,27 +262,49 @@ export class AIModelClient {
       }
     ];
 
-    const completion = await this.openai!.chat.completions.create({
-      model: profile.model_config.model,
-      messages,
-      tools,
-      tool_choice: { type: 'function', function: { name: 'add_tags' } } // Force specific tool
-    });
+    console.log('🚀 Making tags API call with model:', profile.model_config.model);
 
-    if (completion.choices[0]?.message?.tool_calls?.[0]) {
-      const toolCall = completion.choices[0].message.tool_calls[0];
-      const args = JSON.parse(toolCall.function.arguments);
-      return {
-        tags: args.tags,
-        tag_colors: args.tag_colors || {}
-      };
+    try {
+      const completion = await openai.chat.completions.create({
+        model: profile.model_config.model,
+        messages,
+        tools,
+        tool_choice: { type: 'function', function: { name: 'add_tags' } } // Force specific tool
+      });
+
+      console.log('✅ Tags API call completed');
+      console.log('📋 Completion response:', JSON.stringify(completion, null, 2));
+
+      if (completion.choices[0]?.message?.tool_calls?.[0]) {
+        const toolCall = completion.choices[0].message.tool_calls[0];
+        console.log('🔧 Tags tool call found:', toolCall);
+
+        const args = JSON.parse(toolCall.function.arguments);
+        console.log('🏷️ Parsed tags args:', args);
+
+        const result = {
+          tags: args.tags,
+          tag_colors: args.tag_colors || {}
+        };
+        console.log('🎯 Tags result:', result);
+        return result;
+      } else {
+        console.warn('⚠️ No tool calls found in tags completion');
+        console.log('📋 Full completion:', completion);
+      }
+    } catch (error) {
+      console.error('❌ Error in generateTagsOnly API call:', error);
+      console.error('❌ Error details:', error instanceof Error ? error.message : 'Unknown error');
     }
 
     // Fallback if tool call fails
-    return {
+    console.log('🔄 Using fallback for tags');
+    const fallback = {
       tags: ['general'],
       tag_colors: { 'general': '#6b7280' }
     };
+    console.log('🔄 Fallback result:', fallback);
+    return fallback;
   }
 
   private async processToolCalls(toolCalls: ToolCall[], word: string): Promise<ProcessedToolData> {
