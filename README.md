@@ -2,6 +2,8 @@
 
 A slim, modern word memo application built with Electron, TypeScript, and SQLite.
 
+![UI Screenshot](screenshots/UI.png)
+
 ## Features
 
 - **Multi-profile support**: Create separate profiles for different languages or study sessions
