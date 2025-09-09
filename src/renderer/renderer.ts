@@ -794,15 +794,31 @@ class EverEtchApp {
 
   private createWordItem(word: WordDocument): HTMLElement {
     const wordItem = document.createElement('div');
-    wordItem.className = 'word-item p-3 mb-2 bg-white/60 backdrop-blur-sm border border-slate-200/60 rounded-lg shadow-sm hover:shadow-md transition-all duration-200';
+    wordItem.className = 'word-item p-1.5 mb-0.5 cursor-pointer transition-all duration-200 hover:bg-amber-50/20 relative';
     wordItem.setAttribute('data-word-id', word.id); // Add data attribute for scrolling
     wordItem.innerHTML = `
       <div class="font-semibold text-slate-800 text-base mb-0.5">${word.word}</div>
-      <div class="text-sm text-slate-600 line-clamp-2">${word.one_line_desc || 'No description'}</div>
+      <div class="text-sm text-slate-500 line-clamp-2">${word.one_line_desc || 'No description'}</div>
+      <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-amber-200/60 via-amber-300/80 to-amber-200/60 opacity-0 transition-opacity duration-200"></div>
     `;
 
     wordItem.addEventListener('click', () => {
       this.selectWord(word);
+    });
+
+    // Add hover effect for underline
+    wordItem.addEventListener('mouseenter', () => {
+      const underline = wordItem.querySelector('div:last-child') as HTMLElement;
+      if (underline) {
+        underline.style.opacity = '1';
+      }
+    });
+
+    wordItem.addEventListener('mouseleave', () => {
+      const underline = wordItem.querySelector('div:last-child') as HTMLElement;
+      if (underline) {
+        underline.style.opacity = '0.0';
+      }
     });
 
     return wordItem;
@@ -838,7 +854,7 @@ class EverEtchApp {
 
     suggestions.forEach(word => {
       const suggestionItem = document.createElement('div');
-      suggestionItem.className = 'p-3 hover:bg-blue-50 cursor-pointer rounded-lg transition-colors duration-150 border-b border-slate-100/50 last:border-b-0';
+      suggestionItem.className = 'p-3 hover:bg-amber-100/70 cursor-pointer rounded-lg transition-colors duration-150 border-b border-amber-200/60 last:border-b-0';
       suggestionItem.innerHTML = `
         <div class="font-medium text-slate-800 mb-1">${word.word}</div>
         <div class="text-sm text-slate-600 line-clamp-2">${word.one_line_desc || 'No description'}</div>
@@ -854,7 +870,7 @@ class EverEtchApp {
         } else {
           // Otherwise, just select the word in input field
           wordInput.value = word.word;
-          this.updateGenerateBtnState(word.word);
+          this.updateGenerateBtnState(word.word, true); // Since it's from search results, it's an exact match
         }
 
         this.hideSuggestions();
@@ -946,7 +962,7 @@ class EverEtchApp {
         <button
           id="copy-btn"
           title="Copy to Clipboard"
-          class="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-all duration-200 hover:shadow-sm"
+          class="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-amber-100/70 rounded-md transition-all duration-200 hover:shadow-sm"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
@@ -957,7 +973,7 @@ class EverEtchApp {
           <button
             id="add-btn"
             title="Add Word"
-            class="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-all duration-200 hover:shadow-sm"
+            class="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-amber-100/70 rounded-md transition-all duration-200 hover:shadow-sm"
           >
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
@@ -967,7 +983,7 @@ class EverEtchApp {
           <button
             id="delete-btn"
             title="Delete it"
-            class="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-all duration-200 hover:shadow-sm"
+            class="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-amber-100/70 rounded-md transition-all duration-200 hover:shadow-sm"
           >
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
@@ -978,7 +994,7 @@ class EverEtchApp {
         <button
           id="refresh-btn"
           title="Regenerate meaning"
-          class="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-all duration-200 hover:shadow-sm"
+          class="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-amber-100/70 rounded-md transition-all duration-200 hover:shadow-sm"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
@@ -1085,7 +1101,7 @@ class EverEtchApp {
 
     words.forEach(word => {
       const wordItem = document.createElement('div');
-      wordItem.className = 'word-item p-3 mb-2 bg-white/60 backdrop-blur-sm border border-slate-200/60 rounded-lg shadow-sm hover:shadow-md transition-all duration-200';
+      wordItem.className = 'word-item p-3 mb-2 bg-amber-50/60 backdrop-blur-sm border border-amber-200/60 rounded-lg shadow-sm hover:bg-amber-100/70 hover:border-amber-300/70 transition-all duration-200';
       wordItem.innerHTML = `
         <div class="font-semibold text-slate-800 text-base mb-0.5">${word.word}</div>
         <div class="text-sm text-slate-600 line-clamp-2">${word.one_line_desc || 'No description'}</div>
@@ -1628,14 +1644,31 @@ class EverEtchApp {
 
     newWords.forEach(word => {
       const wordItem = document.createElement('div');
-      wordItem.className = 'word-item p-3 mb-2 bg-white/60 backdrop-blur-sm border border-slate-200/60 rounded-lg shadow-sm hover:shadow-md transition-all duration-200';
+      wordItem.className = 'word-item p-1.5 mb-0.5 cursor-pointer transition-all duration-200 hover:bg-amber-50/20 relative';
+      wordItem.setAttribute('data-word-id', word.id); // Add data attribute for scrolling
       wordItem.innerHTML = `
         <div class="font-semibold text-slate-800 text-base mb-0.5">${word.word}</div>
-        <div class="text-sm text-slate-600 line-clamp-2">${word.one_line_desc || 'No description'}</div>
+        <div class="text-sm text-slate-500 line-clamp-2">${word.one_line_desc || 'No description'}</div>
+        <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-amber-200/60 via-amber-300/80 to-amber-200/60 opacity-0 transition-opacity duration-200"></div>
       `;
 
       wordItem.addEventListener('click', () => {
         this.selectWord(word);
+      });
+
+      // Add hover effect for underline
+      wordItem.addEventListener('mouseenter', () => {
+        const underline = wordItem.querySelector('div:last-child') as HTMLElement;
+        if (underline) {
+          underline.style.opacity = '1';
+        }
+      });
+
+      wordItem.addEventListener('mouseleave', () => {
+        const underline = wordItem.querySelector('div:last-child') as HTMLElement;
+        if (underline) {
+          underline.style.opacity = '0.0';
+        }
       });
 
       // Insert before loading indicator if it exists, otherwise append

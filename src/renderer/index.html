@@ -9,10 +9,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body class="bg-gradient-to-br from-slate-50 to-blue-50 h-screen overflow-hidden font-['Inter']">
+<body class="bg-amber-50 h-screen overflow-hidden font-['Inter']">
     <div id="app" class="h-full flex flex-col">
         <!-- Modern Header -->
-        <header class="bg-white/80 backdrop-blur-md shadow-lg border-b border-white/20 pl-3 pr-6 py-2 flex items-center justify-between">
+        <header class="bg-amber-50/80 backdrop-blur-md shadow-lg border-b border-amber-100/20 pl-3 pr-6 py-2 flex items-center justify-between">
             <h1 class="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent flex items-center">
                 <svg t="1757400859266" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="26108" width="32" height="32"><path d="M386.327273 828.509091l374.690909-374.690909h-214.109091L600.436364 186.181818 279.272727 560.872727h214.109091l-107.054545 267.636364z" fill="#8C24FF" p-id="26111"></path></svg>
                 EverEtch
@@ -20,7 +20,7 @@
             <div class="flex items-center space-x-4">
                 <div class="flex items-center space-x-2">
                     <label for="profile-select" class="text-sm font-medium text-slate-600 flex items-center">
-                        <svg class="w-3 h-3 mr-1.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="w-3 h-3 mr-1.5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"></path>
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5a2 2 0 012-2h4a2 2 0 012 2v2H8V5z"></path>
                         </svg>
@@ -34,13 +34,13 @@
                     <button
                         id="add-profile-btn"
                         title="Add New Profile"
-                        class="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-700 rounded-lg transition-all duration-200 hover:shadow-md"
+                        class="p-2 bg-amber-50/60 hover:bg-amber-100/70 text-slate-600 hover:text-slate-700 rounded-lg transition-all duration-200 hover:shadow-md"
                     >
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                         </svg>
                     </button>
-                    <button id="settings-btn" title="Settings" class="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-all duration-200 hover:shadow-md group">
+                    <button id="settings-btn" title="Settings" class="p-2 bg-amber-50/60 hover:bg-amber-100/70 text-slate-600 hover:text-slate-700 rounded-lg transition-all duration-200 hover:shadow-md group">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
@@ -53,8 +53,8 @@
         <!-- Main Content Area -->
         <div id="main-content" class="flex-1 flex overflow-hidden">
             <!-- Left Panel: Word List -->
-            <div id="left-panel" class="bg-white/70 backdrop-blur-sm border-r border-slate-200/60 flex flex-col shadow-sm" style="width: 25%; min-width: 200px;">
-                <div class="p-2 border-b border-slate-200/60 bg-gradient-to-r from-slate-50/80 to-white/80">
+            <div id="left-panel" class="bg-amber-50/70 backdrop-blur-sm border-r border-amber-200/60 flex flex-col shadow-sm" style="width: 25%; min-width: 200px;">
+                <div class="p-2 border-b border-amber-200/60 bg-gradient-to-r from-amber-25/40 to-amber-50/60">
                     <h2 class="text-sm font-medium text-slate-700 flex items-center justify-between">
                         <div class="flex items-center">
                             <svg class="w-3 h-3 mr-1.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -62,7 +62,7 @@
                             </svg>
                             Words
                         </div>
-                        <span id="word-count" class="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">0</span>
+                        <span id="word-count" class="text-xs font-medium text-slate-600 bg-amber-100/70 px-2 py-0.5 rounded-full">0</span>
                     </h2>
                 </div>
                 <div id="word-list" class="flex-1 overflow-y-auto scrollbar-thin p-3">
@@ -71,9 +71,9 @@
             </div>
 
             <!-- Middle Panel: Operate Panel -->
-            <div id="middle-panel" class="bg-white/70 backdrop-blur-sm flex flex-col min-h-0 shadow-sm mx-2" style="width: 50%; min-width: 300px;">
+            <div id="middle-panel" class="bg-amber-50/70 backdrop-blur-sm flex flex-col min-h-0 shadow-sm mx-2" style="width: 50%; min-width: 300px;">
                 <!-- Upper Panel: Word Details -->
-                <div class="flex-1 p-6 overflow-y-auto bg-gradient-to-b from-white/80 to-slate-50/50">
+                <div class="flex-1 p-6 overflow-y-auto scrollbar-thin bg-amber-50/70">
                     <div id="word-details" class="h-full">
                         <div class="text-center text-slate-500 mt-12">
                             <svg class="w-16 h-16 mx-auto mb-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -85,9 +85,9 @@
                 </div>
 
                 <!-- Lower Panel: Input/Search -->
-                <div class="p-4 flex-shrink-0 bg-white/90 relative">
+                <div class="p-4 flex-shrink-0 bg-amber-50/70 relative">
                     <!-- Floating Search Suggestions (positioned above input) -->
-                    <div id="suggestions" class="absolute bottom-full left-0 right-0 mb-2 max-h-80 overflow-y-auto scrollbar-thin bg-white/95 backdrop-blur-md rounded-xl shadow-lg border border-slate-200/60 z-10 hidden">
+                    <div id="suggestions" class="absolute bottom-full left-0 right-0 mb-2 max-h-80 overflow-y-auto scrollbar-thin bg-amber-50/95 backdrop-blur-md rounded-xl shadow-lg border border-amber-200/60 z-10 hidden">
                         <!-- Search suggestions will appear here -->
                     </div>
 
@@ -96,12 +96,12 @@
                             type="text"
                             id="word-input"
                             placeholder="Word to search or generate meaning..."
-                            class="w-full pr-12 pl-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white/80 backdrop-blur-sm text-slate-700 placeholder-slate-400"
+                            class="w-full pr-12 pl-4 py-3 border border-amber-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-amber-50/80 backdrop-blur-sm text-slate-700 placeholder-slate-400"
                         >
                         <button
                             id="generate-btn"
                             title="Generate"
-                            class="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 text-blue-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed group"
+                            class="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 text-blue-500 hover:text-blue-600 hover:bg-amber-100/70 rounded-lg transition-all duration-200 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed group"
                         >
                             <svg id="generate-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
@@ -115,8 +115,8 @@
             </div>
 
             <!-- Right Panel: Associated List -->
-            <div id="right-panel" class="bg-white/70 backdrop-blur-sm border-l border-slate-200/60 flex flex-col shadow-sm" style="width: 25%; min-width: 200px;">
-                <div class="p-2 border-b border-slate-200/60 bg-gradient-to-r from-white/80 to-slate-50/80">
+            <div id="right-panel" class="bg-amber-50/70 backdrop-blur-sm border-l border-amber-200/60 flex flex-col shadow-sm" style="width: 25%; min-width: 200px;">
+                <div class="p-2 border-b border-amber-200/60 bg-gradient-to-r from-amber-25/40 to-amber-50/60">
                     <h2 class="text-sm font-medium text-slate-700 flex items-center justify-between">
                         <div class="flex items-center">
                             <svg class="w-3 h-3 mr-1.5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -124,7 +124,7 @@
                             </svg>
                             Associated Words
                         </div>
-                        <span id="associated-count" class="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">0</span>
+                        <span id="associated-count" class="text-xs font-medium text-slate-600 bg-amber-100/70 px-2 py-0.5 rounded-full">0</span>
                     </h2>
                 </div>
                 <div id="associated-list" class="flex-1 overflow-y-auto scrollbar-thin p-3">
