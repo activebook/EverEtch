@@ -93,9 +93,7 @@ src/
 Configure your AI provider in the Settings modal:
 
 - **OpenAI**: Requires API key
-- **Anthropic**: Requires API key
 - **Google**: Requires API key
-- **Custom**: Configure custom endpoint
 
 ## License
 

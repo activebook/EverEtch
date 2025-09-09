@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { ProfileConfig } from '../database/DatabaseManager.js';
 
 export interface AIMessage {
@@ -27,7 +28,15 @@ export interface ProcessedToolData {
   tag_colors?: Record<string, string>;
 }
 
-export class AIModelClient {
+// Provider interface for different AI services
+export interface AIProvider {
+  generateMeaningOnly(word: string, profile: ProfileConfig, onStreamingContent?: (content: string) => void): Promise<string>;
+  generateTagsAndSummary(word: string, meaning: string, profile: ProfileConfig): Promise<ProcessedToolData>;
+  getAvailableModels?(profile: ProfileConfig): Promise<string[]>;
+}
+
+// OpenAI provider implementation
+export class OpenAIProvider implements AIProvider {
   private openai: OpenAI | null = null;
 
   async generateMeaningOnly(word: string, profile: ProfileConfig, onStreamingContent?: (content: string) => void): Promise<string> {
@@ -307,50 +316,6 @@ export class AIModelClient {
     return fallback;
   }
 
-  private async processToolCalls(toolCalls: ToolCall[], word: string): Promise<ProcessedToolData> {
-    const toolData: ProcessedToolData = {};
-
-    console.log('Processing tool calls:', toolCalls.length);
-
-    for (const toolCall of toolCalls) {
-      try {
-        console.log('Processing tool call:', toolCall.function.name);
-        switch (toolCall.function.name) {
-          case 'add_summary':
-            const summaryArgs = JSON.parse(toolCall.function.arguments);
-            toolData.summary = summaryArgs.summary;
-            console.log('Summary extracted:', toolData.summary);
-            break;
-
-          case 'add_tags':
-            const tagsArgs = JSON.parse(toolCall.function.arguments);
-            toolData.tags = tagsArgs.tags;
-            toolData.tag_colors = tagsArgs.tag_colors || {};
-            console.log('Tags extracted:', toolData.tags);
-            break;
-
-          default:
-            console.log('Unknown tool called:', toolCall.function.name);
-        }
-      } catch (error) {
-        console.error('Error processing tool call:', error, 'Arguments:', toolCall.function.arguments);
-      }
-    }
-
-    // Ensure we have fallback data if tools failed
-    if (!toolData.summary) {
-      toolData.summary = `A word related to: ${word}`;
-    }
-    if (!toolData.tags || toolData.tags.length === 0) {
-      toolData.tags = ['general'];
-      toolData.tag_colors = { 'general': '#6b7280' };
-    }
-
-    console.log('Final processed tool data:', toolData);
-    return toolData;
-  }
-
-  // Method to get available models (for future use)
   async getAvailableModels(profile: ProfileConfig): Promise<string[]> {
     if (!this.openai || !profile.model_config.api_key) {
       return [];
@@ -363,5 +328,218 @@ export class AIModelClient {
       console.error('Error fetching models:', error);
       return [];
     }
+  }
+}
+
+// Google Gemini provider implementation
+export class GeminiProvider implements AIProvider {
+  private genAI: GoogleGenerativeAI | null = null;
+
+  async generateMeaningOnly(word: string, profile: ProfileConfig, onStreamingContent?: (content: string) => void): Promise<string> {
+    if (!profile.model_config.api_key) {
+      throw new Error('API key not configured for this profile');
+    }
+
+    // Configure Google AI to use undici fetch for Electron compatibility
+    // Note: GoogleGenerativeAI constructor doesn't accept fetch config, so we need to set it globally
+    this.genAI = new GoogleGenerativeAI(profile.model_config.api_key);
+
+    try {
+      const model = this.genAI.getGenerativeModel({
+        model: profile.model_config.model || 'gemini-pro',
+        systemInstruction: profile.system_prompt
+      });
+
+      const result = await model.generateContent(`Please provide a meaning for the word "${word}".`);
+      const response = await result.response;
+      const text = response.text();
+
+      // For streaming, we'll emit the full content at once since Gemini doesn't support streaming in the same way
+      if (onStreamingContent) {
+        onStreamingContent(text);
+      }
+
+      return text;
+
+    } catch (error) {
+      console.error('Error generating meaning with Gemini:', error);
+      throw new Error('Failed to generate meaning. Please check your API configuration.');
+    }
+  }
+
+  async generateTagsAndSummary(word: string, meaning: string, profile: ProfileConfig): Promise<ProcessedToolData> {
+    console.log('🔄 Gemini generateTagsAndSummary called with word:', word, 'meaning length:', meaning.length);
+
+    if (!profile.model_config.api_key) {
+      console.error('❌ API key not configured for this profile');
+      throw new Error('API key not configured for this profile');
+    }
+
+    this.genAI = new GoogleGenerativeAI(profile.model_config.api_key);
+
+    try {
+      console.log('🚀 Starting Gemini generation of summary and tags...');
+
+      // Gemini doesn't have function calling like OpenAI, so we'll use structured prompts
+      const [summaryResult, tagsResult] = await Promise.all([
+        this.generateSummaryOnly(word, meaning, profile),
+        this.generateTagsOnly(word, meaning, profile)
+      ]);
+
+      console.log('✅ Both Gemini API calls completed successfully');
+      console.log('📝 Summary result:', summaryResult);
+      console.log('🏷️ Tags result:', tagsResult);
+
+      const finalResult = {
+        summary: summaryResult.summary,
+        tags: tagsResult.tags,
+        tag_colors: tagsResult.tag_colors
+      };
+
+      console.log('🎯 Final result:', finalResult);
+      return finalResult;
+
+    } catch (error) {
+      console.error('❌ Error in Gemini generateTagsAndSummary:', error);
+      console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+
+      // Provide fallbacks if any call fails
+      const fallbackResult = {
+        summary: `A word: ${word}`,
+        tags: ['general'],
+        tag_colors: { 'general': '#6b7280' }
+      };
+
+      console.log('🔄 Returning fallback result:', fallbackResult);
+      return fallbackResult;
+    }
+  }
+
+  private async generateSummaryOnly(word: string, meaning: string, profile: ProfileConfig): Promise<{ summary: string }> {
+    console.log('📝 Gemini generateSummaryOnly called for word:', word);
+
+    this.genAI = new GoogleGenerativeAI(profile.model_config.api_key);
+
+    try {
+      const model = this.genAI.getGenerativeModel({
+        model: profile.model_config.model || 'gemini-pro',
+        systemInstruction: `You are a language assistant. Your task is to provide a concise one-line summary of a word's meaning. Always respond with just the summary, no additional text.`
+      });
+
+      const prompt = `Provide a brief one-line summary for the word "${word}" based on this meaning: ${meaning}
+
+Respond with only the summary, nothing else.`;
+
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text().trim();
+
+      console.log('🎯 Gemini Summary result:', text);
+      return { summary: text };
+
+    } catch (error) {
+      console.error('❌ Error in Gemini generateSummaryOnly API call:', error);
+      console.error('❌ Error details:', error instanceof Error ? error.message : 'Unknown error');
+
+      // Fallback if API call fails
+      console.log('🔄 Using fallback for Gemini summary');
+      const fallback = { summary: `A word: ${word}` };
+      console.log('🔄 Fallback result:', fallback);
+      return fallback;
+    }
+  }
+
+  private async generateTagsOnly(word: string, meaning: string, profile: ProfileConfig): Promise<{ tags: string[], tag_colors: Record<string, string> }> {
+    console.log('🏷️ Gemini generateTagsOnly called for word:', word);
+
+    this.genAI = new GoogleGenerativeAI(profile.model_config.api_key);
+
+    try {
+      const model = this.genAI.getGenerativeModel({
+        model: profile.model_config.model || 'gemini-pro',
+        systemInstruction: `You are a language assistant. Your task is to provide relevant tags and colors for categorizing words. Always respond in valid JSON format.`
+      });
+
+      const prompt = `Provide 5-10 relevant tags for the word "${word}" based on this meaning: ${meaning}.
+
+Respond with a JSON object in this exact format:
+{
+  "tags": ["tag1", "tag2", "tag3"],
+  "tag_colors": {"tag1": "#hexcolor1", "tag2": "#hexcolor2"}
+}
+
+Include appropriate hex colors for each tag. Respond with only the JSON, no additional text.`;
+
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text().trim();
+
+      console.log('📋 Gemini Tags raw response:', text);
+
+      // Try to parse the JSON response
+      try {
+        const parsed = JSON.parse(text);
+        const result = {
+          tags: parsed.tags || ['general'],
+          tag_colors: parsed.tag_colors || { 'general': '#6b7280' }
+        };
+        console.log('🎯 Gemini Tags result:', result);
+        return result;
+      } catch (parseError) {
+        console.warn('⚠️ Failed to parse Gemini tags JSON, using fallback');
+        throw new Error('Invalid JSON response from Gemini');
+      }
+
+    } catch (error) {
+      console.error('❌ Error in Gemini generateTagsOnly API call:', error);
+      console.error('❌ Error details:', error instanceof Error ? error.message : 'Unknown error');
+
+      // Fallback if API call fails
+      console.log('🔄 Using fallback for Gemini tags');
+      const fallback = {
+        tags: ['general'],
+        tag_colors: { 'general': '#6b7280' }
+      };
+      console.log('🔄 Fallback result:', fallback);
+      return fallback;
+    }
+  }
+
+  async getAvailableModels(profile: ProfileConfig): Promise<string[]> {
+    // Gemini doesn't have a models list API like OpenAI
+    // Return common Gemini models
+    return ['gemini-pro', 'gemini-pro-vision', 'gemini-1.5-pro', 'gemini-1.5-flash'];
+  }
+}
+
+// Provider factory function
+function createProvider(profile: ProfileConfig): AIProvider {
+  switch (profile.model_config.provider) {
+    case 'openai':
+      return new OpenAIProvider();
+    case 'google':
+      return new GeminiProvider();
+    default:
+      // Default to OpenAI for backward compatibility
+      return new OpenAIProvider();
+  }
+}
+
+// Main AIModelClient that delegates to appropriate provider
+export class AIModelClient {
+  async generateMeaningOnly(word: string, profile: ProfileConfig, onStreamingContent?: (content: string) => void): Promise<string> {
+    const provider = createProvider(profile);
+    return provider.generateMeaningOnly(word, profile, onStreamingContent);
+  }
+
+  async generateTagsAndSummary(word: string, meaning: string, profile: ProfileConfig): Promise<ProcessedToolData> {
+    const provider = createProvider(profile);
+    return provider.generateTagsAndSummary(word, meaning, profile);
+  }
+
+  // Method to get available models (for future use)
+  async getAvailableModels(profile: ProfileConfig): Promise<string[]> {
+    const provider = createProvider(profile);
+    return provider.getAvailableModels ? provider.getAvailableModels(profile) : [];
   }
 }

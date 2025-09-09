@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-//import { getAndSetProxyEnvironment } from './sys_proxy.js';
+import { getAndSetProxyEnvironment } from './sys_proxy.js';
 import { DatabaseManager } from './database/DatabaseManager.js';
 import { ProfileManager } from './database/ProfileManager.js';
 import { AIModelClient } from './ai/AIModelClient.js';
@@ -32,7 +32,8 @@ async function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, 'renderer/index.html'));
 
-  //getAndSetProxyEnvironment();
+  // Set up proxy environment variables
+  getAndSetProxyEnvironment();
 
   // Initialize managers
   dbManager = new DatabaseManager();

@@ -1204,6 +1204,12 @@ class EverEtchApp {
   }
 
   private selectWord(word: WordDocument) {
+    // Prevent selecting a word while generation is in progress
+    if (this.isGenerating) {
+      console.log('⚠️ selectWord: Generation in progress, ignoring word selection');
+      return;
+    }
+
     this.currentWord = word;
     this.renderWordDetails(word);
 
@@ -1298,7 +1304,7 @@ class EverEtchApp {
 
   private handleStreamingContent(content: string) {
     this.streamingContent += content;
-    if (this.currentWord) {
+    if (this.currentWord && this.currentWord.id === 'temp') {
       const streamingWord = { ...this.currentWord, details: this.streamingContent };
       this.renderStreamingWordDetails(streamingWord);
 
