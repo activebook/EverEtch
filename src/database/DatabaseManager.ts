@@ -341,4 +341,41 @@ export class DatabaseManager {
       }
     });
   }
+
+  /**
+   * Reconnect to an existing database file (used after renaming)
+   * This bypasses the table creation logic and directly opens the existing database
+   */
+  reconnectToDatabase(profileName: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      // Close any existing connection
+      if (this.db) {
+        this.db.close((closeErr) => {
+          if (closeErr) {
+            console.error('Error closing existing database:', closeErr);
+          }
+
+          // Now open the new database
+          this.dbPath = getDatabasePath(profileName);
+          this.db = new sqlite3.Database(this.dbPath, (err) => {
+            if (err) {
+              reject(err);
+            } else {
+              resolve();
+            }
+          });
+        });
+      } else {
+        // No existing connection, just open the database
+        this.dbPath = getDatabasePath(profileName);
+        this.db = new sqlite3.Database(this.dbPath, (err) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        });
+      }
+    });
+  }
 }

@@ -68,8 +68,20 @@ ipcMain.handle('get-profiles', () => {
   return profileManager.getProfiles();
 });
 
+ipcMain.handle('get-current-profile-name', () => {
+  return profileManager.getLastOpenedProfile();
+});
+
 ipcMain.handle('switch-profile', async (event, profileName: string) => {
   return await profileManager.switchProfile(profileName);
+});
+
+ipcMain.handle('create-profile', async (event, profileName: string) => {
+  return await profileManager.createProfile(profileName);
+});
+
+ipcMain.handle('rename-profile', async (event, oldName: string, newName: string) => {
+  return await profileManager.renameProfile(oldName, newName);
 });
 
 ipcMain.handle('get-words', async () => {

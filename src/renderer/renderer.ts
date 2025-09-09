@@ -3,7 +3,10 @@ declare global {
   interface Window {
     electronAPI: {
       getProfiles: () => Promise<string[]>;
+      getCurrentProfileName: () => Promise<string | null>;
       switchProfile: (profileName: string) => Promise<boolean>;
+      createProfile: (profileName: string) => Promise<boolean>;
+      renameProfile: (oldName: string, newName: string) => Promise<boolean>;
       getWords: () => Promise<any[]>;
       searchWords: (query: string) => Promise<any[]>;
       getWord: (wordId: string) => Promise<any>;
@@ -75,6 +78,7 @@ class EverEtchApp {
   private async loadProfiles() {
     try {
       this.profiles = await window.electronAPI.getProfiles();
+      const currentProfileName = await window.electronAPI.getCurrentProfileName();
       const profileSelect = document.getElementById('profile-select') as HTMLSelectElement;
 
       profileSelect.innerHTML = '';
@@ -85,8 +89,12 @@ class EverEtchApp {
         profileSelect.appendChild(option);
       });
 
-      // Set current profile
-      if (this.profiles.length > 0) {
+      // Set current profile to the actual current profile from backend
+      if (currentProfileName && this.profiles.includes(currentProfileName)) {
+        this.currentProfile = currentProfileName;
+        profileSelect.value = this.currentProfile;
+      } else if (this.profiles.length > 0) {
+        // Fallback to first profile if current profile is not found
         this.currentProfile = this.profiles[0];
         profileSelect.value = this.currentProfile;
       }
@@ -434,26 +442,28 @@ class EverEtchApp {
     }
 
     try {
-      // For now, we'll just add it to the UI since we don't have backend API for creating profiles
-      // In a real implementation, this would call an API to create the profile
-      this.profiles.push(profileName);
-      this.currentProfile = profileName;
+      // Call backend API to create the profile and database
+      const success = await window.electronAPI.createProfile(profileName);
 
-      // Update the profile selector
-      const profileSelect = document.getElementById('profile-select') as HTMLSelectElement;
-      const option = document.createElement('option');
-      option.value = profileName;
-      option.textContent = profileName;
-      profileSelect.appendChild(option);
-      profileSelect.value = profileName;
+      if (success) {
+        // Refresh the profile list from backend
+        await this.loadProfiles();
+        this.currentProfile = profileName;
 
-      // Clear current word list and details
-      this.clearWordDetails();
-      const wordList = document.getElementById('word-list')!;
-      wordList.innerHTML = '';
+        // Switch to the newly created profile
+        const profileSelect = document.getElementById('profile-select') as HTMLSelectElement;
+        profileSelect.value = profileName;
 
-      this.hideAddProfileModal();
-      this.showSuccess(`Profile "${profileName}" created successfully`);
+        // Clear current word list and details since we're switching to empty profile
+        this.clearWordDetails();
+        const wordList = document.getElementById('word-list')!;
+        wordList.innerHTML = '';
+
+        this.hideAddProfileModal();
+        this.showSuccess(`Profile "${profileName}" created successfully`);
+      } else {
+        this.showError('Failed to create profile');
+      }
     } catch (error) {
       console.error('Error creating profile:', error);
       this.showError('Failed to create profile');
@@ -990,17 +1000,21 @@ class EverEtchApp {
     try {
       const success = await window.electronAPI.updateProfileConfig(config);
       if (success) {
-        // Update the profile name in the UI if it changed
+        // Update the profile name if it changed
         if (profileName !== this.currentProfile) {
-          this.currentProfile = profileName;
-          // Update the profile selector dropdown
-          const profileSelect = document.getElementById('profile-select') as HTMLSelectElement;
-          const currentOption = profileSelect.querySelector(`option[value="${this.currentProfile}"]`) as HTMLOptionElement;
-          if (currentOption) {
-            currentOption.textContent = profileName;
-            currentOption.value = profileName;
+          const success = await window.electronAPI.renameProfile(this.currentProfile, profileName);
+          if (success) {
+            // Refresh the entire profile list from backend to show updated names
+            await this.loadProfiles();
+            this.currentProfile = profileName;
+
+            // Ensure the dropdown shows the renamed profile as selected
+            const profileSelect = document.getElementById('profile-select') as HTMLSelectElement;
+            profileSelect.value = profileName;
+          } else {
+            this.showError('Failed to rename profile');
+            return;
           }
-          profileSelect.value = profileName;
         }
 
         this.showSuccess('Settings saved successfully');

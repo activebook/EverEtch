@@ -5,7 +5,10 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electronAPI', {
   // Profile management
   getProfiles: () => ipcRenderer.invoke('get-profiles'),
+  getCurrentProfileName: () => ipcRenderer.invoke('get-current-profile-name'),
   switchProfile: (profileName: string) => ipcRenderer.invoke('switch-profile', profileName),
+  createProfile: (profileName: string) => ipcRenderer.invoke('create-profile', profileName),
+  renameProfile: (oldName: string, newName: string) => ipcRenderer.invoke('rename-profile', oldName, newName),
 
   // Word operations
   getWords: () => ipcRenderer.invoke('get-words'),
