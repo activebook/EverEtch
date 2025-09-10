@@ -44,6 +44,8 @@ interface WordDocument {
   details: string;
   tags: string[];
   tag_colors: Record<string, string>;
+  synonyms: string[];
+  antonyms: string[];
   created_at: string;
   updated_at: string;
 }
@@ -506,6 +508,8 @@ class EverEtchApp {
         details: '',
         tags: [],
         tag_colors: {},
+        synonyms: [],
+        antonyms: [],
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -522,8 +526,8 @@ class EverEtchApp {
 
       // Show loading states for summary and tags
       tempWord.one_line_desc = 'Generating summary...';
-      tempWord.tags = ['Generating tags...'];
-      tempWord.tag_colors = { 'Generating tags...': '#6b7280' };
+      tempWord.tags = ['Analyzing word...'];
+      tempWord.tag_colors = { 'Analyzing word...': '#6b7280' };
       this.renderWordDetails(tempWord);
 
       // Second call: Generate tags and summary using the meaning
@@ -537,7 +541,7 @@ class EverEtchApp {
           // Only update if this is still the current generation and word has loading states
           if (this.currentGenerationId === generationId &&
               this.currentWord &&
-              this.currentWord.tags.includes('Generating tags...')) {
+              this.currentWord.tags.includes('Analyzing word...')) {
             console.log('Tool result timeout - forcing UI update');
             // Force update with fallback data
             this.currentWord.one_line_desc = `Summary for: ${word}`;
@@ -586,7 +590,9 @@ class EverEtchApp {
         one_line_desc: this.currentWord.one_line_desc,
         details: this.currentWord.details,
         tags: this.currentWord.tags,
-        tag_colors: this.currentWord.tag_colors
+        tag_colors: this.currentWord.tag_colors,
+        synonyms: this.currentWord.synonyms || [],
+        antonyms: this.currentWord.antonyms || []
       };
 
       const addedWord = await window.electronAPI.addWord(wordData);
@@ -998,7 +1004,7 @@ class EverEtchApp {
   private async renderWordDetails(word: WordDocument) {
     const wordDetails = document.getElementById('word-details')!;
     const isLoadingSummary = word.one_line_desc === 'Generating summary...';
-    const isLoadingTags = word.tags.includes('Generating tags...');
+    const isLoadingTags = word.tags.includes('Analyzing word...');
 
     // Process markdown content via IPC
     const renderedDetails = await window.electronAPI.processMarkdown(word.details || '');
@@ -1011,15 +1017,25 @@ class EverEtchApp {
         </div>
 
         <div>
-          <h4 class="text-lg font-semibold text-slate-800 mb-3">Details</h4>
+          <h4 class="text-lg font-semibold text-slate-800 mb-3 flex items-center">
+            <svg class="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            Details
+          </h4>
           <div class="markdown-details prose prose-sm max-w-none">${renderedDetails}</div>
         </div>
 
         <div>
-          <h4 class="text-lg font-semibold text-slate-800 mb-3">Tags</h4>
+          <h4 class="text-lg font-semibold text-slate-800 mb-3 flex items-center">
+            <svg class="w-4 h-4 mr-2 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+            </svg>
+            Tags
+          </h4>
           <div id="tags-container" class="flex flex-wrap gap-2 mb-4">
             ${word.tags.map(tag => {
-      const isLoadingTags = tag === 'Generating tags...';
+      const isLoadingTags = tag === 'Analyzing word...';
       return `
                 <span
                   class="tag-button ${isLoadingTags ? 'animate-pulse' : ''}"
@@ -1032,10 +1048,46 @@ class EverEtchApp {
               `;
     }).join('')}
           </div>
-
-          <!-- Action buttons will be loaded separately after word details are complete -->
-          <div id="action-buttons-container"></div>
         </div>
+
+        ${word.synonyms && word.synonyms.length > 0 ? `
+          <div>
+            <h4 class="text-lg font-semibold text-slate-800 mb-3 flex items-center">
+              <svg class="w-4 h-4 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
+              </svg>
+              Synonyms
+            </h4>
+            <div class="flex flex-wrap gap-2 mb-4">
+              ${word.synonyms.map(synonym => `
+                <span class="synonym-button px-3 py-1.5 text-sm font-medium bg-green-100 text-green-800 rounded-full border border-green-200 hover:bg-green-200 transition-colors duration-200 cursor-pointer">
+                  ${synonym}
+                </span>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+
+        ${word.antonyms && word.antonyms.length > 0 ? `
+          <div>
+            <h4 class="text-lg font-semibold text-slate-800 mb-3 flex items-center">
+              <svg class="w-4 h-4 mr-2 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+              Antonyms
+            </h4>
+            <div class="flex flex-wrap gap-2 mb-4">
+              ${word.antonyms.map(antonym => `
+                <span class="antonym-button px-3 py-1.5 text-sm font-medium bg-red-100 text-red-800 rounded-full border border-red-200 hover:bg-red-200 transition-colors duration-200 cursor-pointer">
+                  ${antonym}
+                </span>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- Action buttons will be loaded separately after word details are complete -->
+        <div id="action-buttons-container"></div>
       </div>
     `;
 
@@ -1046,6 +1098,40 @@ class EverEtchApp {
         const target = e.target as HTMLElement;
         const tag = target.dataset.tag!;
         await this.loadAssociatedWords(tag);
+      });
+    });
+
+    // Add click handlers for synonyms
+    const synonymElements = wordDetails.querySelectorAll('.synonym-button');
+    synonymElements.forEach(synonymEl => {
+      synonymEl.addEventListener('click', async (e) => {
+        const target = e.target as HTMLElement;
+        const synonym = target.textContent!.trim();
+        // Set the input field to the synonym and trigger search
+        const wordInput = document.getElementById('word-input') as HTMLInputElement;
+        wordInput.value = synonym;
+        this.updateGenerateBtnState(synonym);
+        // Trigger search if synonym exists
+        if (synonym.length > 0) {
+          this.handleSearchInput(synonym);
+        }
+      });
+    });
+
+    // Add click handlers for antonyms
+    const antonymElements = wordDetails.querySelectorAll('.antonym-button');
+    antonymElements.forEach(antonymEl => {
+      antonymEl.addEventListener('click', async (e) => {
+        const target = e.target as HTMLElement;
+        const antonym = target.textContent!.trim();
+        // Set the input field to the antonym and trigger search
+        const wordInput = document.getElementById('word-input') as HTMLInputElement;
+        wordInput.value = antonym;
+        this.updateGenerateBtnState(antonym);
+        // Trigger search if antonym exists
+        if (antonym.length > 0) {
+          this.handleSearchInput(antonym);
+        }
       });
     });
 
@@ -1473,6 +1559,14 @@ class EverEtchApp {
           console.log('🎨 Renderer: Updating tag colors:', toolData.tag_colors);
           this.currentWord.tag_colors = toolData.tag_colors;
         }
+        if (toolData.synonyms) {
+          console.log('🔄 Renderer: Updating synonyms:', toolData.synonyms);
+          this.currentWord.synonyms = toolData.synonyms;
+        }
+        if (toolData.antonyms) {
+          console.log('🔄 Renderer: Updating antonyms:', toolData.antonyms);
+          this.currentWord.antonyms = toolData.antonyms;
+        }
 
         console.log('🔄 Renderer: Re-rendering word details');
         // Re-render with updated data (use regular render, not streaming)
@@ -1504,12 +1598,22 @@ class EverEtchApp {
         </div>
 
         <div>
-          <h4 class="text-lg font-semibold text-slate-800 mb-3">Details</h4>
+          <h4 class="text-lg font-semibold text-slate-800 mb-3 flex items-center">
+            <svg class="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            Details
+          </h4>
           <div class="markdown-details prose prose-sm max-w-none">${formattedDetails}<span class="animate-pulse">|</span></div>
         </div>
 
         <div>
-          <h4 class="text-lg font-semibold text-slate-800 mb-3">Tags</h4>
+          <h4 class="text-lg font-semibold text-slate-800 mb-3 flex items-center">
+            <svg class="w-4 h-4 mr-2 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+            </svg>
+            Tags
+          </h4>
           <div id="tags-container" class="flex flex-wrap gap-2 mb-4">
             ${word.tags.map(tag => `
               <span

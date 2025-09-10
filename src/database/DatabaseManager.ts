@@ -8,6 +8,8 @@ export interface WordDocument {
   details: string;
   tags: string[];
   tag_colors: Record<string, string>;
+  synonyms: string[];
+  antonyms: string[];
   created_at: string;
   updated_at: string;
 }
