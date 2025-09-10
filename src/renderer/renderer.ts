@@ -15,8 +15,8 @@ declare global {
       addWord: (wordData: any) => Promise<any>;
       updateWord: (wordId: string, wordData: any) => Promise<any>;
       deleteWord: (wordId: string) => Promise<boolean>;
-      generateMeaningOnly: (word: string) => Promise<string>;
-      generateTagsAndSummary: (word: string, meaning: string, generationId: string) => Promise<any>;
+      generateWordMeaning: (word: string) => Promise<string>;
+      generateWordMetas: (word: string, meaning: string, generationId: string) => Promise<any>;
       generateMeaning: (word: string) => Promise<string>;
       getAssociatedWords: (tag: string) => Promise<any[]>;
       getAssociatedWordsPaginated: (tag: string, offset: number, limit: number) => Promise<{ words: any[], hasMore: boolean, total: number }>;
@@ -514,7 +514,7 @@ class EverEtchApp {
       this.renderStreamingWordDetails(tempWord);
 
       // First call: Generate meaning only
-      const meaning = await window.electronAPI.generateMeaningOnly(word);
+      const meaning = await window.electronAPI.generateWordMeaning(word);
 
       // Update the word with the meaning
       tempWord.details = meaning;
@@ -528,9 +528,9 @@ class EverEtchApp {
 
       // Second call: Generate tags and summary using the meaning
       try {
-        console.log('Starting generateTagsAndSummary call...');
-        const tagsResult = await window.electronAPI.generateTagsAndSummary(word, meaning, generationId);
-        console.log('generateTagsAndSummary completed:', tagsResult);
+        console.log('Starting generateWordMetas call...');
+        const tagsResult = await window.electronAPI.generateWordMetas(word, meaning, generationId);
+        console.log('generateWordMetas completed:', tagsResult);
 
         // Set a timeout to ensure UI updates even if event is delayed
         setTimeout(() => {
@@ -548,7 +548,7 @@ class EverEtchApp {
         }, 10000); // 10 second timeout
 
       } catch (error) {
-        console.error('Error in generateTagsAndSummary:', error);
+        console.error('Error in generateWordMetas:', error);
         this.showError('Failed to generate tags and summary. Please check your API configuration.');
         // Clear loading states on error (only if this is still the current generation)
         if (this.currentGenerationId === generationId && this.currentWord) {
@@ -1494,7 +1494,7 @@ class EverEtchApp {
     const wordDetails = document.getElementById('word-details')!;
 
     // Process markdown content via IPC
-    const formattedDetails = await window.electronAPI.processMarkdown(word.details || ' ');
+    const formattedDetails = await window.electronAPI.processMarkdown(word.details || '');
 
     wordDetails.innerHTML = `
       <div class="space-y-6">

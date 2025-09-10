@@ -434,7 +434,7 @@ function createProvider(profile: ProfileConfig): AIProvider {
 
 // Main AIModelClient that delegates to appropriate provider
 export class AIModelClient {
-  async generateMeaningOnly(word: string, profile: ProfileConfig, onStreamingContent?: (content: string) => void): Promise<string> {
+  async generateWordMeaning(word: string, profile: ProfileConfig, onStreamingContent?: (content: string) => void): Promise<string> {
     const provider = createProvider(profile);
     return provider.generateWordMeaning(word, profile, onStreamingContent);
   }

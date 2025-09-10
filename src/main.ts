@@ -107,7 +107,7 @@ ipcMain.handle('get-word', async (event, wordId: string) => {
   return await dbManager.getWord(wordId);
 });
 
-ipcMain.handle('generate-meaning-only', async (event, word: string) => {
+ipcMain.handle('generate-word-meaning', async (event, word: string) => {
   const profile = await profileManager.getCurrentProfile();
   if (!profile) return null;
 
@@ -116,12 +116,12 @@ ipcMain.handle('generate-meaning-only', async (event, word: string) => {
     mainWindow.webContents.send('streaming-content', content);
   };
 
-  const meaning = await aiClient.generateMeaningOnly(word, profile, onStreamingContent);
+  const meaning = await aiClient.generateWordMeaning(word, profile, onStreamingContent);
   return meaning;
 });
 
-ipcMain.handle('generate-tags-summary', async (event, word: string, meaning: string, generationId: string) => {
-  console.log('🔄 Main process: generate-tags-summary called with generationId:', generationId);
+ipcMain.handle('generate-word-metas', async (event, word: string, meaning: string, generationId: string) => {
+  console.log('🔄 Main process: generate-word-metas called with generationId:', generationId);
 
   // Defensive check: ensure generationId is valid
   if (!generationId || typeof generationId !== 'string' || generationId.length === 0) {
@@ -176,7 +176,7 @@ ipcMain.handle('generate-tags-summary', async (event, word: string, meaning: str
 
     return safeToolData;
   } catch (error) {
-    console.error('❌ Main process: Error in generate-tags-summary:', error);
+    console.error('❌ Main process: Error in generate-word-metas:', error);
 
     // Send fallback data on error
     const fallbackData = {
