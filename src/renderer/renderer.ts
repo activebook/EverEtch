@@ -1341,7 +1341,7 @@ class EverEtchApp {
     }
 
     // Reset button states
-    this.updateGenerateBtnState('');
+    this.updateGenerateBtnState('', false); // Explicitly set to generate mode (not search mode)
     this.isSearchMode = false;
 
     // Update word count display
