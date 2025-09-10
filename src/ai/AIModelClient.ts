@@ -110,7 +110,7 @@ export class OpenAIProvider implements AIProvider {
     const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
       {
         role: 'system',
-        content: `You are a language assistant. Your task is to provide a concise summary, relevant tags, and appropriate colors for categorizing words.`
+        content: `You are an expert language assistant specializing in word analysis and categorization. Your task is to provide structured, consistent summaries, relevant tags, and appropriate colors for words to support language learning applications. Always use the generate_word_summary_tags_and_colors tool when asked to analyze or categorize words.`
       },
       {
         role: 'user',
@@ -123,24 +123,33 @@ export class OpenAIProvider implements AIProvider {
       {
         type: 'function' as const,
         function: {
-          name: 'add_summary_tags_colors',
-          description: 'Add a summary, relevant tags, and colors to categorize the word',
+          name: 'generate_word_summary_tags_and_colors',
+          description: 'Generate a concise summary, relevant categorization tags, and appropriate color codes for a given word based on its meaning. This tool helps organize and visualize word information for language learning applications.',
           parameters: {
             type: 'object',
             properties: {
               summary: {
                 type: 'string',
-                description: 'A brief one-line summary of the word\'s primary meaning'
+                description: 'A single, concise sentence that captures the word\'s primary meaning or definition.'
               },
               tags: {
                 type: 'array',
                 items: { type: 'string' },
-                description: 'Array of 5-10 relevant tags for the word'
+                minItems: 5,
+                maxItems: 10,
+                description: '5-10 relevant tags that categorize the word by part of speech, category, usage, or characteristics. Examples: ["noun", "animal", "marine", "mammal"] or ["verb", "communication", "informal", "slang"]'
               },
               tag_colors: {
                 type: 'object',
-                description: 'Hex color codes for each tag (e.g., {"noun": "#3B82F6", "animal": "#10B981", "slang": "#FBBF24"})',
-                additionalProperties: { type: 'string' }
+                description: 'Hex color codes for each tag in the tags array. Each tag must have a corresponding color. Use visually distinct colors that represent the tag\'s meaning. Examples: {"noun": "#3B82F6", "animal": "#10B981", "marine": "#06B6D4", "mammal": "#8B5CF6"}',
+                additionalProperties: { type: 'string' },
+                patternProperties: {
+                  ".*": {
+                    type: 'string',
+                    pattern: '^#[0-9A-Fa-f]{6}$',
+                    description: 'Valid hex color code (e.g., #FF5733)'
+                  }
+                }
               }
             },
             required: ['summary', 'tags', 'tag_colors']
@@ -149,12 +158,13 @@ export class OpenAIProvider implements AIProvider {
       }
     ];
 
+
     try {
       const completion = await this.openai.chat.completions.create({
         model: profile.model_config.model,
         messages,
         tools,
-        tool_choice: { type: 'function', function: { name: 'add_summary_tags_colors' } } // Force specific tool
+        tool_choice: { type: 'function', function: { name: 'generate_word_summary_tags_and_colors' } } // Force specific tool
       });
 
       if (completion.choices[0]?.message?.tool_calls?.[0]) {
@@ -163,13 +173,13 @@ export class OpenAIProvider implements AIProvider {
         const args = JSON.parse((toolCall as any).function.arguments);
 
         const result: ProcessedToolData = {
-          summary: (typeof args.summary === 'string' && args.summary.trim()) ? args.summary : `${word}`,
+          summary: (typeof args.summary === 'string' && args.summary.trim()) ? args.summary : `---`,
           tags: Array.isArray(args.tags) ? args.tags : ['---'],
           tag_colors: (typeof args.tag_colors === 'object' && args.tag_colors !== null && Object.keys(args.tag_colors).length > 0) ? args.tag_colors : { '---': '#6b7280' }
         };
         return result;
       } else {
-        console.warn('⚠️ No function calls found in OpenAI completion');        
+        console.warn('⚠️ No function calls found in OpenAI completion');
       }
     } catch (error) {
       const err = 'Failed to generate summary and tags. ' + ((error as any) instanceof Error ? (error as Error).message : 'Unknown error');
@@ -262,25 +272,36 @@ export class GeminiProvider implements AIProvider {
       {
         functionDeclarations: [
           {
-            name: 'add_summary_tags_colors',
-            description: 'Add a summary, relevant tags, and colors to categorize the word',
-            // Here must use : Parameters JSON schema
+            name: 'generate_word_summary_tags_and_colors',
+            description: 'Generate a concise summary, relevant categorization tags, and appropriate color codes for a given word based on its meaning. This tool helps organize and visualize word information for language learning applications.',
             parametersJsonSchema: {
               type: Type.OBJECT,
               properties: {
                 summary: {
                   type: Type.STRING,
-                  description: 'A brief one-line summary of the word\'s primary meaning'
+                  description: 'A single, concise sentence that captures the word\'s primary meaning or definition.'
                 },
                 tags: {
                   type: Type.ARRAY,
-                  items: { type: Type.STRING },
-                  description: 'Array of 5-10 relevant tags for the word'
+                  items: {
+                    type: Type.STRING
+                  },
+                  minItems: 5,
+                  maxItems: 10,
+                  description: '5-10 relevant tags that categorize the word by part of speech, category, usage, or characteristics. Examples: ["noun", "animal", "marine", "mammal"] or ["verb", "communication", "informal", "slang"]',
+                  uniqueItems: true
                 },
                 tag_colors: {
                   type: Type.OBJECT,
-                  description: 'Hex color codes for each tag (e.g., {"noun": "#3B82F6", "animal": "#10B981", "slang": "#FBBF24"})',
-                  additionalProperties: { type: Type.STRING }
+                  description: 'Hex color codes for each tag in the tags array. Each tag must have a corresponding color. Use visually distinct colors that represent the tag\'s meaning. Examples: {"noun": "#3B82F6", "animal": "#10B981", "marine": "#06B6D4", "mammal": "#8B5CF6"}',
+                  additionalProperties: {
+                    type: Type.STRING,
+                    pattern: '^#[0-9A-Fa-f]{6}$',
+                    description: 'Valid hex color code (e.g., #FF5733)'
+                  },
+                  propertyNames: {
+                    type: Type.STRING
+                  }
                 }
               },
               required: ['summary', 'tags', 'tag_colors']
@@ -290,17 +311,18 @@ export class GeminiProvider implements AIProvider {
       }
     ];
 
+
     try {
       const response = await this.genAI.models.generateContent({
         model: model,
         contents: messages,
         config: {
-          systemInstruction: 'You are a language assistant. Your task is to provide a concise summary, relevant tags, and appropriate colors for categorizing words.',
+          systemInstruction: `You are an expert language assistant specializing in word analysis and categorization. Your task is to provide structured, consistent summaries, relevant tags, and appropriate colors for words to support language learning applications. Always use the generate_word_summary_tags_and_colors tool when asked to analyze or categorize words.`,
           tools: tools,
           toolConfig: {
             functionCallingConfig: {
               mode: FunctionCallingConfigMode.ANY,
-              allowedFunctionNames: ['add_summary_tags_colors']
+              allowedFunctionNames: ['generate_word_summary_tags_and_colors']
             }
           }
         }
@@ -308,18 +330,18 @@ export class GeminiProvider implements AIProvider {
 
       // Check for function calls in the response
       const functionCall = response.functionCalls?.[0];
-      if (functionCall && functionCall.name === 'add_summary_tags_colors') {
+      if (functionCall && functionCall.name === 'generate_word_summary_tags_and_colors') {
         const args = functionCall.args;
         if (args) {
           const result: ProcessedToolData = {
             summary: (typeof args.summary === 'string' && args.summary.trim()) ? args.summary : `---`,
-            tags: Array.isArray(args.tags) ? args.tags : ['general'],
+            tags: Array.isArray(args.tags) ? args.tags : ['---'],
             tag_colors: (typeof args.tag_colors === 'object' && args.tag_colors !== null && Object.keys(args.tag_colors).length > 0) ? args.tag_colors as Record<string, string> : { '---': '#6b7280' }
           };
           return result;
         }
       } else {
-        console.warn('⚠️ No function calls found in Gemini completion');        
+        console.warn('⚠️ No function calls found in Gemini completion');
       }
     } catch (error) {
       const err = 'Failed to generate summary and tags. ' + ((error as any) instanceof Error ? (error as Error).message : 'Unknown error');
