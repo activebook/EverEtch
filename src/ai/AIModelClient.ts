@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Type, FunctionCallingConfigMode } from '@google/genai';
 import { ProfileConfig } from '../database/DatabaseManager.js';
 
 export interface AIMessage {
@@ -105,26 +105,13 @@ export class OpenAIProvider implements AIProvider {
     console.log('✅ OpenAI client initialized');
 
     try {
-      console.log('🚀 Starting parallel generation of summary and tags...');
+      console.log('🚀 Starting OpenAI combined generation of summary, tags and colors...');
 
-      // Run both API calls in parallel and wait for both to complete
-      const [summaryResult, tagsResult] = await Promise.all([
-        this.generateSummaryOnly(word, meaning, profile),
-        this.generateTagsOnly(word, meaning, profile)
-      ]);
+      // Generate summary, tags and colors in a single tool call
+      const result = await this.generateSummaryTagsAndColors(word, meaning, profile);
 
-      console.log('✅ Both API calls completed successfully');
-      console.log('📝 Summary result:', summaryResult);
-      console.log('🏷️ Tags result:', tagsResult);
-
-      const finalResult = {
-        summary: summaryResult.summary,
-        tags: tagsResult.tags,
-        tag_colors: tagsResult.tag_colors
-      };
-
-      console.log('🎯 Final result:', finalResult);
-      return finalResult;
+      console.log('✅ OpenAI combined result:', result);
+      return result;
 
     } catch (error) {
       console.error('❌ Error in generateTagsAndSummary:', error);
@@ -223,8 +210,9 @@ export class OpenAIProvider implements AIProvider {
     return fallback;
   }
 
-  private async generateTagsOnly(word: string, meaning: string, profile: ProfileConfig): Promise<{ tags: string[], tag_colors: Record<string, string> }> {
-    console.log('🏷️ generateTagsOnly called for word:', word);
+  // Generate summary, tags and colors in a single tool call
+  private async generateSummaryTagsAndColors(word: string, meaning: string, profile: ProfileConfig): Promise<ProcessedToolData> {
+    console.log('📝🏷️ OpenAI generateSummaryTagsAndColors called for word:', word);
 
     // Create a separate OpenAI instance for this call
     const openai = new OpenAI({
@@ -232,16 +220,16 @@ export class OpenAIProvider implements AIProvider {
       baseURL: profile.model_config.endpoint || undefined,
     });
 
-    console.log('✅ Tags OpenAI client created');
+    console.log('✅ Combined OpenAI client created');
 
     const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
       {
         role: 'system',
-        content: `You are a language assistant. Your task is to provide relevant tags and colors for categorizing words.`
+        content: `You are a language assistant. Your task is to provide a concise summary, relevant tags, and appropriate colors for categorizing words.`
       },
       {
         role: 'user',
-        content: `Provide 5-10 relevant tags for the word "${word}" based on this meaning: ${meaning}. Include appropriate colors for each tag.`
+        content: `Provide a brief one-line summary, 5-10 relevant tags, and appropriate colors for each tag for the word "${word}" based on this meaning: ${meaning}.`
       }
     ];
 
@@ -249,11 +237,15 @@ export class OpenAIProvider implements AIProvider {
       {
         type: 'function' as const,
         function: {
-          name: 'add_tags',
-          description: 'Add relevant tags to categorize the word',
+          name: 'add_summary_tags_colors',
+          description: 'Add a summary, relevant tags, and colors to categorize the word',
           parameters: {
             type: 'object',
             properties: {
+              summary: {
+                type: 'string',
+                description: 'A brief one-line summary of the word\'s primary meaning'
+              },
               tags: {
                 type: 'array',
                 items: { type: 'string' },
@@ -265,50 +257,52 @@ export class OpenAIProvider implements AIProvider {
                 additionalProperties: { type: 'string' }
               }
             },
-            required: ['tags']
+            required: ['summary', 'tags', 'tag_colors']
           }
         }
       }
     ];
 
-    console.log('🚀 Making tags API call with model:', profile.model_config.model);
+    console.log('🚀 Making OpenAI combined API call with model:', profile.model_config.model);
 
     try {
       const completion = await openai.chat.completions.create({
         model: profile.model_config.model,
         messages,
         tools,
-        tool_choice: { type: 'function', function: { name: 'add_tags' } } // Force specific tool
+        tool_choice: { type: 'function', function: { name: 'add_summary_tags_colors' } } // Force specific tool
       });
 
-      console.log('✅ Tags API call completed');
+      console.log('✅ OpenAI Combined API call completed');
       console.log('📋 Completion response:', JSON.stringify(completion, null, 2));
 
       if (completion.choices[0]?.message?.tool_calls?.[0]) {
         const toolCall = completion.choices[0].message.tool_calls[0];
-        console.log('🔧 Tags tool call found:', toolCall);
+        console.log('🔧 OpenAI function call found:', toolCall);
 
         const args = JSON.parse((toolCall as any).function.arguments);
-        console.log('🏷️ Parsed tags args:', args);
+        console.log('📝🏷️ Parsed combined function args:', args);
 
-        const result = {
-          tags: args.tags,
-          tag_colors: args.tag_colors || {}
+        const result: ProcessedToolData = {
+          summary: (typeof args.summary === 'string' && args.summary.trim()) ? args.summary : `A word: ${word}`,
+          tags: Array.isArray(args.tags) ? args.tags : ['general'],
+          tag_colors: (typeof args.tag_colors === 'object' && args.tag_colors !== null && Object.keys(args.tag_colors).length > 0) ? args.tag_colors : { 'general': '#6b7280' }
         };
-        console.log('🎯 Tags result:', result);
+        console.log('🎯 OpenAI combined result:', result);
         return result;
       } else {
-        console.warn('⚠️ No tool calls found in tags completion');
+        console.warn('⚠️ No function calls found in OpenAI completion');
         console.log('📋 Full completion:', completion);
       }
     } catch (error) {
-      console.error('❌ Error in generateTagsOnly API call:', error);
+      console.error('❌ Error in OpenAI generateSummaryTagsAndColors API call:', error);
       console.error('❌ Error details:', error instanceof Error ? error.message : 'Unknown error');
     }
 
-    // Fallback if tool call fails
-    console.log('🔄 Using fallback for tags');
-    const fallback = {
+    // Fallback if function call fails
+    console.log('🔄 Using fallback for OpenAI combined generation');
+    const fallback: ProcessedToolData = {
+      summary: `A word: ${word}`,
       tags: ['general'],
       tag_colors: { 'general': '#6b7280' }
     };
@@ -352,7 +346,7 @@ export class GeminiProvider implements AIProvider {
         // Use streaming for real-time updates
         const responseStream = await this.genAI.models.generateContentStream({
           model: model,
-          contents: `Please provide a detailed meaning and explanation for the word "${word}".`,
+          contents: `Please provide a slim meaning and explanation for the word "${word}".`,
           config: {
             systemInstruction: profile.system_prompt,
           }
@@ -399,66 +393,15 @@ export class GeminiProvider implements AIProvider {
     });
 
     try {
-      console.log('🚀 Starting Gemini generation of summary and tags...');
+      console.log('🚀 Starting Gemini combined generation of summary, tags and colors...');
 
       const model = profile.model_config.model || 'gemini-2.5-flash';
 
-      // Generate summary
-      const summaryPrompt = `Provide a brief one-line summary for the word "${word}" based on this meaning: ${meaning}`;
+      // Generate summary, tags and colors in a single tool call
+      const result = await this.generateSummaryTagsAndColors(word, meaning, profile);
 
-      const summaryResponse = await this.genAI.models.generateContent({
-        model: model,
-        contents: summaryPrompt,
-        config: {
-          systemInstruction: 'You are a language assistant. Provide a concise one-line summary of a word\'s meaning.',
-        }
-      });
-
-      const summary = summaryResponse.text?.trim() || `A word: ${word}`;
-
-      // Generate tags
-      const tagsPrompt = `Provide 5-10 relevant tags for the word "${word}" based on this meaning: ${meaning}.
-
-Respond with a JSON object in this exact format:
-{
-  "tags": ["tag1", "tag2", "tag3"],
-  "tag_colors": {"tag1": "#hexcolor1", "tag2": "#hexcolor2"}
-}
-
-Include appropriate hex colors for each tag. Respond with only the JSON, no additional text.`;
-
-      const tagsResponse = await this.genAI.models.generateContent({
-        model: model,
-        contents: tagsPrompt,
-        config: {
-          systemInstruction: 'You are a language assistant. Provide relevant tags and colors for categorizing words.',
-        }
-      });
-
-      const tagsText = tagsResponse.text?.trim() || '';
-
-      console.log('📋 Gemini Tags raw response:', tagsText);
-
-      // Parse the JSON response
-      let tags: string[] = ['general'];
-      let tag_colors: Record<string, string> = { 'general': '#6b7280' };
-
-      try {
-        const parsed = JSON.parse(tagsText);
-        tags = parsed.tags || tags;
-        tag_colors = parsed.tag_colors || tag_colors;
-      } catch (parseError) {
-        console.warn('⚠️ Failed to parse Gemini tags JSON, using defaults');
-      }
-
-      const finalResult = {
-        summary: summary,
-        tags: tags,
-        tag_colors: tag_colors
-      };
-
-      console.log('🎯 Final result:', finalResult);
-      return finalResult;
+      console.log('✅ Gemini combined result:', result);
+      return result;
 
     } catch (error) {
       console.error('❌ Error in Gemini generateTagsAndSummary:', error);
@@ -474,6 +417,114 @@ Include appropriate hex colors for each tag. Respond with only the JSON, no addi
       console.log('🔄 Returning fallback result:', fallbackResult);
       return fallbackResult;
     }
+  }
+
+  // Generate summary, tags and colors in a single tool call
+  private async generateSummaryTagsAndColors(word: string, meaning: string, profile: ProfileConfig): Promise<ProcessedToolData> {
+    console.log('📝🏷️ Gemini generateSummaryTagsAndColors called for word:', word);
+
+    if (!this.genAI) {
+      throw new Error('Gemini client not initialized');
+    }
+
+    const model = profile.model_config.model || 'gemini-2.5-flash';
+
+    const messages = [
+      {
+        role: 'user',
+        parts: [{
+          text: `Provide a brief one-line summary, 5-10 relevant tags, and appropriate colors for each tag for the word "${word}" based on this meaning: ${meaning}.`
+        }]
+      }
+    ];
+
+    const tools = [
+      {
+        functionDeclarations: [
+          {
+            name: 'add_summary_tags_colors',
+            description: 'Add a summary, relevant tags, and colors to categorize the word',
+            // Here must use : Parameters JSON schema
+            parametersJsonSchema: {
+              type: Type.OBJECT,
+              properties: {
+                summary: {
+                  type: Type.STRING,
+                  description: 'A brief one-line summary of the word\'s primary meaning'
+                },
+                tags: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING },
+                  description: 'Array of 5-10 relevant tags for the word'
+                },
+                tag_colors: {
+                  type: Type.OBJECT,
+                  description: 'Hex color codes for each tag (e.g., {"noun": "#3B82F6", "animal": "#10B981"})',
+                  additionalProperties: { type: Type.STRING }
+                }
+              },
+              required: ['summary', 'tags', 'tag_colors']
+            }
+          }
+        ]
+      }
+    ];
+
+    console.log('🚀 Making Gemini combined API call with model:', model);
+
+    try {
+      const response = await this.genAI.models.generateContent({
+        model: model,
+        contents: messages,
+        config: {
+          systemInstruction: 'You are a language assistant. Your task is to provide a concise summary, relevant tags, and appropriate colors for categorizing words.',
+          tools: tools,
+          toolConfig: {
+            functionCallingConfig: {
+              mode: FunctionCallingConfigMode.ANY,
+              allowedFunctionNames: ['add_summary_tags_colors']
+            }
+          }
+        }
+      });
+
+      console.log('✅ Gemini Combined API call completed');
+
+      // Check for function calls in the response
+      const functionCall = response.functionCalls?.[0];
+      if (functionCall && functionCall.name === 'add_summary_tags_colors') {
+        console.log('🔧 Gemini function call found:', functionCall);
+
+        const args = functionCall.args;
+        if (args) {
+          console.log('📝🏷️ Parsed combined function args:', args);
+
+          const result: ProcessedToolData = {
+            summary: (typeof args.summary === 'string' && args.summary.trim()) ? args.summary : `A word: ${word}`,
+            tags: Array.isArray(args.tags) ? args.tags : ['general'],
+            tag_colors: (typeof args.tag_colors === 'object' && args.tag_colors !== null && Object.keys(args.tag_colors).length > 0) ? args.tag_colors as Record<string, string> : { 'general': '#6b7280' }
+          };
+          console.log('🎯 Gemini combined result:', result);
+          return result;
+        }
+      } else {
+        console.warn('⚠️ No function calls found in Gemini response');
+        console.log('📋 Full response:', response);
+      }
+    } catch (error) {
+      console.error('❌ Error in Gemini generateSummaryTagsAndColors API call:', error);
+      console.error('❌ Error details:', error instanceof Error ? error.message : 'Unknown error');
+    }
+
+    // Fallback if function call fails
+    console.log('🔄 Using fallback for Gemini combined generation');
+    const fallback: ProcessedToolData = {
+      summary: `A word: ${word}`,
+      tags: ['general'],
+      tag_colors: { 'general': '#6b7280' }
+    };
+    console.log('🔄 Fallback result:', fallback);
+    return fallback;
   }
 
   async getAvailableModels(profile: ProfileConfig): Promise<string[]> {

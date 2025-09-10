@@ -22,7 +22,7 @@
 /* Custom Scrollbar - Beige Theme */
 .scrollbar-thin {
     scrollbar-width: thin;
-    scrollbar-color: #e1cfb9 rgba(245, 158, 11, 0.02) !important;
+    scrollbar-color: #e8b871d1 rgba(245, 158, 11, 0.02) !important;
 }
 
 .scrollbar-thin::-webkit-scrollbar {

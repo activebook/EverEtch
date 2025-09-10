@@ -209,17 +209,34 @@ class EverEtchApp {
       wordList.appendChild(loadingIndicator);
     }
 
-    // Setup intersection observer
+    // Setup intersection observer with robust duplicate prevention
+    let isTriggering = false; // Flag to prevent concurrent triggers
+
     this.scrollObserver = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && this.hasMoreWords && !this.isLoading) {
-          this.loadMoreWords();
+        const entry = entries[0];
+
+        // Only trigger if:
+        // 1. Element is intersecting (visible)
+        // 2. Not currently triggering another load
+        // 3. There are more words to load
+        // 4. Not already loading
+        if (entry.isIntersecting && !isTriggering && this.hasMoreWords && !this.isLoading) {
+          isTriggering = true; // Set flag immediately
+
+          console.log('🔄 Triggering load from intersection observer');
+
+          this.loadMoreWords().finally(() => {
+            // Reset flag after loading completes (success or failure)
+            isTriggering = false;
+            console.log('✅ Load trigger flag reset');
+          });
         }
       },
       {
         root: document.getElementById('word-list')?.parentElement,
-        rootMargin: '0px',
-        threshold: 0.8 // Trigger when 90% of the indicator is visible
+        rootMargin: '100px', // Trigger 100px before fully visible for better UX
+        threshold: 0.05 // Very low threshold to trigger early
       }
     );
 
