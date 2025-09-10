@@ -146,11 +146,19 @@ class EverEtchApp {
         this.scrollObserver = null;
       }
 
-      // Setup scroll observer for lazy loading
-      this.setupScrollObserver();
-
-      // Load first page
+      // Load first page first, then setup observer after content is rendered
       await this.loadMoreWords();
+
+      // Setup scroll observer after content is rendered to ensure proper detection
+      // Use setTimeout to ensure DOM updates are complete
+      setTimeout(() => {
+        this.setupScrollObserver();
+
+        // Force show the loading indicator if there are more words
+        if (this.hasMoreWords) {
+          this.showLoadingIndicator();
+        }
+      }, 100);
 
     } catch (error) {
       console.error('Error loading words:', error);
@@ -224,12 +232,9 @@ class EverEtchApp {
         if (entry.isIntersecting && !isTriggering && this.hasMoreWords && !this.isLoading) {
           isTriggering = true; // Set flag immediately
 
-          console.log('🔄 Triggering load from intersection observer');
-
           this.loadMoreWords().finally(() => {
             // Reset flag after loading completes (success or failure)
             isTriggering = false;
-            console.log('✅ Load trigger flag reset');
           });
         }
       },
@@ -606,17 +611,8 @@ class EverEtchApp {
       this.hasMoreWords = true;
       this.isLoading = false;
 
-      // Re-setup scroll observer for lazy loading
-      this.setupScrollObserver();
-
-      // Load fresh data from the database
-      await this.loadMoreWords();      
-
-      // Scroll to and highlight the newly added word
-      // Don't need scroll anymore, because it's reloaded
-      // setTimeout(() => {
-      //   this.scrollToWord(addedWord.id);
-      // }, 100);
+      // Load fresh data from the database (this will setup observer after content loads)
+      await this.loadWords();
 
       // Re-render word details with updated action buttons
       if (this.currentWord) {
@@ -886,9 +882,19 @@ class EverEtchApp {
   private renderWordListIncremental(newWords: WordDocument[]) {
     const wordList = document.getElementById('word-list')!;
 
-    // Ensure loading indicator is at the end
-    const loadingIndicator = document.getElementById('loading-indicator');
-    if (loadingIndicator) {
+    // Ensure loading indicator exists and is at the end
+    let loadingIndicator = document.getElementById('loading-indicator');
+    if (!loadingIndicator) {
+      loadingIndicator = document.createElement('div');
+      loadingIndicator.id = 'loading-indicator';
+      loadingIndicator.className = 'flex justify-center items-center py-4 text-slate-500';
+      loadingIndicator.innerHTML = `
+        <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-slate-500"></div>
+        <span class="ml-2 text-sm">Loading more words...</span>
+      `;
+      loadingIndicator.style.display = 'none';
+      wordList.appendChild(loadingIndicator);
+    } else {
       // Remove and re-append loading indicator to ensure it's at the end
       loadingIndicator.remove();
       wordList.appendChild(loadingIndicator);
@@ -903,6 +909,9 @@ class EverEtchApp {
         wordList.appendChild(wordItem);
       }
     });
+
+    // Always update the loading indicator state after rendering
+    this.updateLoadingIndicator();
   }
 
   private createWordItem(word: WordDocument): HTMLElement {
