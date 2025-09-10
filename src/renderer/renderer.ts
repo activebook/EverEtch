@@ -1012,7 +1012,7 @@ class EverEtchApp {
 
         <div>
           <h4 class="text-lg font-semibold text-slate-800 mb-3">Details</h4>
-          <div class="text-slate-700 prose prose-sm max-w-none">${renderedDetails}</div>
+          <div class="markdown-details prose prose-sm max-w-none">${renderedDetails}</div>
         </div>
 
         <div>
@@ -1505,7 +1505,7 @@ class EverEtchApp {
 
         <div>
           <h4 class="text-lg font-semibold text-slate-800 mb-3">Details</h4>
-          <div class="text-slate-700 prose prose-sm max-w-none">${formattedDetails}<span class="animate-pulse">|</span></div>
+          <div class="markdown-details prose prose-sm max-w-none">${formattedDetails}<span class="animate-pulse">|</span></div>
         </div>
 
         <div>
