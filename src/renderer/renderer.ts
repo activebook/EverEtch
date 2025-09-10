@@ -1827,19 +1827,18 @@ class EverEtchApp {
             profileSelect.appendChild(option);
           });
 
-          // Switch to the newly imported profile
-          const switchSuccess = await window.electronAPI.switchProfile(result.profileName);
-          if (switchSuccess) {
-            profileSelect.value = result.profileName;
+          // The import process already switched to the imported profile,
+          // so we just need to update the UI
+          profileSelect.value = result.profileName;
+          this.currentProfile = result.profileName;
 
-            // Clear current word list and details since we're switching to imported profile
-            this.clearWordDetails();
-            const wordList = document.getElementById('word-list')!;
-            wordList.innerHTML = '';
+          // Clear current word list and details since we're switching to imported profile
+          this.clearWordDetails();
+          const wordList = document.getElementById('word-list')!;
+          wordList.innerHTML = '';
 
-            // Load words for the imported profile
-            await this.loadWords();
-          }
+          // Load words for the imported profile
+          await this.loadWords();
         }
       } else {
         this.showError(result.message);
