@@ -1866,17 +1866,34 @@ class EverEtchApp {
       associatedList.appendChild(loadingIndicator);
     }
 
-    // Setup intersection observer
+    // Setup intersection observer with robust duplicate prevention
+    let isTriggering = false; // Flag to prevent concurrent triggers
+
     this.associatedScrollObserver = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && this.associatedHasMore && !this.associatedIsLoading) {
-          this.loadMoreAssociatedWords();
+        const entry = entries[0];
+
+        // Only trigger if:
+        // 1. Element is intersecting (visible)
+        // 2. Not currently triggering another load
+        // 3. There are more words to load
+        // 4. Not already loading
+        if (entry.isIntersecting && !isTriggering && this.associatedHasMore && !this.associatedIsLoading) {
+          isTriggering = true; // Set flag immediately
+
+          console.log('🔄 Triggering load from associated scroll observer');
+
+          this.loadMoreAssociatedWords().finally(() => {
+            // Reset flag after loading completes (success or failure)
+            isTriggering = false;
+            console.log('✅ Associated load trigger flag reset');
+          });
         }
       },
       {
-        root: document.getElementById('associated-list')?.parentElement,
-        rootMargin: '0px',
-        threshold: 0.8 // Trigger when 90% of the indicator is visible
+        root: document.getElementById('associated-list'),
+        rootMargin: '0px 0px 0px 0px', // Add bottom margin to trigger earlier
+        threshold: 0.1 // Higher threshold for more reliable triggering
       }
     );
 
