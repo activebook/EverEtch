@@ -1346,6 +1346,9 @@ class EverEtchApp {
 
     // Update word count display
     this.updateWordCount();
+
+    // Reset associated count display
+    this.updateAssociatedCount(0);
   }
 
   private showToast(message: string, type: 'success' | 'error' = 'success') {
