@@ -12,16 +12,12 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.jso
 const version = packageJson.version;
 
 // Read HTML template
-const htmlPath = path.join(__dirname, 'src/renderer/index.html');
+const htmlPath = path.join(__dirname, 'lib/renderer/index.html');
 let html = fs.readFileSync(htmlPath, 'utf8');
 
-// Replace the EverEtch title in the header with version
+// Replace the version placeholder with actual version
 html = html.replace(
-  /flex items-baseline/,
-  `flex items-center`
-);
-html = html.replace(
-  /{version}/,
+  /\{\$version\}/,
   `${version}`
 );
 
