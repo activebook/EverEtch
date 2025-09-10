@@ -19,28 +19,35 @@
     @apply inline-block px-3 py-1.5 m-1 text-xs font-medium rounded-full cursor-pointer transition-all duration-200 hover:scale-105 shadow-sm;
 }
 
-/* Enhanced Scrollbar - Beige Theme */
+/* Custom Scrollbar - Beige Theme */
 .scrollbar-thin {
     scrollbar-width: thin;
+    scrollbar-color: #e1cfb9 rgba(245, 158, 11, 0.02) !important;
 }
 
 .scrollbar-thin::-webkit-scrollbar {
-    width: 8px;
+    width: 6px;
+    background: rgba(245, 158, 11, 0.02);
 }
 
 .scrollbar-thin::-webkit-scrollbar-track {
-    background: rgba(245, 158, 11, 0.1);
-    border-radius: 10px;
+    background: rgba(245, 158, 11, 0.02);
+    border-radius: 3px;
+    margin: 1px;
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, rgba(245, 158, 11, 0.4), rgba(217, 119, 6, 0.4));
-    border-radius: 10px;
-    border: 2px solid rgba(255, 255, 255, 0.4);
+    background: #ece4c4;
+    border-radius: 3px;
+    border: none;
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(180deg, rgba(245, 158, 11, 0.6), rgba(217, 119, 6, 0.6));
+    background: #d4c4a8;
+}
+
+.scrollbar-thin::-webkit-scrollbar-corner {
+    background: rgba(245, 158, 11, 0.02);
 }
 
 /* Custom animations */
