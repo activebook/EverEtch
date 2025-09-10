@@ -278,45 +278,6 @@ export class DatabaseManager {
     });
   }
 
-  /**
-   * Fallback search method using traditional LIKE queries
-   */
-  private fallbackSearchWords(query: string): Promise<WordDocument[]> {
-    return new Promise((resolve, reject) => {
-      if (!this.db) {
-        resolve([]);
-        return;
-      }
-
-      // Use a single query with UNION to avoid duplicates
-      // First priority: words starting with query
-      // Second priority: words containing query (but not starting with it)
-      const sql = `
-        SELECT data FROM (
-          SELECT data,
-                 CASE
-                   WHEN json_extract(data, '$.word') LIKE ? THEN 1
-                   ELSE 2
-                 END as priority
-          FROM documents
-          WHERE type = 'word'
-          AND json_extract(data, '$.word') LIKE ?
-        ) as results
-        ORDER BY priority, json_extract(data, '$.word')
-        LIMIT 5
-      `;
-
-      this.db.all(sql, [`${query}%`, `%${query}%`], (err, rows: { data: string }[]) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-
-        resolve(rows.map(row => JSON.parse(row.data)));
-      });
-    });
-  }
-
   getWord(wordId: string): Promise<WordDocument | null> {
     return new Promise((resolve, reject) => {
       if (!this.db) {
