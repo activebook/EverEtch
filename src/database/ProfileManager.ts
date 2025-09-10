@@ -59,7 +59,13 @@ export class ProfileManager {
       return false; // Profile already exists
     }
 
-    this.profiles.push(profileName);
+    // Set current profile as last opened profile
+    this.currentProfile = profileName;
+
+    // Import profile
+    if (!this.importProfile(profileName)) {
+      return false; // Profile already exists
+    }
 
     // Close current database
     await this.dbManager.close();
@@ -70,18 +76,17 @@ export class ProfileManager {
     // Create default profile config
     const defaultConfig: Omit<ProfileConfig, 'id'> = {
       name: profileName,
-      system_prompt: `You are a helpful ${profileName} language assistant. When generating meanings and tags for words, provide accurate and useful information.`,
+      system_prompt: `You are a helpful assistant.`,
       model_config: {
         provider: 'openai',
         model: 'gpt-4',
-        endpoint: 'https://api.openai.com/v1/chat/completions',
+        endpoint: 'https://api.openai.com/v1',
         api_key: '' // To be set by user
       },
       last_opened: new Date().toISOString()
     };
 
     await this.dbManager.setProfileConfig(defaultConfig);
-    this.saveProfiles();
 
     return true;
   }
@@ -104,11 +109,11 @@ export class ProfileManager {
       // Create default profile config if it doesn't exist
       const defaultConfig: Omit<ProfileConfig, 'id'> = {
         name: profileName,
-        system_prompt: `You are a helpful ${profileName} language assistant. When generating meanings and tags for words, provide accurate and useful information.`,
+        system_prompt: `You are a helpful assistant.`,
         model_config: {
           provider: 'openai',
           model: 'gpt-4',
-          endpoint: 'https://api.openai.com/v1/chat/completions',
+          endpoint: 'https://api.openai.com/v1',
           api_key: '' // To be set by user
         },
         last_opened: new Date().toISOString()

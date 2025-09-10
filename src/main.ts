@@ -318,42 +318,23 @@ ipcMain.handle('import-profile', async () => {
     ensureDataDirectory();
     fs.copyFileSync(sourcePath, targetPath);
 
-    // Check if the imported database already has a profile config
-    const tempDbManager = new DatabaseManager();
-    let existingConfig = null;
-    try {
-      await tempDbManager.initialize(profileName);
-      existingConfig = await tempDbManager.getProfileConfig();
-      await tempDbManager.close();
-    } catch (error) {
-      console.error('Error checking existing profile config:', error);
-    }
-
     let success = false;
-    if (existingConfig) {
-      // Preserve existing profile config but update the name
-      existingConfig.name = profileName;
-      existingConfig.last_opened = new Date().toISOString();
 
-      // Add profile to profile manager first
-      success = profileManager.importProfile(profileName);
+    // Add new profile to profiles
+    success = profileManager.importProfile(profileName);
+    if (success) {
+      // Switch to the imported profile to ensure it's properly initialized
+      const switchSuccess = await profileManager.switchProfile(profileName);
 
-      if (success) {
-        // Switch to the imported profile to ensure it's properly initialized
-        const switchSuccess = await profileManager.switchProfile(profileName);
-
-        if (switchSuccess) {
-          // Update the profile config in the now-active database
-          await dbManager.setProfileConfig(existingConfig);
-          console.log(`Profile "${profileName}" imported successfully`);
-        } else {
-          console.error('Failed to switch to imported profile');
-          success = false;
-        }
+      if (switchSuccess) {
+        // Update the profile config in the now-active database
+        console.log(`Profile "${profileName}" imported successfully`);
+      } else {
+        console.error('Failed to switch to imported profile');
+        success = false;
       }
     } else {
-      // No existing config, create default profile
-      success = await profileManager.createProfile(profileName);
+      console.error('Failed to imported profile, the same profile already exists');
     }
 
     if (!success) {
@@ -363,7 +344,7 @@ ipcMain.handle('import-profile', async () => {
       } catch (cleanupError) {
         console.error('Error cleaning up failed import:', cleanupError);
       }
-      return { success: false, message: 'Failed to create profile' };
+      return { success: false, message: 'Failed to create new profile' };
     }
 
     return {
