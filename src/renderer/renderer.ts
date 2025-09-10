@@ -1127,9 +1127,11 @@ class EverEtchApp {
   }
 
   private async loadAssociatedWords(tag: string) {
-    // Clear the associated list DOM first
-    const associatedList = document.getElementById('associated-list')!;
-    associatedList.innerHTML = '';
+    // Clean up existing observer first
+    if (this.associatedScrollObserver) {
+      this.associatedScrollObserver.disconnect();
+      this.associatedScrollObserver = null;
+    }
 
     // Reset associated words pagination state
     this.associatedWords = [];
@@ -1138,21 +1140,29 @@ class EverEtchApp {
     this.associatedIsLoading = false;
     this.currentTag = tag;
 
-    // Clean up existing observer
-    if (this.associatedScrollObserver) {
-      this.associatedScrollObserver.disconnect();
-      this.associatedScrollObserver = null;
-    }
+    // Clear the associated list DOM
+    const associatedList = document.getElementById('associated-list')!;
+    associatedList.innerHTML = '';
 
-    // Setup scroll observer for lazy loading
-    this.setupAssociatedScrollObserver();
-
-    // Load first page
+    // Load first page first, then setup observer after content is rendered
     await this.loadMoreAssociatedWords();
+
+    // Setup scroll observer after content is rendered to ensure proper detection
+    // Use setTimeout to ensure DOM updates are complete
+    setTimeout(() => {
+      this.setupAssociatedScrollObserver();
+
+      // Force show the loading indicator if there are more words
+      if (this.associatedHasMore) {
+        this.showAssociatedLoadingIndicator();
+      }
+    }, 100);
   }
 
   private async loadMoreAssociatedWords() {
-    if (this.associatedIsLoading || !this.associatedHasMore) return;
+    if (this.associatedIsLoading || !this.associatedHasMore) {
+      return;
+    }
 
     this.associatedIsLoading = true;
     this.showAssociatedLoadingIndicator();
@@ -1185,6 +1195,7 @@ class EverEtchApp {
       this.showError('Failed to load more associated words');
     } finally {
       this.associatedIsLoading = false;
+      // Always update the loading indicator state
       this.updateAssociatedLoadingIndicator();
     }
   }
@@ -1217,8 +1228,21 @@ class EverEtchApp {
       associatedList.appendChild(wordItem);
     });
 
+    // Create loading indicator if it doesn't exist
+    let loadingIndicator = document.getElementById('associated-loading-indicator');
+    if (!loadingIndicator) {
+      loadingIndicator = document.createElement('div');
+      loadingIndicator.id = 'associated-loading-indicator';
+      loadingIndicator.className = 'flex justify-center items-center py-4 text-slate-500';
+      loadingIndicator.style.display = 'none';
+      associatedList.appendChild(loadingIndicator);
+    }
+
     // Update the associated count
     this.updateAssociatedCount(words.length);
+
+    // Always update the loading indicator state
+    this.updateAssociatedLoadingIndicator();
   }
 
   private selectWord(word: WordDocument) {
@@ -1881,12 +1905,9 @@ class EverEtchApp {
         if (entry.isIntersecting && !isTriggering && this.associatedHasMore && !this.associatedIsLoading) {
           isTriggering = true; // Set flag immediately
 
-          console.log('🔄 Triggering load from associated scroll observer');
-
           this.loadMoreAssociatedWords().finally(() => {
             // Reset flag after loading completes (success or failure)
             isTriggering = false;
-            console.log('✅ Associated load trigger flag reset');
           });
         }
       },
@@ -1945,9 +1966,15 @@ class EverEtchApp {
   private renderAssociatedListIncremental(newWords: WordDocument[]) {
     const associatedList = document.getElementById('associated-list')!;
 
-    // Ensure loading indicator is at the end
-    const loadingIndicator = document.getElementById('associated-loading-indicator');
-    if (loadingIndicator) {
+    // Ensure loading indicator exists and is at the end
+    let loadingIndicator = document.getElementById('associated-loading-indicator');
+    if (!loadingIndicator) {
+      loadingIndicator = document.createElement('div');
+      loadingIndicator.id = 'associated-loading-indicator';
+      loadingIndicator.className = 'flex justify-center items-center py-4 text-slate-500';
+      loadingIndicator.style.display = 'none';
+      associatedList.appendChild(loadingIndicator);
+    } else {
       // Remove and re-append loading indicator to ensure it's at the end
       loadingIndicator.remove();
       associatedList.appendChild(loadingIndicator);
@@ -1982,13 +2009,12 @@ class EverEtchApp {
         }
       });
 
-      // Insert before loading indicator if it exists, otherwise append
-      if (loadingIndicator && associatedList.contains(loadingIndicator)) {
-        associatedList.insertBefore(wordItem, loadingIndicator);
-      } else {
-        associatedList.appendChild(wordItem);
-      }
+      // Insert before loading indicator
+      associatedList.insertBefore(wordItem, loadingIndicator);
     });
+
+    // Always update the loading indicator state after rendering
+    this.updateAssociatedLoadingIndicator();
   }
 }
 
