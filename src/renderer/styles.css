@@ -12,6 +12,15 @@
 
 @layer utilities {
   /* Your custom utilities here */
+
+  .version {
+    font-size: 0.75rem;
+    align-self: flex-end;
+    margin-left: 0.5rem;
+    margin-bottom: 0.25rem;
+    color: #a7a9ae;
+    font-weight: 500;
+  }
 }
 
 /* Modern Tag Button */
