@@ -234,9 +234,9 @@ class EverEtchApp {
         }
       },
       {
-        root: document.getElementById('word-list')?.parentElement,
-        rootMargin: '100px', // Trigger 100px before fully visible for better UX
-        threshold: 0.05 // Very low threshold to trigger early
+        root: document.getElementById('word-list'),
+        rootMargin: '0px 0px 0px 0px', // Add bottom margin to trigger earlier
+        threshold: 0.1 // Higher threshold for more reliable triggering
       }
     );
 
@@ -613,9 +613,10 @@ class EverEtchApp {
       await this.loadMoreWords();      
 
       // Scroll to and highlight the newly added word
-      setTimeout(() => {
-        this.scrollToWord(addedWord.id);
-      }, 100);
+      // Don't need scroll anymore, because it's reloaded
+      // setTimeout(() => {
+      //   this.scrollToWord(addedWord.id);
+      // }, 100);
 
       // Re-render word details with updated action buttons
       if (this.currentWord) {
