@@ -6,7 +6,7 @@ import { dirname } from 'path';
 import { getAndSetProxyEnvironment } from './sys_proxy.js';
 import { DatabaseManager } from './database/DatabaseManager.js';
 import { ProfileManager } from './database/ProfileManager.js';
-import { AIModelClient } from './ai/AIModelClient.js';
+import { AIModelClient, WORD_DUMMY_METAS } from './ai/AIModelClient.js';
 import { marked } from 'marked';
 import { getDatabasePath, getDataPath, ensureDataDirectory } from './utils.js';
 
@@ -133,11 +133,7 @@ ipcMain.handle('generate-word-metas', async (event, word: string, meaning: strin
   if (!generationId || typeof generationId !== 'string' || generationId.length === 0) {
     console.error('❌ Main process: Invalid generationId received:', generationId);
     const fallbackData = {
-      summary: `A word: ${word}`,
-      tags: ['general'],
-      tag_colors: { 'general': '#6b7280' },
-      synonyms: [],
-      antonyms: [],
+      ...WORD_DUMMY_METAS,
       generationId: 'fallback_' + Date.now()
     };
     console.log('📤 Main process: Sending fallback tool result with fallback generationId:', fallbackData);
@@ -149,11 +145,7 @@ ipcMain.handle('generate-word-metas', async (event, word: string, meaning: strin
   if (!profile) {
     console.log('❌ Main process: No profile found');
     const fallbackData = {
-      summary: `A word: ${word}`,
-      tags: ['general'],
-      tag_colors: { 'general': '#6b7280' },
-      synonyms: [],
-      antonyms: [],
+      ...WORD_DUMMY_METAS,
       generationId: generationId
     };
     console.log('📤 Main process: Sending fallback tool result to renderer:', fallbackData);
@@ -186,11 +178,7 @@ ipcMain.handle('generate-word-metas', async (event, word: string, meaning: strin
 
     // Send fallback data on error
     const fallbackData = {
-      summary: `A word: ${word}`,
-      tags: ['general'],
-      tag_colors: { 'general': '#6b7280' },
-      synonyms: [],
-      antonyms: [],
+      ...WORD_DUMMY_METAS,
       generationId: generationId
     };
     console.log('📤 Main process: Sending error fallback to renderer:', fallbackData);
