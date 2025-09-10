@@ -97,4 +97,17 @@ Configure your AI provider in the Settings modal:
 
 ## License
 
-MIT
+EverEtch is licensed under the GNU General Public License version 3 (GPLv3) with additional restrictions to maintain its non-commercial, ads-free nature.
+
+### Key Terms:
+- **Open Source**: You may freely use, modify, and distribute the software under GPLv3
+- **Copyleft**: Any modifications must also be licensed under GPLv3
+- **Non-Commercial**: Strictly prohibited for any business or commercial use
+- **Ads-Free**: No advertising or monetization allowed
+- **Personal/Educational Use Only**: Intended solely for individual learning and study
+
+### Full License Text
+See the [LICENSE](LICENSE) file for complete terms and conditions.
+
+### Important Notice
+This software is provided for personal and educational purposes only. Commercial use, advertising, or any form of monetization is explicitly forbidden. By using EverEtch, you agree to these terms.

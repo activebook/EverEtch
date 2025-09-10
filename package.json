@@ -25,7 +25,7 @@
     "sqlite"
   ],
   "author": "",
-  "license": "MIT",
+  "license": "GPL-3.0-only",
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.13",
     "@types/better-sqlite3": "^7.6.9",
