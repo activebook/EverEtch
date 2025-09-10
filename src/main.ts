@@ -345,7 +345,7 @@ ipcMain.handle('import-profile', async () => {
         if (switchSuccess) {
           // Update the profile config in the now-active database
           await dbManager.setProfileConfig(existingConfig);
-          console.log(`Imported profile "${profileName}" with existing config preserved`);
+          console.log(`Profile "${profileName}" imported successfully`);
         } else {
           console.error('Failed to switch to imported profile');
           success = false;
