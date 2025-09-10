@@ -19,6 +19,12 @@ let dbManager: DatabaseManager;
 let profileManager: ProfileManager;
 let aiClient: AIModelClient;
 
+// Configure marked for proper line break handling
+marked.setOptions({
+  breaks: true, // Convert line breaks to <br> tags
+  gfm: true,    // Enable GitHub Flavored Markdown
+});
+
 async function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -49,7 +55,7 @@ async function createWindow() {
     await profileManager.switchProfile(lastProfile);
   }
 
-  // Configure marked for safe rendering (will be done after dynamic import)
+
 }
 
 app.whenReady().then(createWindow);
@@ -228,7 +234,10 @@ ipcMain.handle('update-profile-config', async (event, config: any) => {
 // Markdown processing
 ipcMain.handle('process-markdown', async (event, markdown: string) => {
   try {
-    return marked(markdown);
+    const result = marked(markdown);
+    // console.log('Markdown input:', JSON.stringify(markdown));
+    // console.log('Markdown output:', result);
+    return result;
   } catch (error) {
     console.error('Error processing markdown:', error);
     return markdown; // Return original markdown on error

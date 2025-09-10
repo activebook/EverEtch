@@ -59,6 +59,102 @@
     background: rgba(245, 158, 11, 0.02);
 }
 
+/* Enhanced markdown styling for Details section */
+.markdown-details {
+    @apply text-slate-700 leading-relaxed;
+}
+
+.markdown-details p {
+    @apply mb-4 text-slate-700 leading-relaxed;
+}
+
+.markdown-details h1,
+.markdown-details h2,
+.markdown-details h3,
+.markdown-details h4,
+.markdown-details h5,
+.markdown-details h6 {
+    @apply text-slate-800 font-semibold mb-3 mt-6;
+}
+
+.markdown-details h1 {
+    @apply text-2xl;
+}
+
+.markdown-details h2 {
+    @apply text-xl;
+}
+
+.markdown-details h3 {
+    @apply text-lg;
+}
+
+.markdown-details ul,
+.markdown-details ol {
+    @apply mb-4 pl-6;
+}
+
+.markdown-details li {
+    @apply mb-2 text-slate-600;
+}
+
+.markdown-details ul li {
+    @apply list-disc;
+}
+
+.markdown-details ol li {
+    @apply list-decimal;
+}
+
+.markdown-details code {
+    @apply bg-amber-50 px-2 py-1 rounded text-sm font-mono text-amber-800 border border-amber-200;
+}
+
+.markdown-details pre {
+    @apply bg-slate-50 p-4 rounded-lg mb-4 overflow-x-auto border border-slate-200;
+}
+
+.markdown-details pre code {
+    @apply bg-transparent border-none p-0;
+}
+
+.markdown-details blockquote {
+    @apply border-l-4 border-amber-300 pl-4 italic text-slate-600 mb-4 bg-amber-50/30 py-2;
+}
+
+.markdown-details a {
+    @apply text-amber-600 hover:text-amber-700 underline decoration-amber-300 hover:decoration-amber-400 transition-colors;
+}
+
+.markdown-details strong {
+    @apply font-semibold text-slate-800;
+}
+
+.markdown-details em {
+    @apply italic text-slate-700;
+}
+
+.markdown-details table {
+    @apply w-full border-collapse mb-4 bg-white rounded-lg overflow-hidden shadow-sm;
+}
+
+.markdown-details th,
+.markdown-details td {
+    @apply border border-slate-200 px-3 py-2 text-left;
+}
+
+.markdown-details th {
+    @apply bg-amber-50 font-semibold text-slate-700;
+}
+
+.markdown-details tr:nth-child(even) {
+    @apply bg-slate-50/50;
+}
+
+.markdown-details hr {
+    @apply border-amber-200 my-6;
+}
+
 /* Custom animations */
 @keyframes fadeIn {
     from {
