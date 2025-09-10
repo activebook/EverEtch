@@ -1,6 +1,18 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+}
+
+@layer components {
+  /* Your custom components here */
+}
+
+@layer utilities {
+  /* Your custom utilities here */
+}
 
 /* Modern Tag Button */
 .tag-button {
@@ -64,7 +76,7 @@
 
 /* Word list item hover effects */
 .word-item {
-    @apply transition-all duration-200 hover:bg-slate-50/80 hover:shadow-sm hover:border-slate-200/60 cursor-pointer;
+    @apply transition-all duration-200 hover:bg-amber-100/70 hover:shadow-sm hover:border-amber-200/60 cursor-pointer;
 }
 
 .word-item:hover {
