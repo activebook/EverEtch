@@ -1494,7 +1494,7 @@ class EverEtchApp {
     const wordDetails = document.getElementById('word-details')!;
 
     // Process markdown content via IPC
-    const formattedDetails = await window.electronAPI.processMarkdown(word.details || '');
+    const formattedDetails = await window.electronAPI.processMarkdown(word.details || ' ');
 
     wordDetails.innerHTML = `
       <div class="space-y-6">
