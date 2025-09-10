@@ -21,8 +21,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   deleteWord: (wordId: string) => ipcRenderer.invoke('delete-word', wordId),
 
   // AI operations
-  generateMeaningOnly: (word: string) => ipcRenderer.invoke('generate-meaning-only', word),
-  generateTagsAndSummary: (word: string, meaning: string, generationId: string) => ipcRenderer.invoke('generate-tags-summary', word, meaning, generationId),
+  generateWordMeaning: (word: string) => ipcRenderer.invoke('generate-word-meaning', word),
+  generateWordMetas: (word: string, meaning: string, generationId: string) => ipcRenderer.invoke('generate-word-metas', word, meaning, generationId),
 
   // Associated words
   getAssociatedWords: (tag: string) => ipcRenderer.invoke('get-associated-words', tag),
