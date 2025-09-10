@@ -130,6 +130,8 @@ ipcMain.handle('generate-tags-summary', async (event, word: string, meaning: str
       summary: `A word: ${word}`,
       tags: ['general'],
       tag_colors: { 'general': '#6b7280' },
+      synonyms: [],
+      antonyms: [],
       generationId: 'fallback_' + Date.now()
     };
     console.log('📤 Main process: Sending fallback tool result with fallback generationId:', fallbackData);
@@ -144,6 +146,8 @@ ipcMain.handle('generate-tags-summary', async (event, word: string, meaning: str
       summary: `A word: ${word}`,
       tags: ['general'],
       tag_colors: { 'general': '#6b7280' },
+      synonyms: [],
+      antonyms: [],
       generationId: generationId
     };
     console.log('📤 Main process: Sending fallback tool result to renderer:', fallbackData);
@@ -152,8 +156,8 @@ ipcMain.handle('generate-tags-summary', async (event, word: string, meaning: str
   }
 
   try {
-    console.log('🚀 Main process: Calling aiClient.generateTagsAndSummary');
-    const toolData = await aiClient.generateTagsAndSummary(word, meaning, profile);
+    console.log('🚀 Main process: Calling aiClient.generateWordMetas');
+    const toolData = await aiClient.generateWordMetas(word, meaning, profile);
     console.log('✅ Main process: AI client returned:', toolData);
 
     // Ensure we have valid data to send
@@ -161,6 +165,8 @@ ipcMain.handle('generate-tags-summary', async (event, word: string, meaning: str
       summary: toolData.summary || `A word: ${word}`,
       tags: toolData.tags || ['general'],
       tag_colors: toolData.tag_colors || { 'general': '#6b7280' },
+      synonyms: toolData.synonyms || [],
+      antonyms: toolData.antonyms || [],
       generationId: generationId  // Explicitly include generationId
     };
 
@@ -177,6 +183,8 @@ ipcMain.handle('generate-tags-summary', async (event, word: string, meaning: str
       summary: `A word: ${word}`,
       tags: ['general'],
       tag_colors: { 'general': '#6b7280' },
+      synonyms: [],
+      antonyms: [],
       generationId: generationId
     };
     console.log('📤 Main process: Sending error fallback to renderer:', fallbackData);

@@ -26,19 +26,77 @@ export interface ProcessedToolData {
   summary?: string;
   tags?: string[];
   tag_colors?: Record<string, string>;
+  synonyms?: string[];
+  antonyms?: string[];
 }
 
-// Provide fallbacks if any call fails
-const noTagAndSummaryResult = {
+// Provide dummy metas if any call fails
+export const WORD_DUMMY_METAS = {
   summary: '---',
   tags: ['---'],
-  tag_colors: { '---': '#6b7280' }
+  tag_colors: { '---': '#6b7280' },
+  synonyms: [],
+  antonyms: []
+};
+
+// Shared prompts for word metadata generation
+const WORD_METAS_SYSTEM_PROMPT = `You are an expert language assistant specializing in comprehensive word analysis and categorization. Your task is to provide structured, consistent word metadata including summaries, relevant tags with colors, synonyms, and antonyms to support language learning applications. Always use the generate_word_metas tool when asked to analyze or categorize words.`;
+
+const WORD_METAS_USER_PROMPT = (word: string, meaning: string) =>
+  `Provide comprehensive metadata for the word "${word}" based on this meaning: ${meaning}. Include a brief one-line summary, 5-10 relevant tags with appropriate colors, 3-6 synonyms, and 3-6 antonyms.`;
+
+// Shared tool definitions for word metadata generation
+const WORD_METAS_TOOL_NAME = 'generate_word_metas';
+const WORD_METAS_TOOL_DESCRIPTION = 'Generate comprehensive word metadata including summary, categorization tags with colors, synonyms, and antonyms for language learning applications.';
+
+const WORD_METAS_TOOL_PARAMETERS = {
+  type: 'object' as const,
+  properties: {
+    summary: {
+      type: 'string' as const,
+      description: 'A single, concise sentence that captures the word\'s primary meaning or definition.'
+    },
+    tags: {
+      type: 'array' as const,
+      items: { type: 'string' as const },
+      minItems: 5,
+      maxItems: 10,
+      description: '5-10 relevant tags that categorize the word by part of speech, category, usage, or characteristics. Examples: ["noun", "animal", "marine", "mammal"] or ["verb", "communication", "informal", "slang"]'
+    },
+    tag_colors: {
+      type: 'object' as const,
+      description: 'Hex color codes for each tag in the tags array. Each tag must have a corresponding color. Use visually distinct colors that represent the tag\'s meaning. Examples: {"noun": "#3B82F6", "animal": "#10B981", "marine": "#06B6D4", "mammal": "#8B5CF6"}',
+      additionalProperties: { type: 'string' as const },
+      patternProperties: {
+        ".*": {
+          type: 'string' as const,
+          pattern: '^#[0-9A-Fa-f]{6}$',
+          description: 'Valid hex color code (e.g., #FF5733)'
+        }
+      }
+    },
+    synonyms: {
+      type: 'array' as const,
+      items: { type: 'string' as const },
+      minItems: 3,
+      maxItems: 6,
+      description: '3-6 relevant synonyms that have similar meanings to the word, aka synonyms. Examples: ["happy", "joyful", "cheerful"] for the word "glad"'
+    },
+    antonyms: {
+      type: 'array' as const,
+      items: { type: 'string' as const },
+      minItems: 3,
+      maxItems: 6,
+      description: '3-6 relevant antonyms that have opposite meanings to the word, aka antonyms. Examples: ["sad", "unhappy", "miserable"] for the word "glad"'
+    }
+  },
+  required: ['summary', 'tags', 'tag_colors', 'synonyms', 'antonyms']
 };
 
 // Provider interface for different AI services
 export interface AIProvider {
   generateWordMeaning(word: string, profile: ProfileConfig, onStreamingContent?: (content: string) => void): Promise<string>;
-  generateTagsAndSummary(word: string, meaning: string, profile: ProfileConfig): Promise<ProcessedToolData>;
+  generateWordMetas(word: string, meaning: string, profile: ProfileConfig): Promise<ProcessedToolData>;
   getAvailableModels?(profile: ProfileConfig): Promise<string[]>;
 }
 
@@ -96,7 +154,7 @@ export class OpenAIProvider implements AIProvider {
     }
   }
 
-  async generateTagsAndSummary(word: string, meaning: string, profile: ProfileConfig): Promise<ProcessedToolData> {
+  async generateWordMetas(word: string, meaning: string, profile: ProfileConfig): Promise<ProcessedToolData> {
     if (!profile.model_config.api_key) {
       throw new Error('API key not configured for this profile');
     }
@@ -106,54 +164,26 @@ export class OpenAIProvider implements AIProvider {
       baseURL: profile.model_config.endpoint || undefined,
     });
 
-    // Generate summary, tags and colors in a single tool call
+    // Generate comprehensive word metadata including summary, tags, colors, synonyms, and antonyms
     const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
       {
         role: 'system',
-        content: `You are an expert language assistant specializing in word analysis and categorization. Your task is to provide structured, consistent summaries, relevant tags, and appropriate colors for words to support language learning applications. Always use the generate_word_summary_tags_and_colors tool when asked to analyze or categorize words.`
+        content: WORD_METAS_SYSTEM_PROMPT
       },
       {
         role: 'user',
-        content: `Provide a brief one-line summary, 5-10 relevant tags, and appropriate colors for each tag for the word "${word}" based on this meaning: ${meaning}.`
+        content: WORD_METAS_USER_PROMPT(word, meaning)
       }
     ];
 
-    // Define tools (Use tool to get summary, tags, and colors response from llm)
+    // Define tools (Use tool to get comprehensive word metadata from llm)
     const tools = [
       {
         type: 'function' as const,
         function: {
-          name: 'generate_word_summary_tags_and_colors',
-          description: 'Generate a concise summary, relevant categorization tags, and appropriate color codes for a given word based on its meaning. This tool helps organize and visualize word information for language learning applications.',
-          parameters: {
-            type: 'object',
-            properties: {
-              summary: {
-                type: 'string',
-                description: 'A single, concise sentence that captures the word\'s primary meaning or definition.'
-              },
-              tags: {
-                type: 'array',
-                items: { type: 'string' },
-                minItems: 5,
-                maxItems: 10,
-                description: '5-10 relevant tags that categorize the word by part of speech, category, usage, or characteristics. Examples: ["noun", "animal", "marine", "mammal"] or ["verb", "communication", "informal", "slang"]'
-              },
-              tag_colors: {
-                type: 'object',
-                description: 'Hex color codes for each tag in the tags array. Each tag must have a corresponding color. Use visually distinct colors that represent the tag\'s meaning. Examples: {"noun": "#3B82F6", "animal": "#10B981", "marine": "#06B6D4", "mammal": "#8B5CF6"}',
-                additionalProperties: { type: 'string' },
-                patternProperties: {
-                  ".*": {
-                    type: 'string',
-                    pattern: '^#[0-9A-Fa-f]{6}$',
-                    description: 'Valid hex color code (e.g., #FF5733)'
-                  }
-                }
-              }
-            },
-            required: ['summary', 'tags', 'tag_colors']
-          }
+          name: WORD_METAS_TOOL_NAME,
+          description: WORD_METAS_TOOL_DESCRIPTION,
+          parameters: WORD_METAS_TOOL_PARAMETERS
         }
       }
     ];
@@ -164,7 +194,7 @@ export class OpenAIProvider implements AIProvider {
         model: profile.model_config.model,
         messages,
         tools,
-        tool_choice: { type: 'function', function: { name: 'generate_word_summary_tags_and_colors' } } // Force specific tool
+        tool_choice: { type: 'function', function: { name: 'generate_word_metas' } } // Force specific tool
       });
 
       if (completion.choices[0]?.message?.tool_calls?.[0]) {
@@ -173,19 +203,21 @@ export class OpenAIProvider implements AIProvider {
         const args = JSON.parse((toolCall as any).function.arguments);
 
         const result: ProcessedToolData = {
-          summary: (typeof args.summary === 'string' && args.summary.trim()) ? args.summary : `---`,
-          tags: Array.isArray(args.tags) ? args.tags : ['---'],
-          tag_colors: (typeof args.tag_colors === 'object' && args.tag_colors !== null && Object.keys(args.tag_colors).length > 0) ? args.tag_colors : { '---': '#6b7280' }
+          summary: (typeof args.summary === 'string' && args.summary.trim()) ? args.summary : WORD_DUMMY_METAS.summary,
+          tags: Array.isArray(args.tags) ? args.tags : WORD_DUMMY_METAS.tags,
+          tag_colors: (typeof args.tag_colors === 'object' && args.tag_colors !== null && Object.keys(args.tag_colors).length > 0) ? args.tag_colors as Record<string, string> : WORD_DUMMY_METAS.tag_colors as Record<string, string>,
+          synonyms: Array.isArray(args.synonyms) ? args.synonyms : WORD_DUMMY_METAS.synonyms,
+          antonyms: Array.isArray(args.antonyms) ? args.antonyms : WORD_DUMMY_METAS.antonyms
         };
         return result;
       } else {
         console.warn('⚠️ No function calls found in OpenAI completion');
+        return WORD_DUMMY_METAS;
       }
     } catch (error) {
-      const err = 'Failed to generate summary and tags. ' + ((error as any) instanceof Error ? (error as Error).message : 'Unknown error');
+      const err = 'Failed to generate word metadata. ' + ((error as any) instanceof Error ? (error as Error).message : 'Unknown error');
       throw new Error(err);
-    }
-    return noTagAndSummaryResult;
+    }    
   }
 
   async getAvailableModels(profile: ProfileConfig): Promise<string[]> {
@@ -247,7 +279,7 @@ export class GeminiProvider implements AIProvider {
     }
   }
 
-  async generateTagsAndSummary(word: string, meaning: string, profile: ProfileConfig): Promise<ProcessedToolData> {
+  async generateWordMetas(word: string, meaning: string, profile: ProfileConfig): Promise<ProcessedToolData> {
     if (!profile.model_config.api_key) {
       throw new Error('API key not configured for this profile');
     }
@@ -263,7 +295,7 @@ export class GeminiProvider implements AIProvider {
       {
         role: 'user',
         parts: [{
-          text: `Provide a brief one-line summary, 5-10 relevant tags, and appropriate colors for each tag for the word "${word}" based on this meaning: ${meaning}.`
+          text: WORD_METAS_USER_PROMPT(word, meaning)
         }]
       }
     ];
@@ -272,28 +304,28 @@ export class GeminiProvider implements AIProvider {
       {
         functionDeclarations: [
           {
-            name: 'generate_word_summary_tags_and_colors',
-            description: 'Generate a concise summary, relevant categorization tags, and appropriate color codes for a given word based on its meaning. This tool helps organize and visualize word information for language learning applications.',
+            name: WORD_METAS_TOOL_NAME,
+            description: WORD_METAS_TOOL_DESCRIPTION,
             parametersJsonSchema: {
               type: Type.OBJECT,
               properties: {
                 summary: {
                   type: Type.STRING,
-                  description: 'A single, concise sentence that captures the word\'s primary meaning or definition.'
+                  description: WORD_METAS_TOOL_PARAMETERS.properties.summary.description
                 },
                 tags: {
                   type: Type.ARRAY,
                   items: {
                     type: Type.STRING
                   },
-                  minItems: 5,
-                  maxItems: 10,
-                  description: '5-10 relevant tags that categorize the word by part of speech, category, usage, or characteristics. Examples: ["noun", "animal", "marine", "mammal"] or ["verb", "communication", "informal", "slang"]',
+                  minItems: WORD_METAS_TOOL_PARAMETERS.properties.tags.minItems,
+                  maxItems: WORD_METAS_TOOL_PARAMETERS.properties.tags.maxItems,
+                  description: WORD_METAS_TOOL_PARAMETERS.properties.tags.description,
                   uniqueItems: true
                 },
                 tag_colors: {
                   type: Type.OBJECT,
-                  description: 'Hex color codes for each tag in the tags array. Each tag must have a corresponding color. Use visually distinct colors that represent the tag\'s meaning. Examples: {"noun": "#3B82F6", "animal": "#10B981", "marine": "#06B6D4", "mammal": "#8B5CF6"}',
+                  description: WORD_METAS_TOOL_PARAMETERS.properties.tag_colors.description,
                   additionalProperties: {
                     type: Type.STRING,
                     pattern: '^#[0-9A-Fa-f]{6}$',
@@ -302,9 +334,27 @@ export class GeminiProvider implements AIProvider {
                   propertyNames: {
                     type: Type.STRING
                   }
+                },
+                synonyms: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.STRING
+                  },
+                  minItems: WORD_METAS_TOOL_PARAMETERS.properties.synonyms.minItems,
+                  maxItems: WORD_METAS_TOOL_PARAMETERS.properties.synonyms.maxItems,
+                  description: WORD_METAS_TOOL_PARAMETERS.properties.synonyms.description
+                },
+                antonyms: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.STRING
+                  },
+                  minItems: WORD_METAS_TOOL_PARAMETERS.properties.antonyms.minItems,
+                  maxItems: WORD_METAS_TOOL_PARAMETERS.properties.antonyms.maxItems,
+                  description: WORD_METAS_TOOL_PARAMETERS.properties.antonyms.description
                 }
               },
-              required: ['summary', 'tags', 'tag_colors']
+              required: WORD_METAS_TOOL_PARAMETERS.required
             }
           }
         ]
@@ -317,12 +367,12 @@ export class GeminiProvider implements AIProvider {
         model: model,
         contents: messages,
         config: {
-          systemInstruction: `You are an expert language assistant specializing in word analysis and categorization. Your task is to provide structured, consistent summaries, relevant tags, and appropriate colors for words to support language learning applications. Always use the generate_word_summary_tags_and_colors tool when asked to analyze or categorize words.`,
+          systemInstruction: WORD_METAS_SYSTEM_PROMPT,
           tools: tools,
           toolConfig: {
             functionCallingConfig: {
               mode: FunctionCallingConfigMode.ANY,
-              allowedFunctionNames: ['generate_word_summary_tags_and_colors']
+              allowedFunctionNames: ['generate_word_metas']
             }
           }
         }
@@ -330,24 +380,29 @@ export class GeminiProvider implements AIProvider {
 
       // Check for function calls in the response
       const functionCall = response.functionCalls?.[0];
-      if (functionCall && functionCall.name === 'generate_word_summary_tags_and_colors') {
+      if (functionCall && functionCall.name === 'generate_word_metas') {
         const args = functionCall.args;
         if (args) {
           const result: ProcessedToolData = {
-            summary: (typeof args.summary === 'string' && args.summary.trim()) ? args.summary : `---`,
-            tags: Array.isArray(args.tags) ? args.tags : ['---'],
-            tag_colors: (typeof args.tag_colors === 'object' && args.tag_colors !== null && Object.keys(args.tag_colors).length > 0) ? args.tag_colors as Record<string, string> : { '---': '#6b7280' }
+            summary: (typeof args.summary === 'string' && args.summary.trim()) ? args.summary : WORD_DUMMY_METAS.summary,
+            tags: Array.isArray(args.tags) ? args.tags : WORD_DUMMY_METAS.tags,
+            tag_colors: (typeof args.tag_colors === 'object' && args.tag_colors !== null && Object.keys(args.tag_colors).length > 0) ? args.tag_colors as Record<string, string> : WORD_DUMMY_METAS.tag_colors as Record<string, string>,
+            synonyms: Array.isArray(args.synonyms) ? args.synonyms : WORD_DUMMY_METAS.synonyms,
+            antonyms: Array.isArray(args.antonyms) ? args.antonyms : WORD_DUMMY_METAS.antonyms
           };
           return result;
+        } else {
+          console.warn('⚠️ Invalid function call arguments in Gemini completion');
+          return WORD_DUMMY_METAS;
         }
       } else {
         console.warn('⚠️ No function calls found in Gemini completion');
+        return WORD_DUMMY_METAS;
       }
     } catch (error) {
-      const err = 'Failed to generate summary and tags. ' + ((error as any) instanceof Error ? (error as Error).message : 'Unknown error');
+      const err = 'Failed to generate word metadata. ' + ((error as any) instanceof Error ? (error as Error).message : 'Unknown error');
       throw new Error(err);
-    }
-    return noTagAndSummaryResult;
+    }    
   }
 
   async getAvailableModels(profile: ProfileConfig): Promise<string[]> {
@@ -384,9 +439,9 @@ export class AIModelClient {
     return provider.generateWordMeaning(word, profile, onStreamingContent);
   }
 
-  async generateTagsAndSummary(word: string, meaning: string, profile: ProfileConfig): Promise<ProcessedToolData> {
+  async generateWordMetas(word: string, meaning: string, profile: ProfileConfig): Promise<ProcessedToolData> {
     const provider = createProvider(profile);
-    return provider.generateTagsAndSummary(word, meaning, profile);
+    return provider.generateWordMetas(word, meaning, profile);
   }
 
   // Method to get available models (for future use)
