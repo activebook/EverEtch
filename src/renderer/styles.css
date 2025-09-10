@@ -76,7 +76,8 @@
 
 /* Word list item hover effects */
 .word-item {
-    @apply transition-all duration-200 hover:bg-amber-100/70 hover:shadow-sm hover:border-amber-200/60 cursor-pointer;
+    @apply transition-all duration-200 hover:bg-amber-50/40 hover:shadow-sm cursor-pointer;
+    position: relative;
 }
 
 .word-item:hover {
