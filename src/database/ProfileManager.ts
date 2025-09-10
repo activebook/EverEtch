@@ -237,4 +237,18 @@ export class ProfileManager {
       return false;
     }
   }
+
+  /**
+   * Import a profile by adding it to the profiles list without creating default config
+   * Used when importing an existing database that already has a profile config
+   */
+  importProfile(profileName: string): boolean {
+    if (this.profiles.includes(profileName)) {
+      return false; // Profile already exists
+    }
+
+    this.profiles.push(profileName);
+    this.saveProfiles();
+    return true;
+  }
 }

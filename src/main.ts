@@ -318,8 +318,44 @@ ipcMain.handle('import-profile', async () => {
     ensureDataDirectory();
     fs.copyFileSync(sourcePath, targetPath);
 
-    // Add profile to profile manager
-    const success = await profileManager.createProfile(profileName);
+    // Check if the imported database already has a profile config
+    const tempDbManager = new DatabaseManager();
+    let existingConfig = null;
+    try {
+      await tempDbManager.initialize(profileName);
+      existingConfig = await tempDbManager.getProfileConfig();
+      await tempDbManager.close();
+    } catch (error) {
+      console.error('Error checking existing profile config:', error);
+    }
+
+    let success = false;
+    if (existingConfig) {
+      // Preserve existing profile config but update the name
+      existingConfig.name = profileName;
+      existingConfig.last_opened = new Date().toISOString();
+
+      // Add profile to profile manager first
+      success = profileManager.importProfile(profileName);
+
+      if (success) {
+        // Switch to the imported profile to ensure it's properly initialized
+        const switchSuccess = await profileManager.switchProfile(profileName);
+
+        if (switchSuccess) {
+          // Update the profile config in the now-active database
+          await dbManager.setProfileConfig(existingConfig);
+          console.log(`Imported profile "${profileName}" with existing config preserved`);
+        } else {
+          console.error('Failed to switch to imported profile');
+          success = false;
+        }
+      }
+    } else {
+      // No existing config, create default profile
+      success = await profileManager.createProfile(profileName);
+    }
+
     if (!success) {
       // Clean up the copied file if profile creation failed
       try {
