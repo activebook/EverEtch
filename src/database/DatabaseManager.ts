@@ -478,11 +478,11 @@ export class DatabaseManager {
         return;
       }
 
-      // Use json_each for efficient array searching
+      // Use json_each for efficient array searching with case-insensitive comparison
       const sql = `
         SELECT DISTINCT d.data
         FROM documents d, json_each(d.data, '$.tags') as t
-        WHERE d.type = 'word' AND t.value = ?
+        WHERE d.type = 'word' AND LOWER(t.value) = LOWER(?)
         ORDER BY json_extract(d.data, '$.word')
       `;
 
@@ -499,7 +499,7 @@ export class DatabaseManager {
   }
 
   /**
-   * Fallback method for tag search using LIKE
+   * Fallback method for tag search using LIKE with case-insensitive comparison
    */
   private fallbackGetAssociatedWords(tag: string): Promise<WordDocument[]> {
     return new Promise((resolve, reject) => {
@@ -509,7 +509,7 @@ export class DatabaseManager {
       }
 
       this.db.all(
-        `SELECT data FROM documents WHERE type = 'word' AND json_extract(data, '$.tags') LIKE ? ORDER BY json_extract(data, '$.word')`,
+        `SELECT data FROM documents WHERE type = 'word' AND LOWER(json_extract(data, '$.tags')) LIKE LOWER(?) ORDER BY json_extract(data, '$.word')`,
         [`%${tag}%`],
         (err, rows: { data: string }[]) => {
           if (err) {
@@ -530,11 +530,11 @@ export class DatabaseManager {
         return;
       }
 
-      // Use json_each for efficient array searching with pagination
+      // Use json_each for efficient array searching with pagination and case-insensitive comparison
       const query = `
         SELECT DISTINCT d.data, COUNT(*) OVER() as total_count
         FROM documents d, json_each(d.data, '$.tags') as t
-        WHERE d.type = 'word' AND t.value = ?
+        WHERE d.type = 'word' AND LOWER(t.value) = LOWER(?)
         ORDER BY json_extract(d.data, '$.word')
         LIMIT ${limit} OFFSET ${offset}
       `;
@@ -557,7 +557,7 @@ export class DatabaseManager {
   }
 
   /**
-   * Fallback method for paginated tag search using LIKE
+   * Fallback method for paginated tag search using LIKE with case-insensitive comparison
    */
   private fallbackGetAssociatedWordsPaginated(tag: string, offset: number, limit: number): Promise<{words: WordDocument[], hasMore: boolean, total: number}> {
     return new Promise((resolve, reject) => {
@@ -570,7 +570,7 @@ export class DatabaseManager {
       const query = `
         SELECT data, COUNT(*) OVER() as total_count
         FROM documents
-        WHERE type = 'word' AND json_extract(data, '$.tags') LIKE ?
+        WHERE type = 'word' AND LOWER(json_extract(data, '$.tags')) LIKE LOWER(?)
         ORDER BY json_extract(data, '$.word')
         LIMIT ${limit} OFFSET ${offset}
       `;
