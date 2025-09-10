@@ -654,7 +654,9 @@ class EverEtchApp {
           one_line_desc: this.currentWord.one_line_desc,
           details: this.currentWord.details,
           tags: this.currentWord.tags,
-          tag_colors: this.currentWord.tag_colors
+          tag_colors: this.currentWord.tag_colors,
+          synonyms: this.currentWord.synonyms || [],
+          antonyms: this.currentWord.antonyms || []
         };
 
         // Update the word in database
@@ -1060,7 +1062,7 @@ class EverEtchApp {
             </h4>
             <div class="flex flex-wrap gap-2 mb-4">
               ${word.synonyms.map(synonym => `
-                <span class="synonym-button px-3 py-1.5 text-sm font-medium bg-green-100 text-green-800 rounded-full border border-green-200 hover:bg-green-200 transition-colors duration-200 cursor-pointer">
+                <span class="synonym-button px-3 py-1.5 text-sm font-medium bg-green-100 text-green-800 rounded-full border border-green-200 hover:bg-green-200 hover:scale-105 transition-all duration-200 cursor-pointer">
                   ${synonym}
                 </span>
               `).join('')}
@@ -1078,7 +1080,7 @@ class EverEtchApp {
             </h4>
             <div class="flex flex-wrap gap-2 mb-4">
               ${word.antonyms.map(antonym => `
-                <span class="antonym-button px-3 py-1.5 text-sm font-medium bg-red-100 text-red-800 rounded-full border border-red-200 hover:bg-red-200 transition-colors duration-200 cursor-pointer">
+                <span class="antonym-button px-3 py-1.5 text-sm font-medium bg-red-100 text-red-800 rounded-full border border-red-200 hover:bg-red-200 hover:scale-105 transition-all duration-200 cursor-pointer">
                   ${antonym}
                 </span>
               `).join('')}
