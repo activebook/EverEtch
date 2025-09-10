@@ -318,16 +318,11 @@ class EverEtchApp {
         if (success) {
           this.currentProfile = newProfile;
 
-          // Clear the word list UI before loading new words
-          const wordList = document.getElementById('word-list')!;
-          wordList.innerHTML = '';
+          // Comprehensive UI reset for profile switch
+          this.resetUIForProfileSwitch();
 
-          // Clear the associated words list as well
-          const associatedList = document.getElementById('associated-list')!;
-          associatedList.innerHTML = '';
-
+          // Load words for the new profile
           await this.loadWords();
-          this.clearWordDetails();
         }
       }
     });
@@ -803,10 +798,8 @@ class EverEtchApp {
         const profileSelect = document.getElementById('profile-select') as HTMLSelectElement;
         profileSelect.value = profileName;
 
-        // Clear current word list and details since we're switching to empty profile
-        this.clearWordDetails();
-        const wordList = document.getElementById('word-list')!;
-        wordList.innerHTML = '';
+        // Comprehensive UI reset for new profile
+        this.resetUIForProfileSwitch();
 
         this.hideAddProfileModal();
         this.showSuccess(`Profile "${profileName}" created successfully`);
@@ -849,10 +842,8 @@ class EverEtchApp {
           const profileSelect = document.getElementById('profile-select') as HTMLSelectElement;
           profileSelect.value = this.currentProfile;
 
-          // Clear current word list and details since we're switching to a different profile
-          this.clearWordDetails();
-          const wordList = document.getElementById('word-list')!;
-          wordList.innerHTML = '';
+          // Comprehensive UI reset for profile switch after deletion
+          this.resetUIForProfileSwitch();
 
           // Load words for the new current profile
           await this.loadWords();
@@ -1288,6 +1279,73 @@ class EverEtchApp {
     const suggestionsDiv = document.getElementById('suggestions')!;
     suggestionsDiv.innerHTML = '';
     this.hideSuggestions();
+  }
+
+  /**
+   * Comprehensive UI reset for profile switching/importing
+   * Clears all profile-specific state and UI elements
+   */
+  private resetUIForProfileSwitch() {
+    // Clear current word selection and details
+    this.currentWord = null;
+    this.clearWordDetails();
+
+    // Clear word input field
+    const wordInput = document.getElementById('word-input') as HTMLInputElement;
+    if (wordInput) {
+      wordInput.value = '';
+    }
+
+    // Clear suggestions
+    this.clearSuggestions();
+
+    // Reset generation state
+    this.isGenerating = false;
+    this.currentGenerationId = '';
+    this.streamingContent = '';
+
+    // Clear word list UI
+    const wordList = document.getElementById('word-list')!;
+    if (wordList) {
+      wordList.innerHTML = '';
+    }
+
+    // Clear associated words list
+    const associatedList = document.getElementById('associated-list')!;
+    if (associatedList) {
+      associatedList.innerHTML = '';
+    }
+
+    // Reset pagination states
+    this.words = [];
+    this.currentOffset = 0;
+    this.hasMoreWords = true;
+    this.isLoading = false;
+    this.totalWords = 0;
+
+    // Reset associated words pagination states
+    this.associatedWords = [];
+    this.associatedCurrentOffset = 0;
+    this.associatedHasMore = true;
+    this.associatedIsLoading = false;
+    this.currentTag = '';
+
+    // Disconnect existing observers
+    if (this.scrollObserver) {
+      this.scrollObserver.disconnect();
+      this.scrollObserver = null;
+    }
+    if (this.associatedScrollObserver) {
+      this.associatedScrollObserver.disconnect();
+      this.associatedScrollObserver = null;
+    }
+
+    // Reset button states
+    this.updateGenerateBtnState('');
+    this.isSearchMode = false;
+
+    // Update word count display
+    this.updateWordCount();
   }
 
   private showToast(message: string, type: 'success' | 'error' = 'success') {
@@ -1865,10 +1923,8 @@ class EverEtchApp {
           profileSelect.value = result.profileName;
           this.currentProfile = result.profileName;
 
-          // Clear current word list and details since we're switching to imported profile
-          this.clearWordDetails();
-          const wordList = document.getElementById('word-list')!;
-          wordList.innerHTML = '';
+          // Comprehensive UI reset for imported profile
+          this.resetUIForProfileSwitch();
 
           // Load words for the imported profile
           await this.loadWords();
