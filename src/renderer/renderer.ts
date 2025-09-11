@@ -19,7 +19,7 @@ declare global {
       generateWordMeaning: (word: string) => Promise<string>;
       generateWordMetas: (word: string, meaning: string, generationId: string) => Promise<any>;
       generateMeaning: (word: string) => Promise<string>;
-      getAssociatedWords: (tag: string) => Promise<any[]>;
+      getAssociatedWords: (tag: string) => Promise<WordListItem[]>;
       getAssociatedWordsPaginated: (tag: string, offset: number, limit: number) => Promise<{ words: WordListItem[], hasMore: boolean, total: number }>;
       getRelatedWords: (searchTerm: string) => Promise<any[]>;
       getRelatedWordsOptimized: (searchTerm: string) => Promise<WordListItem[]>;
@@ -615,22 +615,18 @@ class EverEtchApp {
       const addedWord = await window.electronAPI.addWord(wordData);
       this.currentWord = addedWord;
 
-      // Disconnect scroll observer to prevent interference
-      if (this.scrollObserver) {
-        this.scrollObserver.disconnect();
-        this.scrollObserver = null;
-      }
+      // Add new word to top of local array
+      this.words.unshift({
+        id: addedWord.id,
+        word: addedWord.word,
+        one_line_desc: addedWord.one_line_desc
+      });
 
-      // Clear the current word list UI and reset pagination state
-      const wordList = document.getElementById('word-list')!;
-      wordList.innerHTML = '';
-      this.words = [];
-      this.currentOffset = 0;
-      this.hasMoreWords = true;
-      this.isLoading = false;
+      // Update total count
+      this.totalWords++;
 
-      // Load fresh data from the database (this will setup observer after content loads)
-      await this.loadWords();
+      // Render new word item at top of list
+      this.renderWordItemAtTop(addedWord);
 
       // Re-render word details with updated action buttons
       if (this.currentWord) {
@@ -687,19 +683,22 @@ class EverEtchApp {
         // Update current word reference
         this.currentWord = updatedWord;
 
-        // Update the word in the words array
+        // Update the word in the words array (keep it in its current position)
         const wordIndex = this.words.findIndex(word => word.id === originalWordId);
         if (wordIndex !== -1) {
           // Update the existing object in place to preserve references in click handlers
-          Object.assign(this.words[wordIndex], updatedWord);
-          console.log('Updated word in words array:', this.words[wordIndex]);
+          Object.assign(this.words[wordIndex], {
+            id: updatedWord.id,
+            word: updatedWord.word,
+            one_line_desc: updatedWord.one_line_desc
+          });
         }
 
         // Re-render word details with updated content
         if (this.currentWord) {
           this.renderWordDetails(this.currentWord);
-        
-          // Update the word item in the list
+
+          // Update the word item in the list (keep it in current position)
           this.updateWordInList(originalWordId, this.currentWord);
         }
 
@@ -930,6 +929,28 @@ class EverEtchApp {
     this.updateLoadingIndicator();
   }
 
+  private renderWordItemAtTop(word: WordDocument) {
+    const wordList = document.getElementById('word-list')!;
+
+    // Create new word item
+    const wordItem = this.createWordItemFromList({
+      id: word.id,
+      word: word.word,
+      one_line_desc: word.one_line_desc
+    });
+
+    // Insert at the top of the list
+    const firstChild = wordList.firstChild;
+    if (firstChild) {
+      wordList.insertBefore(wordItem, firstChild);
+    } else {
+      wordList.appendChild(wordItem);
+    }
+
+    // Update word count display
+    this.updateWordCount();
+  }
+
   private createWordItem(word: WordListItem): HTMLElement {
     const wordItem = document.createElement('div');
     wordItem.className = 'word-item p-1.5 mb-0.5 cursor-pointer transition-all duration-200 hover:bg-amber-50/20 relative';
@@ -941,6 +962,11 @@ class EverEtchApp {
     `;
 
     wordItem.addEventListener('click', () => {
+      // Prevent clicking during generation to avoid wasteful API calls
+      if (this.isGenerating) {
+        console.log('⚠️ Word item click ignored - generation in progress');
+        return;
+      }
       this.selectWord(word);
     });
 
@@ -973,6 +999,12 @@ class EverEtchApp {
     `;
 
     wordItem.addEventListener('click', async () => {
+      // Prevent clicking during generation to avoid wasteful API calls
+      if (this.isGenerating) {
+        console.log('⚠️ Word list item click ignored - generation in progress');
+        return;
+      }
+
       // For WordListItem, we need to fetch the full WordDocument when clicked
       try {
         const fullWord = await window.electronAPI.getWord(word.id);
@@ -1041,6 +1073,12 @@ class EverEtchApp {
       `;
 
       suggestionItem.addEventListener('click', async () => {
+        // Prevent clicking during generation to avoid wasteful API calls
+        if (this.isGenerating) {
+          console.log('⚠️ Suggestion item click ignored - generation in progress');
+          return;
+        }
+
         // For WordListItem, we need to fetch the full WordDocument when clicked
         try {
           const fullWord = await window.electronAPI.getWord(word.id);
@@ -1165,6 +1203,12 @@ class EverEtchApp {
     const tagElements = wordDetails.querySelectorAll('.tag-button:not([data-loading])');
     tagElements.forEach(tagEl => {
       tagEl.addEventListener('click', async (e) => {
+        // Prevent clicking during generation to avoid wasteful API calls
+        if (this.isGenerating) {
+          console.log('⚠️ Tag click ignored - generation in progress');
+          return;
+        }
+
         const target = e.target as HTMLElement;
         const tag = target.dataset.tag!;
         await this.loadAssociatedWords(tag);
@@ -1175,6 +1219,12 @@ class EverEtchApp {
     const synonymElements = wordDetails.querySelectorAll('.synonym-button');
     synonymElements.forEach(synonymEl => {
       synonymEl.addEventListener('click', async (e) => {
+        // Prevent clicking during generation to avoid wasteful API calls
+        if (this.isGenerating) {
+          console.log('⚠️ Synonym click ignored - generation in progress');
+          return;
+        }
+
         const target = e.target as HTMLElement;
         const synonym = target.textContent!.trim();
         // Set the input field to the synonym and show related words
@@ -1192,6 +1242,12 @@ class EverEtchApp {
     const antonymElements = wordDetails.querySelectorAll('.antonym-button');
     antonymElements.forEach(antonymEl => {
       antonymEl.addEventListener('click', async (e) => {
+        // Prevent clicking during generation to avoid wasteful API calls
+        if (this.isGenerating) {
+          console.log('⚠️ Antonym click ignored - generation in progress');
+          return;
+        }
+
         const target = e.target as HTMLElement;
         const antonym = target.textContent!.trim();
         // Set the input field to the antonym and show related words
@@ -2017,6 +2073,8 @@ class EverEtchApp {
 
     console.log('Updated word item in list:', wordId, updatedWord.word);
   }
+
+
 
   private updateGenerateBtnState(query: string, hasExactMatch?: boolean) {
     const generateBtn = document.getElementById('generate-btn') as HTMLButtonElement;
