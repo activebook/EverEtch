@@ -14,11 +14,7 @@ export class ProfileManager {
     ensureDataDirectory();
   }
 
-  async initialize(): Promise<void> {
-    await this.loadProfiles();
-  }
-
-  private async loadProfiles() {
+  async loadProfiles(): Promise<string[]> {
     try {
       if (fs.existsSync(this.profilesPath)) {
         const data = fs.readFileSync(this.profilesPath, 'utf-8');
@@ -36,6 +32,7 @@ export class ProfileManager {
       this.profiles = [];
       this.currentProfile = null;
     }
+    return [...this.profiles];
   }
 
   private saveProfiles() {

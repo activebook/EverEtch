@@ -6,7 +6,7 @@ export class ProfileService {
 
   async loadProfiles(): Promise<void> {
     try {
-      this.profiles = await window.electronAPI.getProfiles();
+      this.profiles = await window.electronAPI.loadProfiles();
       const currentProfileName = await window.electronAPI.getCurrentProfileName();
       const profileSelect = document.getElementById('profile-select') as HTMLSelectElement;
 

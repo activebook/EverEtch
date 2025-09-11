@@ -45,15 +45,6 @@ async function createWindow() {
   profileManager = new ProfileManager(dbManager);
   aiClient = new AIModelClient();
 
-  // Initialize profile manager and load profiles
-  await profileManager.initialize();
-
-  // Load last opened profile
-  const lastProfile = profileManager.getLastOpenedProfile();
-  if (lastProfile) {
-    await profileManager.switchProfile(lastProfile);
-  }
-
   if (process.env.NODE_ENV === 'development') {
     // Open DevTools(cmd + alt + i)
     // mainWindow.webContents.openDevTools();
@@ -76,6 +67,11 @@ app.on('activate', () => {
 });
 
 // IPC handlers
+
+ipcMain.handle('load-profiles', async (event) => {
+  return await profileManager.loadProfiles();
+});
+
 ipcMain.handle('get-profiles', () => {
   return profileManager.getProfiles();
 });
