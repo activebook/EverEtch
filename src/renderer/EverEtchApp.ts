@@ -19,7 +19,7 @@ export class EverEtchApp {
   private words: WordListItem[] = [];
   private wordsPagination: PaginationState = {
     offset: 0,
-    pageSize: 5,
+    pageSize: 10, // For release builds, set to 10, debug 5
     isLoading: false,
     hasMore: true,
     total: 0
@@ -27,7 +27,7 @@ export class EverEtchApp {
   private associatedWordsState: AssociatedWordsState = {
     words: [],
     offset: 0,
-    pageSize: 5,
+    pageSize: 10, // For release builds, set to 10, debug 5
     isLoading: false,
     hasMore: true,
     total: 0,
