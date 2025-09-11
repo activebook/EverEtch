@@ -1,113 +1,115 @@
-# EverEtch - Word Memo Application
+# EverEtch - Smart Word Learning
 
-A slim, modern word memo application built with Electron, TypeScript, and SQLite.
+A slim, AI-powered app to help you learn and remember words.
+No fxxking ads, no tracking, and completely free.
 
-![UI Screenshot](screenshots/UI.png)
+![UI Screenshot](screenshots/UI_EN.png)
+![UI Screenshot](screenshots/UI_JP.png)
 
-## Features
+## ✨ What You Can Do
 
-- **Multi-profile support**: Create separate profiles for different languages or study sessions
-- **AI-powered word generation**: Generate meanings, tags, and summaries using OpenAI
-- **Tag-based organization**: Organize words with custom tags and colors
-- **Responsive design**: Clean, modern UI with resizable panels
-- **Cross-platform**: Works on Windows, macOS, and Linux
+- **Learn Words with AI**: Enter any word and get instant meanings, examples, and related words
+- **Organize with Tags**: Group words by topics, difficulty, or any category you choose
+- **Find Connections**: Click on tags, synonyms, or antonyms to discover related words
+- **Multiple Profiles**: Keep separate word lists for different languages or subjects
+- **Beautiful Interface**: Clean, modern design that works on any device
 
-## Data Storage
+## 🚀 Quick Start
 
-EverEtch stores user data in the appropriate system user data directory under a `data` subdirectory:
+1. **Download and Install**: Get EverEtch from the releases page
+2. **Create a Profile**: Set up your first word collection
+3. **Add Your First Word**: Type a word and click "Generate" to let AI help
+4. **Explore Relationships**: Click on tags or related words to discover more
 
-- **Windows**: `%APPDATA%/EverEtch/data/`
-- **macOS**: `~/Library/Application Support/EverEtch/data/`
-- **Linux**: `~/.config/EverEtch/data/`
+## 📱 How to Use
 
-This ensures user data is properly separated from the application code and follows platform conventions.
+### Adding Words
+- Type any word you want to learn
+- Click "Generate" to get AI-powered explanations
+- The app will suggest tags, synonyms, and antonyms automatically
 
-### Data Migration
+### Organizing Words
+- **Tags**: Create custom tags like "Basic", "Advanced", "Verbs", "Food"
+- **Colors**: Give tags colors to make them easy to spot
+- **Search**: Find words instantly by typing any part of the word
 
-If you're upgrading from a version that stored data in the project directory, run the migration script:
+### Finding Related Words
+- Click any **tag** to see all words with that tag
+- Click any **synonym** to find words with similar meanings
+- Click any **antonym** to find words with opposite meanings
 
-```bash
-npm run migrate-data
-```
+## ⚙️ Settings
 
-This will safely move your existing data files (`profiles.json`, `English.db`, `Japanese.db`, etc.) to the user data directory.
+### AI Configuration
+Set up your AI helper in the settings:
+- **OpenAI**: Add your API key for GPT models
+- **Google**: Add your API key for Gemini models
 
-## Development
+### Profiles
+- Create separate collections for different languages
+- Switch between profiles instantly
+- Keep your learning organized
 
-### Prerequisites
+## 💾 Data Storage
 
-- Node.js 18+
-- npm
+Your word collections are saved locally on your computer:
+- **Windows**: In your AppData folder
+- **Mac**: In Application Support
+- **Linux**: In your config directory
 
-### Installation
+Your data stays private and secure on your device.
 
+## 🛠️ For Developers
+
+### Requirements
+- Node.js 18 or newer
+- npm (comes with Node.js)
+
+### Install for Development
 ```bash
 npm install
 ```
 
-### Development
-
+### Run the App
 ```bash
-# Build and run in development mode
 npm run dev
-
-# Or run separately:
-npm run build-css  # Build CSS
-npm run build      # Build TypeScript
-npm start          # Start Electron app
 ```
 
-### Building
-
+### Build for Distribution
 ```bash
 npm run build
 ```
 
-## Project Structure
+## 📂 Project Files
 
 ```
 src/
-├── main.ts              # Electron main process
-├── preload.ts           # Preload script for IPC
-├── utils.ts             # Utility functions for paths and IDs
-├── ai/
-│   └── AIModelClient.ts # OpenAI integration
-├── database/
-│   ├── DatabaseManager.ts   # SQLite database operations
-│   └── ProfileManager.ts    # Profile management
-└── renderer/
-    ├── index.html       # Main UI
-    ├── renderer.ts      # Renderer process logic
-    └── styles.css       # Styles
+├── main.ts              # App startup and windows
+├── renderer.ts          # User interface logic
+├── database/            # Word storage and search
+├── ai/                  # AI word generation
+└── utils.ts             # Helper functions
 ```
 
-## Usage
+## 📋 Recent Updates
 
-1. **Profiles**: Switch between different language profiles using the dropdown
-2. **Adding Words**: Enter a word and click "Generate" to get AI-powered meanings and tags
-3. **Organizing**: Use tags to categorize and find related words
-4. **Settings**: Configure AI models and API keys in the settings modal
+- **Faster Search**: Improved word search and relationship finding
+- **Better Performance**: Optimized for large word collections
+- **Unified Relationships**: Tags, synonyms, and antonyms work the same way
+- **Memory Efficient**: Uses less memory when loading many words
 
-## Configuration
+## 📄 License
 
-Configure your AI provider in the Settings modal:
+EverEtch is free and open source under GPL v3.
 
-- **OpenAI**: Requires API key
-- **Google**: Requires API key
+### Important Notes:
+- **Free to Use**: For personal learning and education
+- **No Commercial Use**: Not for business or selling
+- **No Ads**: Completely ad-free
+- **Open Source**: You can view and modify the code
 
-## License
+See [LICENSE](LICENSE) for full details.
 
-EverEtch is licensed under the GNU General Public License version 3 (GPLv3) with additional restrictions to maintain its non-commercial, ads-free nature.
+---
 
-### Key Terms:
-- **Open Source**: You may freely use, modify, and distribute the software under GPLv3
-- **Copyleft**: Any modifications must also be licensed under GPLv3
-- **Non-Commercial**: Strictly prohibited for any business or commercial use
-- **Ads-Free**: No advertising or monetization allowed
-- **Personal/Educational Use Only**: Intended solely for individual learning and study
-
-### Full License Text
-See the [LICENSE](LICENSE) file for complete terms and conditions.
-
-### Important Notice
-This software is provided for personal and educational purposes only. Commercial use, advertising, or any form of monetization is explicitly forbidden. By using EverEtch, you agree to these terms.
+**Made for language learners, students, and anyone who loves words!** 📚
