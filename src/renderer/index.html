@@ -93,6 +93,10 @@
                                         d="M.213.342.092.221.11.203.2.294v-.27h.025v.27L.316.203l.018.018zM.4.226v.162a.013.013 0 0 1-.013.013h-.35A.013.013 0 0 1 .024.388V.226H0v.162c0 .021.017.038.038.038h.35A.04.04 0 0 0 .426.388V.226z" />
                                 </svg>
                             </button>
+                            <button id="howto-btn" title="How to Use Guide"
+                                class="p-2 bg-amber-50/60 hover:bg-amber-100/70 text-slate-600 hover:text-slate-700 rounded-lg transition-all duration-200 hover:shadow-md group">
+                                <svg class="w-4 h-4" viewBox="0 0 1.4 1.4" xmlns="http://www.w3.org/2000/svg"><path d="M.672.938C.712.938.731.91.731.872v-.02C.732.775.76.742.854.678c.1-.068.164-.147.164-.26C1.018.242.875.141.697.141.565.141.448.204.398.317A.2.2 0 0 0 .38.394c0 .033.019.057.055.057.03 0 .05-.018.059-.046C.524.294.598.252.693.252c.114 0 .203.064.203.166 0 .084-.052.131-.127.183C.677.665.61.733.61.837v.037c0 .038.021.064.061.064m0 .321a.083.083 0 0 0 .083-.083.083.083 0 0 0-.083-.083.084.084 0 0 0-.084.083c0 .046.038.083.084.083"/></svg>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -315,6 +319,36 @@
                                 Save
                             </button>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Howto Modal -->
+        <div id="howto-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden z-50">
+            <div class="flex items-center justify-center min-h-screen p-4">
+                <div class="bg-amber-50/95 backdrop-blur-md rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh]">
+                    <div class="p-4 border-b border-amber-200/60 bg-gradient-to-r from-amber-25/40 to-amber-50/60 rounded-t-2xl">
+                        <h3 class="text-lg font-semibold text-slate-800 flex items-center">
+                            <svg class="w-5 h-5 mr-2 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                            </svg>
+                            How to Use EverEtch
+                        </h3>
+                    </div>
+                    <div id="howto-content" class="p-6 overflow-y-auto max-h-[70vh] markdown-details scrollbar-thin">
+                        <!-- Markdown content will be rendered here -->
+                        <div class="text-center text-slate-500 py-8">
+                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500 mx-auto mb-4"></div>
+                            <p>Loading help content...</p>
+                        </div>
+                    </div>
+                    <div class="p-4 border-t border-amber-200/60 flex justify-center bg-amber-50/50 rounded-b-2xl">
+                        <button id="close-howto-btn"
+                            class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all duration-200 hover:shadow-lg font-medium">
+                            Got it!
+                        </button>
                     </div>
                 </div>
             </div>

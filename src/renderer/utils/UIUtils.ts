@@ -252,13 +252,14 @@ export class UIUtils {
   // Panel width persistence methods
   async loadPanelWidths(): Promise<void> {
     try {
-      const uiState = await window.electronAPI.getUIState();
-      if (uiState?.panel_widths) {
-        this.savedPanelWidths = uiState.panel_widths;
+      const data = localStorage.getItem('panel-widths');
+      if (data) {
+        const panelWidths = JSON.parse(data);
+        this.savedPanelWidths = panelWidths;
         this.applySavedPanelWidths();
       }
     } catch (error) {
-      console.error('Error loading panel widths:', error);
+      console.error('Error loading panel widths from localStorage:', error);
     }
   }
 
@@ -276,7 +277,7 @@ export class UIUtils {
     }
   }
 
-  private async savePanelWidths(): Promise<void> {
+  private savePanelWidths(): void {
     try {
       const leftPanel = document.getElementById('left-panel') as HTMLElement;
       const middlePanel = document.getElementById('middle-panel') as HTMLElement;
@@ -300,11 +301,11 @@ export class UIUtils {
           Math.abs(this.savedPanelWidths.middle - panelWidths.middle) > 0.1 ||
           Math.abs(this.savedPanelWidths.right - panelWidths.right) > 0.1) {
 
-        await window.electronAPI.savePanelWidths(panelWidths);
+        localStorage.setItem('panel-widths', JSON.stringify(panelWidths));
         this.savedPanelWidths = panelWidths;
       }
     } catch (error) {
-      console.error('Error saving panel widths:', error);
+      console.error('Error saving panel widths to localStorage:', error);
     }
   }
 }

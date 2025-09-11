@@ -422,6 +422,16 @@ export class EverEtchApp {
       this.handleImportProfile();
     });
 
+    // Howto button
+    const howtoBtn = document.getElementById('howto-btn') as HTMLButtonElement;
+    howtoBtn.addEventListener('click', () => {
+      this.showHowtoModal();
+    });
+
+    // Close howto modal
+    const closeHowtoBtn = document.getElementById('close-howto-btn') as HTMLButtonElement;
+    closeHowtoBtn.addEventListener('click', () => this.hideHowtoModal());
+
     // Add profile modal buttons
     const cancelAddProfileBtn = document.getElementById('cancel-add-profile') as HTMLButtonElement;
     const createProfileBtn = document.getElementById('create-profile') as HTMLButtonElement;
@@ -1279,5 +1289,37 @@ export class EverEtchApp {
       console.error('Error saving settings:', error);
       this.toastManager.showError('Failed to save settings');
     }
+  }
+
+  // Howto modal methods
+  private async showHowtoModal(): Promise<void> {
+    try {
+      // Load markdown content from assets/howto.md
+      const response = await fetch('../../assets/howto.md');
+      if (!response.ok) {
+        throw new Error(`Failed to load howto.md: ${response.status}`);
+      }
+
+      const markdown = await response.text();
+
+      // Convert markdown to HTML using the existing IPC method
+      const htmlContent = await window.electronAPI.processMarkdown(markdown);
+
+      // Insert into modal
+      const contentDiv = document.getElementById('howto-content')!;
+      contentDiv.innerHTML = htmlContent;
+
+      // Show modal
+      const modal = document.getElementById('howto-modal')!;
+      modal.classList.remove('hidden');
+    } catch (error) {
+      console.error('Error loading howto content:', error);
+      this.toastManager.showError('Failed to load help content');
+    }
+  }
+
+  private hideHowtoModal(): void {
+    const modal = document.getElementById('howto-modal')!;
+    modal.classList.add('hidden');
   }
 }
