@@ -4,12 +4,11 @@ import * as fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { getAndSetProxyEnvironment } from './utils/sys_proxy.js';
+import { getDatabasePath, ensureDataDirectory } from './utils/utils.js';
 import { DatabaseManager } from './database/DatabaseManager.js';
 import { ProfileManager } from './database/ProfileManager.js';
 import { AIModelClient, WORD_DUMMY_METAS } from './ai/AIModelClient.js';
 import { marked } from 'marked';
-import { getDatabasePath, ensureDataDirectory } from './utils/utils.js';
-
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -56,7 +55,8 @@ async function createWindow() {
   }
 
   if (process.env.NODE_ENV === 'development') {
-    mainWindow.webContents.openDevTools();
+    // Open DevTools(cmd + alt + i)
+    // mainWindow.webContents.openDevTools();
   }
 
 }
@@ -126,7 +126,7 @@ ipcMain.handle('generate-word-meaning', async (event, word: string) => {
 });
 
 ipcMain.handle('generate-word-metas', async (event, word: string, meaning: string, generationId: string) => {
-  console.log('🔄 Main process: generate-word-metas called with generationId:', generationId);
+  console.debug('🔄 Main process: generate-word-metas called with generationId:', generationId);
 
   // Defensive check: ensure generationId is valid
   if (!generationId || typeof generationId !== 'string' || generationId.length === 0) {
@@ -135,27 +135,27 @@ ipcMain.handle('generate-word-metas', async (event, word: string, meaning: strin
       ...WORD_DUMMY_METAS,
       generationId: 'fallback_' + Date.now()
     };
-    console.log('📤 Main process: Sending fallback word metadata with fallback generationId:', fallbackData);
+    console.debug('📤 Main process: Sending fallback word metadata with fallback generationId:', fallbackData);
     mainWindow.webContents.send('word-metadata-ready', fallbackData);
     return fallbackData;
   }
 
   const profile = await profileManager.getCurrentProfile();
   if (!profile) {
-    console.log('❌ Main process: No profile found');
+    console.debug('❌ Main process: No profile found');
     const fallbackData = {
       ...WORD_DUMMY_METAS,
       generationId: generationId
     };
-    console.log('📤 Main process: Sending fallback word metadata to renderer:', fallbackData);
+    console.debug('📤 Main process: Sending fallback word metadata to renderer:', fallbackData);
     mainWindow.webContents.send('word-metadata-ready', fallbackData);
     return fallbackData;
   }
 
   try {
-    console.log('🚀 Main process: Calling aiClient.generateWordMetas');
+    console.debug('🚀 Main process: Calling aiClient.generateWordMetas');
     const toolData = await aiClient.generateWordMetas(word, meaning, profile);
-    console.log('✅ Main process: AI client returned:', toolData);
+    console.debug('✅ Main process: AI client returned:', toolData);
 
     // Ensure we have valid data to send
     const safeToolData = {
@@ -167,7 +167,7 @@ ipcMain.handle('generate-word-metas', async (event, word: string, meaning: strin
       generationId: generationId  // Explicitly include generationId
     };
 
-    console.log('📤 Main process: Sending word metadata to renderer:', safeToolData);
+    console.debug('📤 Main process: Sending word metadata to renderer:', safeToolData);
     // Send tool data to renderer
     mainWindow.webContents.send('word-metadata-ready', safeToolData);
 
@@ -180,7 +180,7 @@ ipcMain.handle('generate-word-metas', async (event, word: string, meaning: strin
       ...WORD_DUMMY_METAS,
       generationId: generationId
     };
-    console.log('📤 Main process: Sending error fallback to renderer:', fallbackData);
+    console.debug('📤 Main process: Sending error fallback to renderer:', fallbackData);
     mainWindow.webContents.send('word-metadata-ready', fallbackData);
 
     return fallbackData;
@@ -217,9 +217,7 @@ ipcMain.handle('update-profile-config', async (event, config: any) => {
 // Markdown processing
 ipcMain.handle('process-markdown', async (event, markdown: string) => {
   try {
-    const result = marked(markdown);
-    // console.log('Markdown input:', JSON.stringify(markdown));
-    // console.log('Markdown output:', result);
+    const result = marked(markdown);    
     return result;
   } catch (error) {
     console.error('Error processing markdown:', error);
@@ -324,15 +322,7 @@ ipcMain.handle('import-profile', async () => {
     success = profileManager.importProfile(profileName);
     if (success) {
       // Switch to the imported profile to ensure it's properly initialized
-      const switchSuccess = await profileManager.switchProfile(profileName);
-
-      if (switchSuccess) {
-        // Update the profile config in the now-active database
-        console.log(`Profile "${profileName}" imported successfully`);
-      } else {
-        console.error('Failed to switch to imported profile');
-        success = false;
-      }
+      success = await profileManager.switchProfile(profileName);
     } else {
       console.error('Failed to imported profile, the same profile already exists');
     }
