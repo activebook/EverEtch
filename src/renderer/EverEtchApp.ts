@@ -412,6 +412,7 @@ export class EverEtchApp {
 
     this.currentGenerationId = generationId;
     this.isGenerating = true;
+    this.wordRenderer.setGenerationState(true); // Update WordRenderer generation state
     generateBtn.disabled = true;
     generateIcon.classList.add('hidden');
     loadingIcon.classList.remove('hidden');
@@ -485,6 +486,7 @@ export class EverEtchApp {
       this.toastManager.showError('Failed to generate meaning. Please check your API configuration.');
     } finally {
       this.isGenerating = false;
+      this.wordRenderer.setGenerationState(false); // Update WordRenderer generation state
       generateBtn.disabled = false;
       generateIcon.classList.remove('hidden');
       loadingIcon.classList.add('hidden');
@@ -686,7 +688,7 @@ export class EverEtchApp {
       this.associatedWordsState.offset += this.associatedWordsState.pageSize;
 
       if (newWords.length > 0) {
-        this.wordRenderer.renderWordListIncremental(newWords);
+        this.wordRenderer.renderAssociatedWordListIncremental(newWords);
       }
 
       this.uiUtils.updateAssociatedCount(result.total);
@@ -823,6 +825,7 @@ export class EverEtchApp {
     this.uiUtils.clearSuggestions();
 
     this.isGenerating = false;
+    this.wordRenderer.setGenerationState(false); // Reset WordRenderer generation state
     this.currentGenerationId = '';
     this.streamingContent = '';
 
