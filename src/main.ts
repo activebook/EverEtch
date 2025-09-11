@@ -97,20 +97,12 @@ ipcMain.handle('delete-profile', async (event, profileName: string) => {
   return await profileManager.deleteProfile(profileName);
 });
 
-ipcMain.handle('get-words', async () => {
-  return await dbManager.getWords();
-});
-
 ipcMain.handle('get-words-paginated', async (event, offset: number, limit: number) => {
   return await dbManager.getWordsPaginated(offset, limit);
 });
 
 ipcMain.handle('search-words', async (event, query: string) => {
   return await dbManager.searchWords(query);
-});
-
-ipcMain.handle('search-words-optimized', async (event, query: string) => {
-  return await dbManager.searchWordsOptimized(query);
 });
 
 ipcMain.handle('get-word', async (event, wordId: string) => {
@@ -140,8 +132,8 @@ ipcMain.handle('generate-word-metas', async (event, word: string, meaning: strin
       ...WORD_DUMMY_METAS,
       generationId: 'fallback_' + Date.now()
     };
-    console.log('📤 Main process: Sending fallback tool result with fallback generationId:', fallbackData);
-    mainWindow.webContents.send('tool-result', fallbackData);
+    console.log('📤 Main process: Sending fallback word metadata with fallback generationId:', fallbackData);
+    mainWindow.webContents.send('word-metadata-ready', fallbackData);
     return fallbackData;
   }
 
@@ -152,8 +144,8 @@ ipcMain.handle('generate-word-metas', async (event, word: string, meaning: strin
       ...WORD_DUMMY_METAS,
       generationId: generationId
     };
-    console.log('📤 Main process: Sending fallback tool result to renderer:', fallbackData);
-    mainWindow.webContents.send('tool-result', fallbackData);
+    console.log('📤 Main process: Sending fallback word metadata to renderer:', fallbackData);
+    mainWindow.webContents.send('word-metadata-ready', fallbackData);
     return fallbackData;
   }
 
@@ -172,9 +164,9 @@ ipcMain.handle('generate-word-metas', async (event, word: string, meaning: strin
       generationId: generationId  // Explicitly include generationId
     };
 
-    console.log('📤 Main process: Sending tool result to renderer:', safeToolData);
+    console.log('📤 Main process: Sending word metadata to renderer:', safeToolData);
     // Send tool data to renderer
-    mainWindow.webContents.send('tool-result', safeToolData);
+    mainWindow.webContents.send('word-metadata-ready', safeToolData);
 
     return safeToolData;
   } catch (error) {
@@ -186,7 +178,7 @@ ipcMain.handle('generate-word-metas', async (event, word: string, meaning: strin
       generationId: generationId
     };
     console.log('📤 Main process: Sending error fallback to renderer:', fallbackData);
-    mainWindow.webContents.send('tool-result', fallbackData);
+    mainWindow.webContents.send('word-metadata-ready', fallbackData);
 
     return fallbackData;
   }
@@ -204,20 +196,8 @@ ipcMain.handle('delete-word', async (event, wordId: string) => {
   return await dbManager.deleteWord(wordId);
 });
 
-ipcMain.handle('get-associated-words', async (event, tag: string) => {
-  return await dbManager.getAssociatedWords(tag);
-});
-
-ipcMain.handle('get-associated-words-paginated', async (event, tag: string, offset: number, limit: number) => {
-  return await dbManager.getAssociatedWordsPaginated(tag, offset, limit);
-});
-
-ipcMain.handle('get-related-words', async (event, searchTerm: string) => {
-  return await dbManager.getRelatedWords(searchTerm);
-});
-
-ipcMain.handle('get-related-words-optimized', async (event, searchTerm: string) => {
-  return await dbManager.getRelatedWordsOptimized(searchTerm);
+ipcMain.handle('get-related-words-paginated', async (event, searchTerm: string, offset: number, limit: number) => {
+  return await dbManager.getRelatedWordsPaginated(searchTerm, offset, limit);
 });
 
 // Profile config operations

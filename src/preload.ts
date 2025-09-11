@@ -12,10 +12,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   deleteProfile: (profileName: string) => ipcRenderer.invoke('delete-profile', profileName),
 
   // Word operations
-  getWords: () => ipcRenderer.invoke('get-words'),
   getWordsPaginated: (offset: number, limit: number) => ipcRenderer.invoke('get-words-paginated', offset, limit),
   searchWords: (query: string) => ipcRenderer.invoke('search-words', query),
-  searchWordsOptimized: (query: string) => ipcRenderer.invoke('search-words-optimized', query),
   getWord: (wordId: string) => ipcRenderer.invoke('get-word', wordId),
   addWord: (wordData: any) => ipcRenderer.invoke('add-word', wordData),
   updateWord: (wordId: string, wordData: any) => ipcRenderer.invoke('update-word', wordId, wordData),
@@ -26,10 +24,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   generateWordMetas: (word: string, meaning: string, generationId: string) => ipcRenderer.invoke('generate-word-metas', word, meaning, generationId),
 
   // Associated words
-  getAssociatedWords: (tag: string) => ipcRenderer.invoke('get-associated-words', tag),
-  getAssociatedWordsPaginated: (tag: string, offset: number, limit: number) => ipcRenderer.invoke('get-associated-words-paginated', tag, offset, limit),
-  getRelatedWords: (searchTerm: string) => ipcRenderer.invoke('get-related-words', searchTerm),
-  getRelatedWordsOptimized: (searchTerm: string) => ipcRenderer.invoke('get-related-words-optimized', searchTerm),
+  getRelatedWordsPaginated: (searchTerm: string, offset: number, limit: number) => ipcRenderer.invoke('get-related-words-paginated', searchTerm, offset, limit),
 
   // Profile config
   getProfileConfig: () => ipcRenderer.invoke('get-profile-config'),
@@ -47,8 +42,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('streaming-content', (_event: any, content: string) => callback(content));
   },
 
-  onToolResult: (callback: Function) => {
-    ipcRenderer.on('tool-result', (_event: any, toolData: any) => callback(toolData));
+  onWordMetadataReady: (callback: Function) => {
+    ipcRenderer.on('word-metadata-ready', (_event: any, toolData: any) => callback(toolData));
   },
 
   removeAllListeners: (event: string) => {
