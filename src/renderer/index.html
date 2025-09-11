@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,65 +10,88 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
+
 <body class="bg-amber-50 h-screen overflow-hidden font-['Inter']">
     <div id="app" class="h-full flex flex-col">
         <!-- Modern Header -->
-        <header class="bg-amber-50/80 backdrop-blur-md shadow-lg border-b border-amber-100/20 pl-3 pr-6 py-2 flex items-center justify-between">
-            <h1 class="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent flex items-center">
-                <svg t="1757400859266" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="26108" width="32" height="32"><path d="M386.327273 828.509091l374.690909-374.690909h-214.109091L600.436364 186.181818 279.272727 560.872727h214.109091l-107.054545 267.636364z" fill="#8C24FF" p-id="26111"></path></svg>
+        <header
+            class="bg-amber-50/80 backdrop-blur-md shadow-lg border-b border-amber-100/20 pl-3 pr-6 py-2 flex items-center justify-between">
+            <h1
+                class="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent flex items-center">
+                <svg t="1757400859266" class="icon" viewBox="0 0 1024 1024" version="1.1"
+                    xmlns="http://www.w3.org/2000/svg" p-id="26108" width="32" height="32">
+                    <path
+                        d="M386.327273 828.509091l374.690909-374.690909h-214.109091L600.436364 186.181818 279.272727 560.872727h214.109091l-107.054545 267.636364z"
+                        fill="#8C24FF" p-id="26111"></path>
+                </svg>
                 EverEtch
                 <span class="version">(v{$version})</span>
             </h1>
             <div class="flex items-center space-x-4">
                 <div class="flex items-center space-x-2">
                     <label for="profile-select" class="text-sm font-medium text-slate-600 flex items-center">
-                        <svg class="w-3 h-3 mr-1.5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"></path>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5a2 2 0 012-2h4a2 2 0 012 2v2H8V5z"></path>
+                        <svg class="w-3 h-3 mr-1.5 text-amber-600" fill="none" stroke="currentColor"
+                            viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M8 5a2 2 0 012-2h4a2 2 0 012 2v2H8V5z"></path>
                         </svg>
                         Profile:
                     </label>
-                    <select id="profile-select" class="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium shadow-sm hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200">
+                    <select id="profile-select"
+                        class="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium shadow-sm hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200">
                         <option value="">Loading...</option>
                     </select>
                 </div>
                 <div class="flex items-center space-x-2">
-                    <button id="settings-btn" title="Settings" class="p-2 bg-amber-50/60 hover:bg-amber-100/70 text-slate-600 hover:text-slate-700 rounded-lg transition-all duration-200 hover:shadow-md group">                        
-                        <svg class="w-5 h-5" viewBox="0 0 1.6 1.6" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg"><path d="M1.073 1.411H.527a.14.14 0 0 1-.119-.069L.134.869a.14.14 0 0 1 0-.138L.408.258A.14.14 0 0 1 .527.189h.546a.14.14 0 0 1 .119.069l.273.474a.14.14 0 0 1 0 .138l-.272.472a.14.14 0 0 1-.119.069M.527.264a.06.06 0 0 0-.054.031L.2.769a.06.06 0 0 0 0 .063l.273.474a.06.06 0 0 0 .054.031h.546a.06.06 0 0 0 .054-.031L1.4.831a.06.06 0 0 0 0-.063L1.128.295a.06.06 0 0 0-.054-.031Z"/><path d="M.8 1.052A.252.252 0 1 1 1.052.8a.25.25 0 0 1-.252.252m0-.429A.177.177 0 1 0 .977.8.177.177 0 0 0 .8.623"/></svg>
+                    <button id="settings-btn" title="Settings"
+                        class="p-2 bg-amber-50/60 hover:bg-amber-100/70 text-slate-600 hover:text-slate-700 rounded-lg transition-all duration-200 hover:shadow-md group">
+                        <svg class="w-5 h-5" viewBox="0 0 1.6 1.6" data-name="Layer 1"
+                            xmlns="http://www.w3.org/2000/svg">
+                            <path
+                                d="M1.073 1.411H.527a.14.14 0 0 1-.119-.069L.134.869a.14.14 0 0 1 0-.138L.408.258A.14.14 0 0 1 .527.189h.546a.14.14 0 0 1 .119.069l.273.474a.14.14 0 0 1 0 .138l-.272.472a.14.14 0 0 1-.119.069M.527.264a.06.06 0 0 0-.054.031L.2.769a.06.06 0 0 0 0 .063l.273.474a.06.06 0 0 0 .054.031h.546a.06.06 0 0 0 .054-.031L1.4.831a.06.06 0 0 0 0-.063L1.128.295a.06.06 0 0 0-.054-.031Z" />
+                            <path
+                                d="M.8 1.052A.252.252 0 1 1 1.052.8a.25.25 0 0 1-.252.252m0-.429A.177.177 0 1 0 .977.8.177.177 0 0 0 .8.623" />
+                        </svg>
                     </button>
 
                     <!-- More Actions - Inline Buttons -->
                     <div class="flex items-center space-x-1">
-                        <button
-                            id="more-btn"
-                            title="Toggle More Actions"
-                            class="p-2 bg-amber-50/60 hover:bg-amber-100/70 text-slate-600 hover:text-slate-700 rounded-lg transition-all duration-200 hover:shadow-md group"
-                        >
-                            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" xml:space="preserve"><path d="M6 8.667c-.735 0-1.333.598-1.333 1.333S5.265 11.333 6 11.333 7.333 10.735 7.333 10 6.735 8.667 6 8.667m4 0c-.735 0-1.333.598-1.333 1.333s.598 1.333 1.333 1.333 1.333-.598 1.333-1.333S10.735 8.667 10 8.667M15.333 10c0-.735-.598-1.333-1.333-1.333s-1.333.598-1.333 1.333.598 1.333 1.333 1.333 1.333-.598 1.333-1.333"/><path d="m.805 10 4.431-4.431a.333.333 0 1 0-.471-.471L.098 9.765a.333.333 0 0 0 0 .471l4.667 4.667a.33.33 0 0 0 .471 0 .333.333 0 0 0 0-.471zm19.097-.236-4.667-4.667a.333.333 0 1 0-.471.471L19.195 10l-4.431 4.431a.333.333 0 1 0 .471.471l4.667-4.667a.333.333 0 0 0 0-.471"/></svg>
+                        <button id="more-btn" title="Toggle More Actions"
+                            class="p-2 bg-amber-50/60 hover:bg-amber-100/70 text-slate-600 hover:text-slate-700 rounded-lg transition-all duration-200 hover:shadow-md group">
+                            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"
+                                xml:space="preserve">
+                                <path
+                                    d="M6 8.667c-.735 0-1.333.598-1.333 1.333S5.265 11.333 6 11.333 7.333 10.735 7.333 10 6.735 8.667 6 8.667m4 0c-.735 0-1.333.598-1.333 1.333s.598 1.333 1.333 1.333 1.333-.598 1.333-1.333S10.735 8.667 10 8.667M15.333 10c0-.735-.598-1.333-1.333-1.333s-1.333.598-1.333 1.333.598 1.333 1.333 1.333 1.333-.598 1.333-1.333" />
+                                <path
+                                    d="m.805 10 4.431-4.431a.333.333 0 1 0-.471-.471L.098 9.765a.333.333 0 0 0 0 .471l4.667 4.667a.33.33 0 0 0 .471 0 .333.333 0 0 0 0-.471zm19.097-.236-4.667-4.667a.333.333 0 1 0-.471.471L19.195 10l-4.431 4.431a.333.333 0 1 0 .471.471l4.667-4.667a.333.333 0 0 0 0-.471" />
+                            </svg>
                         </button>
 
                         <!-- Inline Action Buttons -->
-                        <div id="inline-actions" class="flex items-center space-x-1 w-0 overflow-hidden pointer-events-none transform transition-all duration-200 ease-out">
-                            <button
-                                id="add-profile-btn"
-                                title="Add New Profile"
-                                class="p-2 bg-amber-50/60 hover:bg-amber-100/70 text-slate-600 hover:text-slate-700 rounded-lg transition-all duration-200 hover:shadow-md group"
-                            >
-                                <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" xml:space="preserve"><path d="M17.893 0H2.107A2.11 2.11 0 0 0 0 2.107v15.786A2.11 2.11 0 0 0 2.107 20h15.786A2.11 2.11 0 0 0 20 17.893V2.107C20 .947 19.053 0 17.893 0M19 17.893A1.11 1.11 0 0 1 17.893 19H2.107A1.11 1.11 0 0 1 1 17.893V2.107A1.11 1.11 0 0 1 2.107 1h15.786A1.11 1.11 0 0 1 19 2.107z"/><path d="M13.777 9.502h-3.279V6.223a.502.502 0 1 0-1.004 0v3.279H6.215a.5.5 0 1 0 0 1h3.279v3.279a.502.502 0 1 0 1.004 0v-3.279h3.279a.499.499 0 1 0 0-1"/></svg>
+                        <div id="inline-actions"
+                            class="flex items-center space-x-1 w-0 overflow-hidden pointer-events-none transform transition-all duration-200 ease-out">
+                            <button id="add-profile-btn" title="Add New Profile"
+                                class="p-2 bg-amber-50/60 hover:bg-amber-100/70 text-slate-600 hover:text-slate-700 rounded-lg transition-all duration-200 hover:shadow-md group">
+                                <svg class="w-5 h-5" viewBox="0 0 0.4 0.4" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="m.238.028.085.088.003.01v.05H.301V.15H.2v-.1H.075v.275h.1V.35H.063L.05.337v-.3L.063.024h.168zM.225.05v.075h.072zm.1.35H.3V.325H.225V.3H.3V.225h.025V.3H.4v.025H.325z"/></svg>
                             </button>
-                            <button
-                                id="export-profile-btn"
-                                title="Export Profile"
-                                class="p-2 bg-amber-50/60 hover:bg-amber-100/70 text-slate-600 hover:text-slate-700 rounded-lg transition-all duration-200 hover:shadow-md group"
-                            >
-                                <svg class="w-4 h-4" viewBox="0 0 0.4 0.4" xmlns="http://www.w3.org/2000/svg"><g data-name="Layer 2"><path d="M.4.238v.1a.063.063 0 0 1-.063.063H.062A.063.063 0 0 1 0 .338V.063A.063.063 0 0 1 .063 0h.075a.013.013 0 0 1 .013.013.013.013 0 0 1-.013.013H.063a.04.04 0 0 0-.038.037v.275a.04.04 0 0 0 .038.037h.275A.04.04 0 0 0 .376.337v-.1a.013.013 0 0 1 .025 0m-.275 0a.013.013 0 0 0 .025 0v-.05A.09.09 0 0 1 .238.1h.12L.304.154a.012.012 0 0 0 0 .017.012.012 0 0 0 .017 0L.396.096.4.092a.01.01 0 0 0 0-.01L.397.078.322.003a.012.012 0 0 0-.017 0 .012.012 0 0 0 0 .017l.052.055H.238a.113.113 0 0 0-.113.113Z" data-name="Layer 1"/></g></svg>
+                            <button id="export-profile-btn" title="Export Profile"
+                                class="p-2 bg-amber-50/60 hover:bg-amber-100/70 text-slate-600 hover:text-slate-700 rounded-lg transition-all duration-200 hover:shadow-md group">
+                                <svg class="w-4 h-4" viewBox="0 0 0.4 0.4" xmlns="http://www.w3.org/2000/svg">
+                                    <g data-name="Layer 2">
+                                        <path
+                                            d="M.4.238v.1a.063.063 0 0 1-.063.063H.062A.063.063 0 0 1 0 .338V.063A.063.063 0 0 1 .063 0h.075a.013.013 0 0 1 .013.013.013.013 0 0 1-.013.013H.063a.04.04 0 0 0-.038.037v.275a.04.04 0 0 0 .038.037h.275A.04.04 0 0 0 .376.337v-.1a.013.013 0 0 1 .025 0m-.275 0a.013.013 0 0 0 .025 0v-.05A.09.09 0 0 1 .238.1h.12L.304.154a.012.012 0 0 0 0 .017.012.012 0 0 0 .017 0L.396.096.4.092a.01.01 0 0 0 0-.01L.397.078.322.003a.012.012 0 0 0-.017 0 .012.012 0 0 0 0 .017l.052.055H.238a.113.113 0 0 0-.113.113Z"
+                                            data-name="Layer 1" />
+                                    </g>
+                                </svg>
                             </button>
-                            <button
-                                id="import-profile-btn"
-                                title="Import Profile"
-                                class="p-2 bg-amber-50/60 hover:bg-amber-100/70 text-slate-600 hover:text-slate-700 rounded-lg transition-all duration-200 hover:shadow-md group"
-                            >
-                                <svg class="w-4 h-4" viewBox="0 0 0.425 0.425" xmlns="http://www.w3.org/2000/svg"><path d="M.213.342.092.221.11.203.2.294v-.27h.025v.27L.316.203l.018.018zM.4.226v.162a.013.013 0 0 1-.013.013h-.35A.013.013 0 0 1 .024.388V.226H0v.162c0 .021.017.038.038.038h.35A.04.04 0 0 0 .426.388V.226z"/></svg>
+                            <button id="import-profile-btn" title="Import Profile"
+                                class="p-2 bg-amber-50/60 hover:bg-amber-100/70 text-slate-600 hover:text-slate-700 rounded-lg transition-all duration-200 hover:shadow-md group">
+                                <svg class="w-4 h-4" viewBox="0 0 0.425 0.425" xmlns="http://www.w3.org/2000/svg">
+                                    <path
+                                        d="M.213.342.092.221.11.203.2.294v-.27h.025v.27L.316.203l.018.018zM.4.226v.162a.013.013 0 0 1-.013.013h-.35A.013.013 0 0 1 .024.388V.226H0v.162c0 .021.017.038.038.038h.35A.04.04 0 0 0 .426.388V.226z" />
+                                </svg>
                             </button>
                         </div>
                     </div>
@@ -78,16 +102,22 @@
         <!-- Main Content Area -->
         <div id="main-content" class="flex-1 flex overflow-hidden">
             <!-- Left Panel: Word List -->
-            <div id="left-panel" class="bg-amber-50/70 backdrop-blur-sm border-r border-amber-200/60 flex flex-col shadow-sm" style="width: 25%; min-width: 200px;">
+            <div id="left-panel"
+                class="bg-amber-50/70 backdrop-blur-sm border-r border-amber-200/60 flex flex-col shadow-sm"
+                style="width: 25%; min-width: 200px;">
                 <div class="p-2 border-b border-amber-200/60 bg-gradient-to-r from-amber-25/40 to-amber-50/60">
                     <h2 class="text-sm font-medium text-slate-700 flex items-center justify-between">
                         <div class="flex items-center">
-                            <svg class="w-3 h-3 mr-1.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            <svg class="w-3 h-3 mr-1.5 text-blue-500" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                                </path>
                             </svg>
                             Words
                         </div>
-                        <span id="word-count" class="text-xs font-medium text-slate-600 bg-amber-100/70 px-2 py-0.5 rounded-full">0</span>
+                        <span id="word-count"
+                            class="text-xs font-medium text-slate-600 bg-amber-100/70 px-2 py-0.5 rounded-full">0</span>
                     </h2>
                 </div>
                 <div id="word-list" class="flex-1 overflow-y-auto scrollbar-thin p-3">
@@ -96,13 +126,17 @@
             </div>
 
             <!-- Middle Panel: Operate Panel -->
-            <div id="middle-panel" class="bg-amber-50/70 backdrop-blur-sm flex flex-col min-h-0 shadow-sm" style="width: 50%; min-width: 300px;">
+            <div id="middle-panel" class="bg-amber-50/70 backdrop-blur-sm flex flex-col min-h-0 shadow-sm"
+                style="width: 50%; min-width: 300px;">
                 <!-- Upper Panel: Word Details -->
                 <div class="flex-1 p-6 overflow-y-auto scrollbar-thin bg-amber-50/70">
                     <div id="word-details" class="h-full">
                         <div class="text-center text-slate-500 mt-12">
-                            <svg class="w-16 h-16 mx-auto mb-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                            <svg class="w-16 h-16 mx-auto mb-4 text-slate-300" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                    d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z">
+                                </path>
                             </svg>
                             <p class="text-lg font-medium">Select a word or enter a new one to get started</p>
                         </div>
@@ -112,27 +146,26 @@
                 <!-- Lower Panel: Input/Search -->
                 <div class="p-4 flex-shrink-0 bg-amber-50/70 relative">
                     <!-- Floating Search Suggestions (positioned above input) -->
-                    <div id="suggestions" class="absolute bottom-full left-0 right-0 mb-2 max-h-80 overflow-y-auto scrollbar-thin bg-amber-50/95 backdrop-blur-md rounded-xl shadow-lg border border-amber-200/60 z-10 hidden">
+                    <div id="suggestions"
+                        class="absolute bottom-full left-0 right-0 mb-2 max-h-80 overflow-y-auto scrollbar-thin bg-amber-50/95 backdrop-blur-md rounded-xl shadow-lg border border-amber-200/60 z-10 hidden">
                         <!-- Search suggestions will appear here -->
                     </div>
 
                     <div class="relative">
-                        <input
-                            type="text"
-                            id="word-input"
-                            placeholder="Word to search or generate meaning..."
-                            class="w-full pr-12 pl-4 py-3 border border-amber-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-amber-50/80 backdrop-blur-sm text-slate-700 placeholder-slate-400"
-                        >
-                        <button
-                            id="generate-btn"
-                            title="Generate"
-                            class="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 text-blue-500 hover:text-blue-600 hover:bg-amber-100/70 rounded-lg transition-all duration-200 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed group"
-                        >
-                            <svg id="generate-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                        <input type="text" id="word-input" placeholder="Word to search or generate meaning..."
+                            class="w-full pr-12 pl-4 py-3 border border-amber-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-amber-50/80 backdrop-blur-sm text-slate-700 placeholder-slate-400">
+                        <button id="generate-btn" title="Generate"
+                            class="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 text-blue-500 hover:text-blue-600 hover:bg-amber-100/70 rounded-lg transition-all duration-200 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed group">
+                            <svg id="generate-icon" class="w-5 h-5" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
                             </svg>
-                            <svg id="loading-icon" class="w-5 h-5 hidden animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                            <svg id="loading-icon" class="w-5 h-5 hidden animate-spin" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+                                </path>
                             </svg>
                         </button>
                     </div>
@@ -140,16 +173,22 @@
             </div>
 
             <!-- Right Panel: Associated List -->
-            <div id="right-panel" class="bg-amber-50/70 backdrop-blur-sm border-l border-amber-200/60 flex flex-col shadow-sm" style="width: 25%; min-width: 200px;">
+            <div id="right-panel"
+                class="bg-amber-50/70 backdrop-blur-sm border-l border-amber-200/60 flex flex-col shadow-sm"
+                style="width: 25%; min-width: 200px;">
                 <div class="p-2 border-b border-amber-200/60 bg-gradient-to-r from-amber-25/40 to-amber-50/60">
                     <h2 class="text-sm font-medium text-slate-700 flex items-center justify-between">
                         <div class="flex items-center">
-                            <svg class="w-3 h-3 mr-1.5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                            <svg class="w-3 h-3 mr-1.5 text-purple-500" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1">
+                                </path>
                             </svg>
                             Associated Words
                         </div>
-                        <span id="associated-count" class="text-xs font-medium text-slate-600 bg-amber-100/70 px-2 py-0.5 rounded-full">0</span>
+                        <span id="associated-count"
+                            class="text-xs font-medium text-slate-600 bg-amber-100/70 px-2 py-0.5 rounded-full">0</span>
                     </h2>
                 </div>
                 <div id="associated-list" class="flex-1 overflow-y-auto scrollbar-thin p-3">
@@ -162,36 +201,34 @@
         <div id="add-profile-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden z-50">
             <div class="flex items-center justify-center min-h-screen p-4">
                 <div class="bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl max-w-sm w-full border border-white/20">
-                    <div class="p-5 border-b border-slate-200/60 bg-gradient-to-r from-green-50/80 to-blue-50/80 rounded-t-2xl">
+                    <div
+                        class="p-5 border-b border-slate-200/60 bg-gradient-to-r from-green-50/80 to-blue-50/80 rounded-t-2xl">
                         <h3 class="text-lg font-semibold text-slate-800 flex items-center">
-                            <svg class="w-5 h-5 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                            <svg class="w-5 h-5 mr-2 text-green-500" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                             </svg>
                             Add New Profile
                         </h3>
                     </div>
                     <div class="p-5">
                         <div>
-                            <label for="new-profile-name" class="block text-sm font-medium text-slate-700 mb-2">Profile Name</label>
-                            <input
-                                type="text"
-                                id="new-profile-name"
+                            <label for="new-profile-name" class="block text-sm font-medium text-slate-700 mb-2">Profile
+                                Name</label>
+                            <input type="text" id="new-profile-name"
                                 class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 bg-white/80 backdrop-blur-sm text-slate-700 placeholder-slate-400"
-                                placeholder="Enter profile name..."
-                            >
+                                placeholder="Enter profile name...">
                         </div>
                     </div>
-                    <div class="p-5 border-t border-slate-200/60 flex justify-end space-x-3 bg-slate-50/50 rounded-b-2xl">
-                        <button
-                            id="cancel-add-profile"
-                            class="px-4 py-2 bg-slate-500 hover:bg-slate-600 text-white rounded-lg transition-all duration-200 hover:shadow-lg font-medium text-sm"
-                        >
+                    <div
+                        class="p-5 border-t border-slate-200/60 flex justify-end space-x-3 bg-slate-50/50 rounded-b-2xl">
+                        <button id="cancel-add-profile"
+                            class="px-4 py-2 bg-slate-500 hover:bg-slate-600 text-white rounded-lg transition-all duration-200 hover:shadow-lg font-medium text-sm">
                             Cancel
                         </button>
-                        <button
-                            id="create-profile"
-                            class="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-all duration-200 hover:shadow-lg font-medium text-sm"
-                        >
+                        <button id="create-profile"
+                            class="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-all duration-200 hover:shadow-lg font-medium text-sm">
                             Create
                         </button>
                     </div>
@@ -203,91 +240,78 @@
         <div id="settings-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden z-50">
             <div class="flex items-center justify-center min-h-screen p-4">
                 <div class="bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl max-w-md w-full border border-white/20">
-                    <div class="p-4 border-b border-slate-200/60 bg-gradient-to-r from-blue-50/80 to-purple-50/80 rounded-t-2xl">
+                    <div
+                        class="p-4 border-b border-slate-200/60 bg-gradient-to-r from-blue-50/80 to-purple-50/80 rounded-t-2xl">
                         <h3 class="text-lg font-semibold text-slate-800 flex items-center">
-                            <svg class="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            <svg class="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
+                                </path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
                             </svg>
                             Profile Settings
                         </h3>
                     </div>
                     <div class="p-4 space-y-3">
                         <div>
-                            <label for="profile-name" class="block text-sm font-medium text-slate-700 mb-1.5">Profile Name</label>
-                            <input
-                                type="text"
-                                id="profile-name"
+                            <label for="profile-name" class="block text-sm font-medium text-slate-700 mb-1.5">Profile
+                                Name</label>
+                            <input type="text" id="profile-name"
                                 class="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white/80 backdrop-blur-sm text-slate-700 placeholder-slate-400"
-                                placeholder="Enter profile name..."
-                            >
+                                placeholder="Enter profile name...">
                         </div>
                         <div>
-                            <label for="system-prompt" class="block text-sm font-medium text-slate-700 mb-1.5">System Prompt</label>
-                            <textarea
-                                id="system-prompt"
-                                rows="3"
+                            <label for="system-prompt" class="block text-sm font-medium text-slate-700 mb-1.5">System
+                                Prompt</label>
+                            <textarea id="system-prompt" rows="3"
                                 class="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white/80 backdrop-blur-sm text-slate-700 placeholder-slate-400 resize-none text-sm"
-                                placeholder="Enter system prompt..."
-                            ></textarea>
+                                placeholder="Enter system prompt..."></textarea>
                         </div>
                         <div>
-                            <label for="model-provider" class="block text-sm font-medium text-slate-700 mb-1.5">Model Provider</label>
-                            <select
-                                id="model-provider"
-                                title="Select AI model provider"
-                                class="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white/80 backdrop-blur-sm text-slate-700 text-sm"
-                            >
+                            <label for="model-provider" class="block text-sm font-medium text-slate-700 mb-1.5">Model
+                                Provider</label>
+                            <select id="model-provider" title="Select AI model provider"
+                                class="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white/80 backdrop-blur-sm text-slate-700 text-sm">
                                 <option value="openai">OpenAI</option>
                                 <option value="google">Google</option>
                             </select>
                         </div>
                         <div>
-                            <label for="model-name" class="block text-sm font-medium text-slate-700 mb-1.5">Model Name</label>
-                            <input
-                                type="text"
-                                id="model-name"
+                            <label for="model-name" class="block text-sm font-medium text-slate-700 mb-1.5">Model
+                                Name</label>
+                            <input type="text" id="model-name"
                                 class="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white/80 backdrop-blur-sm text-slate-700 placeholder-slate-400 text-sm"
-                                placeholder="e.g., gpt-4, claude-3-sonnet"
-                            >
+                                placeholder="e.g., gpt-4, claude-3-sonnet">
                         </div>
                         <div>
-                            <label for="api-endpoint" class="block text-sm font-medium text-slate-700 mb-1.5">API Endpoint</label>
-                            <input
-                                type="text"
-                                id="api-endpoint"
+                            <label for="api-endpoint" class="block text-sm font-medium text-slate-700 mb-1.5">API
+                                Endpoint</label>
+                            <input type="text" id="api-endpoint"
                                 class="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white/80 backdrop-blur-sm text-slate-700 placeholder-slate-400 text-sm"
-                                placeholder="https://api.openai.com/v1/chat/completions"
-                            >
+                                placeholder="https://api.openai.com/v1/chat/completions">
                         </div>
                         <div>
                             <label for="api-key" class="block text-sm font-medium text-slate-700 mb-1.5">API Key</label>
-                            <input
-                                type="password"
-                                id="api-key"
+                            <input type="password" id="api-key"
                                 class="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white/80 backdrop-blur-sm text-slate-700 placeholder-slate-400 text-sm"
-                                placeholder="Enter your API key"
-                            >
+                                placeholder="Enter your API key">
                         </div>
                     </div>
-                    <div class="p-4 border-t border-slate-200/60 flex justify-between items-center bg-slate-50/50 rounded-b-2xl">
-                        <button
-                            id="delete-profile-btn"
-                            class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all duration-200 hover:shadow-lg font-medium text-sm"
-                        >
+                    <div
+                        class="p-4 border-t border-slate-200/60 flex justify-between items-center bg-slate-50/50 rounded-b-2xl">
+                        <button id="delete-profile-btn"
+                            class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all duration-200 hover:shadow-lg font-medium text-sm">
                             Delete Profile
                         </button>
                         <div class="flex space-x-3">
-                            <button
-                                id="cancel-settings"
-                                class="px-4 py-2 bg-slate-500 hover:bg-slate-600 text-white rounded-lg transition-all duration-200 hover:shadow-lg font-medium text-sm"
-                            >
+                            <button id="cancel-settings"
+                                class="px-4 py-2 bg-slate-500 hover:bg-slate-600 text-white rounded-lg transition-all duration-200 hover:shadow-lg font-medium text-sm">
                                 Cancel
                             </button>
-                            <button
-                                id="save-settings"
-                                class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all duration-200 hover:shadow-lg font-medium text-sm"
-                            >
+                            <button id="save-settings"
+                                class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all duration-200 hover:shadow-lg font-medium text-sm">
                                 Save
                             </button>
                         </div>
@@ -308,7 +332,8 @@
     </div>
 
     <!-- Loading Overlay -->
-    <div id="loading-overlay" class="fixed inset-0 bg-transparent hidden z-[10001] flex items-center justify-center pointer-events-auto">
+    <div id="loading-overlay"
+        class="fixed inset-0 bg-transparent hidden z-[10001] flex items-center justify-center pointer-events-auto">
         <div class="bg-amber-50 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-white/30 flex items-center">
             <div class="animate-spin rounded-full h-8 w-8 border-b-3 border-amber-500 mr-3"></div>
             <p class="text-base font-medium text-slate-700">Loading ...</p>
@@ -317,4 +342,5 @@
 
     <script type="module" src="../../lib/renderer/index.js"></script>
 </body>
+
 </html>
