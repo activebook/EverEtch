@@ -307,14 +307,25 @@ export class EverEtchApp {
         try {
           const success = await this.profileService.switchProfile(newProfile);
           if (success) {
+            // Successful switch - load words normally
             this.resetUIForProfileSwitch();
             await this.loadWords();
           } else {
-            this.toastManager.showError('Failed to switch profile');
+            // Failed switch - but still switch UI to failed profile so user can delete it
+            this.profileService.setCurrentProfile(newProfile); // Update UI state
+            profileSelect.value = newProfile; // Keep dropdown on failed profile
+            this.resetUIForProfileSwitch(); // Reset UI
+            // Don't load words - just show empty state
+
+            this.toastManager.showError('Failed to load profile data. You can delete this profile in Settings.');
           }
         } catch (error) {
           console.error('Error switching profile:', error);
-          this.toastManager.showError('Failed to switch profile');
+          // Even on exception, switch UI to failed profile so user can delete it
+          this.profileService.setCurrentProfile(newProfile);
+          profileSelect.value = newProfile;
+          this.resetUIForProfileSwitch();
+          this.toastManager.showError('Failed to load profile data. You can delete this profile in Settings.');
         } finally {
           setTimeout(() => {
               this.hideLoadingOverlay();
@@ -1171,6 +1182,9 @@ export class EverEtchApp {
         this.toastManager.showSuccess(result.message);
 
         if (result.profileName) {
+          // Refresh the profile list to include the new profile
+          await this.profileService.loadProfiles();
+
           this.profileService.setCurrentProfile(result.profileName);
           const profileSelect = document.getElementById('profile-select') as HTMLSelectElement;
           profileSelect.value = result.profileName;
