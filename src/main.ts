@@ -55,6 +55,9 @@ async function createWindow() {
     await profileManager.switchProfile(lastProfile);
   }
 
+  if (process.env.NODE_ENV === 'development') {
+    mainWindow.webContents.openDevTools();
+  }
 
 }
 
