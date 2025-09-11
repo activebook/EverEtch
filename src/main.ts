@@ -208,6 +208,10 @@ ipcMain.handle('get-associated-words-paginated', async (event, tag: string, offs
   return await dbManager.getAssociatedWordsPaginated(tag, offset, limit);
 });
 
+ipcMain.handle('get-related-words', async (event, searchTerm: string) => {
+  return await dbManager.getRelatedWords(searchTerm);
+});
+
 // Profile config operations
 ipcMain.handle('get-profile-config', async () => {
   return await profileManager.getCurrentProfile();

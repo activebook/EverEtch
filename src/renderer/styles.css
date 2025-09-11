@@ -28,6 +28,31 @@
     @apply inline-block px-3 py-1.5 m-1 text-xs font-medium rounded-full cursor-pointer transition-all duration-200 hover:scale-105 shadow-sm;
 }
 
+/* Synonym and Antonym Buttons */
+.synonym-button {
+    @apply inline-block px-3 py-1.5 m-1 text-sm font-medium rounded-full cursor-pointer transition-all duration-200 hover:scale-105 shadow-sm border;
+    background-color: rgba(34, 197, 94, 0.1);
+    color: rgb(21, 128, 61);
+    border-color: rgba(34, 197, 94, 0.3);
+}
+
+.synonym-button:hover {
+    background-color: rgba(34, 197, 94, 0.2);
+    border-color: rgba(34, 197, 94, 0.5);
+}
+
+.antonym-button {
+    @apply inline-block px-3 py-1.5 m-1 text-sm font-medium rounded-full cursor-pointer transition-all duration-200 hover:scale-105 shadow-sm border;
+    background-color: rgba(239, 68, 68, 0.1);
+    color: rgb(185, 28, 28);
+    border-color: rgba(239, 68, 68, 0.3);
+}
+
+.antonym-button:hover {
+    background-color: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.5);
+}
+
 /* Custom Scrollbar - Beige Theme */
 .scrollbar-thin {
     scrollbar-width: thin;

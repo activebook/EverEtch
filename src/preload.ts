@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Associated words
   getAssociatedWords: (tag: string) => ipcRenderer.invoke('get-associated-words', tag),
   getAssociatedWordsPaginated: (tag: string, offset: number, limit: number) => ipcRenderer.invoke('get-associated-words-paginated', tag, offset, limit),
+  getRelatedWords: (searchTerm: string) => ipcRenderer.invoke('get-related-words', searchTerm),
 
   // Profile config
   getProfileConfig: () => ipcRenderer.invoke('get-profile-config'),
