@@ -38,8 +38,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   importProfile: () => ipcRenderer.invoke('import-profile'),
 
   // Event listeners for streaming
-  onStreamingContent: (callback: Function) => {
-    ipcRenderer.on('streaming-content', (_event: any, content: string) => callback(content));
+  onWordMeaningStreaming: (callback: Function) => {
+    ipcRenderer.on('word-meaning-streaming', (_event: any, content: string) => callback(content));
   },
 
   onWordMetadataReady: (callback: Function) => {
