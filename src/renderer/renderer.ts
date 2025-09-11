@@ -8,10 +8,8 @@ declare global {
   createProfile: (profileName: string) => Promise<boolean>;
   renameProfile: (oldName: string, newName: string) => Promise<boolean>;
   deleteProfile: (profileName: string) => Promise<boolean>;
-      getWords: () => Promise<any[]>;
       getWordsPaginated: (offset: number, limit: number) => Promise<{ words: WordListItem[], hasMore: boolean, total: number }>;
-      searchWords: (query: string) => Promise<any[]>;
-      searchWordsOptimized: (query: string) => Promise<WordListItem[]>;
+      searchWords: (query: string) => Promise<WordListItem[]>;
       getWord: (wordId: string) => Promise<any>;
       addWord: (wordData: any) => Promise<any>;
       updateWord: (wordId: string, wordData: any) => Promise<any>;
@@ -19,10 +17,7 @@ declare global {
       generateWordMeaning: (word: string) => Promise<string>;
       generateWordMetas: (word: string, meaning: string, generationId: string) => Promise<any>;
       generateMeaning: (word: string) => Promise<string>;
-      getAssociatedWords: (tag: string) => Promise<WordListItem[]>;
-      getAssociatedWordsPaginated: (tag: string, offset: number, limit: number) => Promise<{ words: WordListItem[], hasMore: boolean, total: number }>;
-      getRelatedWords: (searchTerm: string) => Promise<any[]>;
-      getRelatedWordsOptimized: (searchTerm: string) => Promise<WordListItem[]>;
+      getRelatedWordsPaginated: (searchTerm: string, offset: number, limit: number) => Promise<{ words: WordListItem[], hasMore: boolean, total: number }>;
       getProfileConfig: () => Promise<any>;
       updateProfileConfig: (config: any) => Promise<boolean>;
       processMarkdown: (markdown: string) => Promise<string>;
@@ -32,7 +27,7 @@ declare global {
       importProfile: () => Promise<any>;
 
       onStreamingContent: (callback: Function) => void;
-      onToolResult: (callback: Function) => void;
+      onWordMetadataReady: (callback: Function) => void;
       removeAllListeners: (event: string) => void;
     };
   }
@@ -314,9 +309,9 @@ class EverEtchApp {
       this.handleStreamingContent(content);
     });
 
-    // Set up tool result listener
-    window.electronAPI.onToolResult((toolData: any) => {
-      this.handleToolResult(toolData);
+    // Set up word metadata ready listener
+    window.electronAPI.onWordMetadataReady((toolData: any) => {
+      this.handleWordMetadataReady(toolData);
     });
 
     // Profile selector
@@ -459,11 +454,11 @@ class EverEtchApp {
 
   private async handleSearchInput(query: string) {
     try {
-      const suggestions = await window.electronAPI.searchWordsOptimized(query);
+      const suggestions = await window.electronAPI.searchWords(query);
       this.renderSuggestions(suggestions);
 
       // Check if there's an exact match and update button accordingly
-      const hasExactMatch = suggestions.some(word =>
+      const hasExactMatch = suggestions.some((word: WordListItem) =>
         word.word.toLowerCase() === query.toLowerCase()
       );
       this.updateGenerateBtnState(query, hasExactMatch);
@@ -580,7 +575,7 @@ class EverEtchApp {
         }
       }
 
-      // The tool results will be handled by handleToolResult callback
+      // The tool results will be handled by handleWordMetadataReady callback
       // which will update the UI with tags and summary
 
     } catch (error) {
@@ -1231,9 +1226,9 @@ class EverEtchApp {
         const wordInput = document.getElementById('word-input') as HTMLInputElement;
         wordInput.value = synonym;
         this.updateGenerateBtnState(synonym);
-        // Show related words if synonym exists
+        // Show related words if synonym exists (using paginated method)
         if (synonym.length > 0) {
-          await this.loadRelatedWords(synonym);
+          await this.loadAssociatedWords(synonym);
         }
       });
     });
@@ -1254,9 +1249,9 @@ class EverEtchApp {
         const wordInput = document.getElementById('word-input') as HTMLInputElement;
         wordInput.value = antonym;
         this.updateGenerateBtnState(antonym);
-        // Show related words if antonym exists
+        // Show related words if antonym exists (using paginated method)
         if (antonym.length > 0) {
-          await this.loadRelatedWords(antonym);
+          await this.loadAssociatedWords(antonym);
         }
       });
     });
@@ -1381,7 +1376,7 @@ class EverEtchApp {
     // Reset associated words pagination state
     this.associatedWords = [];
     this.associatedCurrentOffset = 0;
-    this.associatedHasMore = false; // Related words don't use pagination for now
+    this.associatedHasMore = true; // Use pagination now
     this.associatedIsLoading = false;
     this.currentTag = searchTerm;
 
@@ -1389,38 +1384,19 @@ class EverEtchApp {
     const associatedList = document.getElementById('associated-list')!;
     associatedList.innerHTML = '';
 
-    // Load related words
-    await this.loadRelatedWordsData(searchTerm);
-  }
+    // Load first page first, then setup observer after content is rendered
+    await this.loadMoreAssociatedWords();
 
-  private async loadRelatedWordsData(searchTerm: string) {
-    this.associatedIsLoading = true;
-    this.showAssociatedLoadingIndicator();
+    // Setup scroll observer after content is rendered to ensure proper detection
+    // Use setTimeout to ensure DOM updates are complete
+    setTimeout(() => {
+      this.setupAssociatedScrollObserver();
 
-    try {
-      const words: WordDocument[] = await window.electronAPI.getRelatedWords(searchTerm);
-
-      // Filter out duplicates based on word ID
-      const existingIds = new Set(this.associatedWords.map(word => word.id));
-      const newWords = words.filter(word => !existingIds.has(word.id));
-
-      // Add new words to our collection
-      this.associatedWords.push(...newWords);
-
-      // Render the words using the existing associated list method
-      if (newWords.length > 0) {
-        this.renderAssociatedList(newWords, searchTerm);
+      // Force show the loading indicator if there are more words
+      if (this.associatedHasMore) {
+        this.showAssociatedLoadingIndicator();
       }
-
-      // Update associated count
-      this.updateAssociatedCount(words.length);
-    } catch (error) {
-      console.error('Error loading related words:', error);
-      this.showError('Failed to load related words');
-    } finally {
-      this.associatedIsLoading = false;
-      this.updateAssociatedLoadingIndicator();
-    }
+    }, 100);
   }
 
   private async loadMoreAssociatedWords() {
@@ -1432,7 +1408,8 @@ class EverEtchApp {
     this.showAssociatedLoadingIndicator();
 
     try {
-      const result = await window.electronAPI.getAssociatedWordsPaginated(
+      // Use the unified FTS5-powered paginated method for all associated words
+      const result = await window.electronAPI.getRelatedWordsPaginated(
         this.currentTag,
         this.associatedCurrentOffset,
         this.associatedPageSize
@@ -1723,7 +1700,7 @@ class EverEtchApp {
     }
   }
 
-  private handleToolResult(toolData: any) {
+  private handleWordMetadataReady(toolData: any) {
     console.log('📨 Renderer: Received tool result event:', toolData);
     console.log('📨 Renderer: Current generation ID:', this.currentGenerationId);
     console.log('📨 Renderer: Tool data generation ID:', toolData?.generationId);

@@ -85,11 +85,6 @@ export class DatabaseManager {
 
         -- Word-specific indexes
         CREATE INDEX IF NOT EXISTS idx_word_lookup ON documents(type, json_extract(data, '$.word'));
-        CREATE INDEX IF NOT EXISTS idx_word_desc ON documents(json_extract(data, '$.one_line_desc')) WHERE type = 'word';
-        CREATE INDEX IF NOT EXISTS idx_word_details ON documents(json_extract(data, '$.details')) WHERE type = 'word';
-
-        -- Tag-specific indexes
-        CREATE INDEX IF NOT EXISTS idx_tag_lookup ON documents(type, json_extract(data, '$.tag'));
 
         -- Full-text search virtual table for words (optimized for related words search)
         CREATE VIRTUAL TABLE IF NOT EXISTS words_fts USING fts5(
@@ -188,24 +183,6 @@ export class DatabaseManager {
     });
   }
 
-  // Word operations
-  getWords(): Promise<WordDocument[]> {
-    return new Promise((resolve, reject) => {
-      if (!this.db) {
-        resolve([]);
-        return;
-      }
-
-      this.db.all('SELECT data FROM documents WHERE type = ?', ['word'], (err, rows: { data: string }[]) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-        resolve(rows.map(row => JSON.parse(row.data)));
-      });
-    });
-  }
-
   // Paginated word loading for lazy loading - optimized to only fetch required fields
   getWordsPaginated(offset: number, limit: number): Promise<{words: WordListItem[], hasMore: boolean, total: number}> {
     return new Promise(async (resolve, reject) => {
@@ -263,43 +240,9 @@ export class DatabaseManager {
     });
   }
 
-  searchWords(query: string): Promise<WordDocument[]> {
-    return new Promise((resolve, reject) => {
-      if (!this.db) {
-        resolve([]);
-        return;
-      }
-
-      // Use LIKE for reliable substring search in word field only
-      const sql = `
-        SELECT data FROM documents
-        WHERE type = 'word'
-        AND json_extract(data, '$.word') LIKE ?
-        ORDER BY
-          CASE WHEN json_extract(data, '$.word') LIKE ? THEN 1 ELSE 2 END,
-          json_extract(data, '$.word')
-        LIMIT 10
-      `;
-
-      // Search for substring anywhere in word
-      const searchPattern = `%${query}%`;
-      // Prioritize words that start with the query
-      const prefixPattern = `${query}%`;
-
-      this.db.all(sql, [searchPattern, prefixPattern], (err, rows: { data: string }[]) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-
-        const words = rows.map(row => JSON.parse(row.data));
-        resolve(words);
-      });
-    });
-  }
-
   // Optimized search method that only returns necessary fields for suggestions
-  searchWordsOptimized(query: string): Promise<WordListItem[]> {
+  // Only returns 10 results
+  searchWords(query: string): Promise<WordListItem[]> {
     return new Promise((resolve, reject) => {
       if (!this.db) {
         resolve([]);
@@ -342,6 +285,7 @@ export class DatabaseManager {
     });
   }
 
+  // Get word by ID, retrieve whole document
   getWord(wordId: string): Promise<WordDocument | null> {
     return new Promise((resolve, reject) => {
       if (!this.db) {
@@ -496,390 +440,195 @@ export class DatabaseManager {
     });
   }
 
-  // Unified method for getting related words by field (tags, synonyms, antonyms)
-  getRelatedWordsByField(field: 'tags' | 'synonyms' | 'antonyms', term: string): Promise<WordListItem[]> {
-    return new Promise((resolve, reject) => {
-      if (!this.db) {
-        resolve([]);
-        return;
-      }
-
-      // Use FTS5 for fast field-specific search
-      const ftsQuery = `${field}:"${term}"`;
-      const sql = `
-        SELECT
-          f.id,
-          f.word,
-          f.one_line_desc
-        FROM words_fts f
-        WHERE words_fts MATCH ?
-        ORDER BY bm25(words_fts), f.word
-      `;
-
-      this.db.all(sql, [ftsQuery], (err, rows: { id: string, word: string, one_line_desc: string }[]) => {
-        if (err) {
-          // Fallback to JSON search if FTS5 fails
-          console.warn(`FTS5 ${field} search failed, falling back to JSON search:`, err);
-          this.fallbackGetRelatedWordsByField(field, term).then(resolve).catch(reject);
-          return;
-        }
-
-        const words: WordListItem[] = rows.map(row => ({
-          id: row.id,
-          word: row.word,
-          one_line_desc: row.one_line_desc || 'No description'
-        }));
-        resolve(words);
-      });
-    });
-  }
-
-  // Tag operations - now uses unified FTS5 approach
-  getAssociatedWords(tag: string): Promise<WordListItem[]> {
-    return this.getRelatedWordsByField('tags', tag);
-  }
-
-  // Get words by synonym
-  getWordsBySynonym(synonym: string): Promise<WordListItem[]> {
-    return this.getRelatedWordsByField('synonyms', synonym);
-  }
-
-  // Get words by antonym
-  getWordsByAntonym(antonym: string): Promise<WordListItem[]> {
-    return this.getRelatedWordsByField('antonyms', antonym);
-  }
-
-  // Comprehensive search for related words (searches across all fields)
-  getRelatedWords(searchTerm: string): Promise<WordDocument[]> {
-    return new Promise((resolve, reject) => {
-      if (!this.db) {
-        resolve([]);
-        return;
-      }
-
-      // Search across word, tags, synonyms, antonyms, and description fields
-      const sql = `
-        SELECT DISTINCT d.data,
-               CASE
-                 WHEN LOWER(json_extract(d.data, '$.word')) = LOWER(?) THEN 1  -- Exact word match (highest priority)
-                 WHEN LOWER(json_extract(d.data, '$.word')) LIKE LOWER(?) THEN 2  -- Word starts with term
-                 ELSE 3  -- Other matches
-               END as priority
-        FROM documents d
-        WHERE d.type = 'word' AND (
-          -- Exact word match
-          LOWER(json_extract(d.data, '$.word')) = LOWER(?)
-          -- Word contains term
-          OR LOWER(json_extract(d.data, '$.word')) LIKE LOWER(?)
-          -- Tags contain term
-          OR EXISTS (SELECT 1 FROM json_each(d.data, '$.tags') WHERE LOWER(value) = LOWER(?))
-          -- Synonyms contain term
-          OR EXISTS (SELECT 1 FROM json_each(d.data, '$.synonyms') WHERE LOWER(value) = LOWER(?))
-          -- Antonyms contain term
-          OR EXISTS (SELECT 1 FROM json_each(d.data, '$.antonyms') WHERE LOWER(value) = LOWER(?))
-          -- Description contains term
-          OR LOWER(json_extract(d.data, '$.one_line_desc')) LIKE LOWER(?)
-          -- Details contain term
-          OR LOWER(json_extract(d.data, '$.details')) LIKE LOWER(?)
-        )
-        ORDER BY priority, json_extract(d.data, '$.word')
-        LIMIT 20
-      `;
-
-      const searchPattern = `%${searchTerm}%`;
-      const params = [
-        searchTerm,      // exact word match priority
-        `${searchTerm}%`, // word starts with priority
-        searchTerm,      // exact word match
-        searchPattern,   // word contains
-        searchTerm,      // tags contain
-        searchTerm,      // synonyms contain
-        searchTerm,      // antonyms contain
-        searchPattern,   // description contains
-        searchPattern    // details contain
-      ];
-
-      this.db.all(sql, params, (err, rows: { data: string }[]) => {
-        if (err) {
-          console.warn('Comprehensive search failed, falling back to simple search:', err);
-          this.fallbackGetRelatedWords(searchTerm).then(resolve).catch(reject);
-          return;
-        }
-        resolve(rows.map(row => JSON.parse(row.data)));
-      });
-    });
-  }
-
-  // Optimized related words search that only returns necessary fields
-  getRelatedWordsOptimized(searchTerm: string): Promise<WordListItem[]> {
-    return new Promise((resolve, reject) => {
-      if (!this.db) {
-        resolve([]);
-        return;
-      }
-
-      // Use FTS5 for fast full-text search across all relevant fields
-      const ftsQuery = `"${searchTerm}" OR "${searchTerm}"*`;
-      const sql = `
-        SELECT
-          f.id,
-          f.word,
-          f.one_line_desc,
-          CASE
-            WHEN LOWER(f.word) = LOWER(?) THEN 1  -- Exact word match (highest priority)
-            WHEN LOWER(f.word) LIKE LOWER(?) THEN 2  -- Word starts with term
-            ELSE 3  -- Other matches
-          END as priority
-        FROM words_fts f
-        WHERE words_fts MATCH ?
-        ORDER BY priority, bm25(words_fts), f.word
-        LIMIT 20
-      `;
-
-      const params = [
-        searchTerm,      // exact word match priority
-        `${searchTerm}%`, // word starts with priority
-        ftsQuery         // FTS5 search query
-      ];
-
-      this.db.all(sql, params, (err, rows: { id: string, word: string, one_line_desc: string }[]) => {
-        if (err) {
-          console.warn('FTS5 optimized search failed, falling back to JSON search:', err);
-          this.fallbackGetRelatedWordsOptimized(searchTerm).then(resolve).catch(reject);
-          return;
-        }
-
-        const words: WordListItem[] = rows.map(row => ({
-          id: row.id,
-          word: row.word,
-          one_line_desc: row.one_line_desc || 'No description'
-        }));
-        resolve(words);
-      });
-    });
-  }
-
-  /**
-   * Fallback method for comprehensive search using simpler LIKE queries
-   */
-  private fallbackGetRelatedWords(searchTerm: string): Promise<WordDocument[]> {
-    return new Promise((resolve, reject) => {
-      if (!this.db) {
-        resolve([]);
-        return;
-      }
-
-      const searchPattern = `%${searchTerm}%`;
-      const sql = `
-        SELECT DISTINCT data FROM documents
-        WHERE type = 'word' AND (
-          LOWER(json_extract(data, '$.word')) LIKE LOWER(?)
-          OR LOWER(json_extract(data, '$.tags')) LIKE LOWER(?)
-          OR LOWER(json_extract(data, '$.synonyms')) LIKE LOWER(?)
-          OR LOWER(json_extract(data, '$.antonyms')) LIKE LOWER(?)
-          OR LOWER(json_extract(data, '$.one_line_desc')) LIKE LOWER(?)
-          OR LOWER(json_extract(data, '$.details')) LIKE LOWER(?)
-        )
-        ORDER BY json_extract(data, '$.word')
-        LIMIT 20
-      `;
-
-      const params = [
-        searchPattern, // word
-        searchPattern, // tags
-        searchPattern, // synonyms
-        searchPattern, // antonyms
-        searchPattern, // description
-        searchPattern  // details
-      ];
-
-      this.db.all(sql, params, (err, rows: { data: string }[]) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-        resolve(rows.map(row => JSON.parse(row.data)));
-      });
-    });
-  }
-
-  /**
-   * Fallback method for optimized comprehensive search using simpler LIKE queries
-   */
-  private fallbackGetRelatedWordsOptimized(searchTerm: string): Promise<WordListItem[]> {
-    return new Promise((resolve, reject) => {
-      if (!this.db) {
-        resolve([]);
-        return;
-      }
-
-      const searchPattern = `%${searchTerm}%`;
-      const sql = `
-        SELECT DISTINCT
-          id,
-          json_extract(data, '$.word') as word,
-          json_extract(data, '$.one_line_desc') as one_line_desc
-        FROM documents
-        WHERE type = 'word' AND (
-          LOWER(json_extract(data, '$.word')) LIKE LOWER(?)
-          OR LOWER(json_extract(data, '$.tags')) LIKE LOWER(?)
-          OR LOWER(json_extract(data, '$.synonyms')) LIKE LOWER(?)
-          OR LOWER(json_extract(data, '$.antonyms')) LIKE LOWER(?)
-          OR LOWER(json_extract(data, '$.one_line_desc')) LIKE LOWER(?)
-          OR LOWER(json_extract(data, '$.details')) LIKE LOWER(?)
-        )
-        ORDER BY json_extract(data, '$.word')
-        LIMIT 20
-      `;
-
-      const params = [
-        searchPattern, // word
-        searchPattern, // tags
-        searchPattern, // synonyms
-        searchPattern, // antonyms
-        searchPattern, // description
-        searchPattern  // details
-      ];
-
-      this.db.all(sql, params, (err, rows: { id: string, word: string, one_line_desc: string }[]) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-
-        const words: WordListItem[] = rows.map(row => ({
-          id: row.id,
-          word: row.word,
-          one_line_desc: row.one_line_desc || 'No description'
-        }));
-        resolve(words);
-      });
-    });
-  }
-
-  /**
-   * Fallback method for unified field search using LIKE with case-insensitive comparison
-   */
-  private fallbackGetRelatedWordsByField(field: 'tags' | 'synonyms' | 'antonyms', term: string): Promise<WordListItem[]> {
-    return new Promise((resolve, reject) => {
-      if (!this.db) {
-        resolve([]);
-        return;
-      }
-
-      this.db.all(
-        `SELECT
-          id,
-          json_extract(data, '$.word') as word,
-          json_extract(data, '$.one_line_desc') as one_line_desc
-        FROM documents WHERE type = 'word' AND LOWER(json_extract(data, '$.${field}')) LIKE LOWER(?)
-        ORDER BY json_extract(data, '$.word')`,
-        [`%${term}%`],
-        (err, rows: { id: string, word: string, one_line_desc: string }[]) => {
-          if (err) {
-            reject(err);
-            return;
-          }
-
-          const words: WordListItem[] = rows.map(row => ({
-            id: row.id,
-            word: row.word,
-            one_line_desc: row.one_line_desc || 'No description'
-          }));
-          resolve(words);
-        }
-      );
-    });
-  }
-
-  /**
-   * Fallback method for tag search using LIKE with case-insensitive comparison
-   */
-  private fallbackGetAssociatedWords(tag: string): Promise<WordListItem[]> {
-    return this.fallbackGetRelatedWordsByField('tags', tag);
-  }
-
-  // Paginated associated words loading for lazy loading - optimized to only fetch required fields
-  getAssociatedWordsPaginated(tag: string, offset: number, limit: number): Promise<{words: WordListItem[], hasMore: boolean, total: number}> {
-    return new Promise((resolve, reject) => {
+  // Unified paginated related words search using FTS5 - replaces getAssociatedWordsPaginated
+  getRelatedWordsPaginated(searchTerm: string, offset: number, limit: number): Promise<{words: WordListItem[], hasMore: boolean, total: number}> {
+    return new Promise(async (resolve, reject) => {
       if (!this.db) {
         resolve({words: [], hasMore: false, total: 0});
         return;
       }
 
-      // Use json_each for efficient array searching with pagination and case-insensitive comparison
-      const query = `
-        SELECT DISTINCT
-          d.id,
-          json_extract(d.data, '$.word') as word,
-          json_extract(d.data, '$.one_line_desc') as one_line_desc,
-          COUNT(*) OVER() as total_count
-        FROM documents d, json_each(d.data, '$.tags') as t
-        WHERE d.type = 'word' AND LOWER(t.value) = LOWER(?)
-        ORDER BY json_extract(d.data, '$.word')
-        LIMIT ${limit} OFFSET ${offset}
-      `;
+      try {
+        // Use FTS5 for fast full-text search across all relevant fields
+        const ftsQuery = `"${searchTerm}" OR "${searchTerm}"*`;
 
-      this.db!.all(query, [tag], (err, rows: { id: string, word: string, one_line_desc: string, total_count: number }[]) => {
-        if (err) {
-          // Fallback to LIKE search if json_each fails
-          console.warn('JSON array search failed, falling back to LIKE search:', err);
-          this.fallbackGetAssociatedWordsPaginated(tag, offset, limit).then(resolve).catch(reject);
-          return;
-        }
+        // First get total count
+        const totalResult = await new Promise<{ total: number }>((resolveCount, rejectCount) => {
+          const countSql = `
+            SELECT COUNT(*) as total
+            FROM words_fts f
+            WHERE words_fts MATCH ?
+          `;
 
-        const words: WordListItem[] = rows.map(row => ({
+          this.db!.get(countSql, [ftsQuery], (err, row: { total: number } | undefined) => {
+            if (err) {
+              rejectCount(err);
+              return;
+            }
+            resolveCount({ total: row?.total || 0 });
+          });
+        });
+
+        // Then get paginated results
+        const dataResult = await new Promise<{ id: string, word: string, one_line_desc: string }[]>((resolveData, rejectData) => {
+          const sql = `
+            SELECT
+              f.id,
+              f.word,
+              f.one_line_desc
+            FROM words_fts f
+            WHERE words_fts MATCH ?
+            ORDER BY
+              CASE
+                WHEN LOWER(f.word) = LOWER(?) THEN 1  -- Exact word match (highest priority)
+                WHEN LOWER(f.word) LIKE LOWER(?) THEN 2  -- Word starts with term
+                ELSE 3  -- Other matches
+              END,
+              bm25(words_fts),
+              f.word
+            LIMIT ${limit} OFFSET ${offset}
+          `;
+
+          const params = [
+            ftsQuery,         // FTS5 search query
+            searchTerm,       // exact word match priority
+            `${searchTerm}%`  // word starts with priority
+          ];
+
+          this.db!.all(sql, params, (err, rows: { id: string, word: string, one_line_desc: string }[]) => {
+            if (err) {
+              rejectData(err);
+              return;
+            }
+            resolveData(rows);
+          });
+        });
+
+        const words: WordListItem[] = dataResult.map(row => ({
           id: row.id,
           word: row.word,
           one_line_desc: row.one_line_desc || 'No description'
         }));
-        const total = rows.length > 0 ? rows[0].total_count : 0;
+
+        const total = totalResult.total;
         const hasMore = offset + limit < total;
 
         resolve({words, hasMore, total});
-      });
+
+      } catch (err) {
+        // Fallback to LIKE-based pagination if FTS5 fails
+        console.warn('FTS5 paginated search failed, falling back to LIKE search:', err);
+        this.fallbackGetRelatedWordsPaginated(searchTerm, offset, limit).then(resolve).catch(reject);
+      }
     });
   }
 
   /**
-   * Fallback method for paginated tag search using LIKE with case-insensitive comparison
+   * Fallback method for paginated comprehensive search using LIKE queries
    */
-  private fallbackGetAssociatedWordsPaginated(tag: string, offset: number, limit: number): Promise<{words: WordListItem[], hasMore: boolean, total: number}> {
-    return new Promise((resolve, reject) => {
+  private fallbackGetRelatedWordsPaginated(searchTerm: string, offset: number, limit: number): Promise<{words: WordListItem[], hasMore: boolean, total: number}> {
+    return new Promise(async (resolve, reject) => {
       if (!this.db) {
         resolve({words: [], hasMore: false, total: 0});
         return;
       }
 
-      // Get paginated results with total count in one query - optimized for performance
-      const query = `
-        SELECT
-          id,
-          json_extract(data, '$.word') as word,
-          json_extract(data, '$.one_line_desc') as one_line_desc,
-          COUNT(*) OVER() as total_count
-        FROM documents
-        WHERE type = 'word' AND LOWER(json_extract(data, '$.tags')) LIKE LOWER(?)
-        ORDER BY json_extract(data, '$.word')
-        LIMIT ${limit} OFFSET ${offset}
-      `;
+      try {
+        const searchPattern = `%${searchTerm}%`;
 
-      this.db!.all(query, [`%${tag}%`], (err, rows: { id: string, word: string, one_line_desc: string, total_count: number }[]) => {
-        if (err) {
-          reject(err);
-          return;
-        }
+        // Get total count first
+        const totalResult = await new Promise<{ total: number }>((resolveCount, rejectCount) => {
+          const countSql = `
+            SELECT COUNT(DISTINCT id) as total
+            FROM documents
+            WHERE type = 'word' AND (
+              LOWER(json_extract(data, '$.word')) LIKE LOWER(?)
+              OR LOWER(json_extract(data, '$.tags')) LIKE LOWER(?)
+              OR LOWER(json_extract(data, '$.synonyms')) LIKE LOWER(?)
+              OR LOWER(json_extract(data, '$.antonyms')) LIKE LOWER(?)
+              OR LOWER(json_extract(data, '$.one_line_desc')) LIKE LOWER(?)
+              OR LOWER(json_extract(data, '$.details')) LIKE LOWER(?)
+            )
+          `;
 
-        const words: WordListItem[] = rows.map(row => ({
+          const params = [
+            searchPattern, // word
+            searchPattern, // tags
+            searchPattern, // synonyms
+            searchPattern, // antonyms
+            searchPattern, // description
+            searchPattern  // details
+          ];
+
+          this.db!.get(countSql, params, (err, row: { total: number } | undefined) => {
+            if (err) {
+              rejectCount(err);
+              return;
+            }
+            resolveCount({ total: row?.total || 0 });
+          });
+        });
+
+        // Get paginated results
+        const dataResult = await new Promise<{ id: string, word: string, one_line_desc: string }[]>((resolveData, rejectData) => {
+          const sql = `
+            SELECT DISTINCT
+              id,
+              json_extract(data, '$.word') as word,
+              json_extract(data, '$.one_line_desc') as one_line_desc
+            FROM documents
+            WHERE type = 'word' AND (
+              LOWER(json_extract(data, '$.word')) LIKE LOWER(?)
+              OR LOWER(json_extract(data, '$.tags')) LIKE LOWER(?)
+              OR LOWER(json_extract(data, '$.synonyms')) LIKE LOWER(?)
+              OR LOWER(json_extract(data, '$.antonyms')) LIKE LOWER(?)
+              OR LOWER(json_extract(data, '$.one_line_desc')) LIKE LOWER(?)
+              OR LOWER(json_extract(data, '$.details')) LIKE LOWER(?)
+            )
+            ORDER BY
+              CASE
+                WHEN LOWER(json_extract(data, '$.word')) = LOWER(?) THEN 1
+                WHEN LOWER(json_extract(data, '$.word')) LIKE LOWER(?) THEN 2
+                ELSE 3
+              END,
+              json_extract(data, '$.word')
+            LIMIT ${limit} OFFSET ${offset}
+          `;
+
+          const params = [
+            searchPattern, // word
+            searchPattern, // tags
+            searchPattern, // synonyms
+            searchPattern, // antonyms
+            searchPattern, // description
+            searchPattern,  // details
+            searchTerm,     // exact match priority
+            `${searchTerm}%` // starts with priority
+          ];
+
+          this.db!.all(sql, params, (err, rows: { id: string, word: string, one_line_desc: string }[]) => {
+            if (err) {
+              rejectData(err);
+              return;
+            }
+            resolveData(rows);
+          });
+        });
+
+        const words: WordListItem[] = dataResult.map(row => ({
           id: row.id,
           word: row.word,
           one_line_desc: row.one_line_desc || 'No description'
         }));
-        const total = rows.length > 0 ? rows[0].total_count : 0;
+
+        const total = totalResult.total;
         const hasMore = offset + limit < total;
 
         resolve({words, hasMore, total});
-      });
+
+      } catch (err) {
+        reject(err);
+      }
     });
   }
 
