@@ -1,6 +1,6 @@
 {
   "name": "everetch",
-  "version": "1.3.0",
+  "version": "1.3.3",
   "type": "module",
   "description": "A slim word memo application",
   "main": "lib/main.js",
@@ -49,7 +49,7 @@
   "build": {
     "asar": true,
     "asarUnpack": [],
-    "appId": "com.everetch.app",
+    "appId": "com.activebook.everetch",
     "productName": "EverEtch",
     "directories": {
       "output": "dist",

@@ -85,61 +85,143 @@ export class DatabaseManager {
 
         -- Word-specific indexes
         CREATE INDEX IF NOT EXISTS idx_word_lookup ON documents(type, json_extract(data, '$.word'));
-
-        -- Full-text search virtual table for words (optimized for related words search)
-        CREATE VIRTUAL TABLE IF NOT EXISTS words_fts USING fts5(
-          id UNINDEXED,
-          word,
-          one_line_desc,
-          tags,
-          synonyms,
-          antonyms,
-          tokenize = 'porter unicode61'
-        );
-
-        -- Triggers to keep FTS table in sync
-        CREATE TRIGGER IF NOT EXISTS words_fts_insert AFTER INSERT ON documents
-        WHEN NEW.type = 'word'
-        BEGIN
-          INSERT INTO words_fts(id, word, one_line_desc, tags, synonyms, antonyms)
-          VALUES (
-            NEW.id,
-            json_extract(NEW.data, '$.word'),
-            json_extract(NEW.data, '$.one_line_desc'),
-            json_extract(NEW.data, '$.tags'),
-            json_extract(NEW.data, '$.synonyms'),
-            json_extract(NEW.data, '$.antonyms')
-          );
-        END;
-
-        CREATE TRIGGER IF NOT EXISTS words_fts_update AFTER UPDATE ON documents
-        WHEN NEW.type = 'word'
-        BEGIN
-          UPDATE words_fts SET
-            word = json_extract(NEW.data, '$.word'),
-            one_line_desc = json_extract(NEW.data, '$.one_line_desc'),
-            tags = json_extract(NEW.data, '$.tags'),
-            synonyms = json_extract(NEW.data, '$.synonyms'),
-            antonyms = json_extract(NEW.data, '$.antonyms')
-          WHERE id = NEW.id;
-        END;
-
-        CREATE TRIGGER IF NOT EXISTS words_fts_delete AFTER DELETE ON documents
-        WHEN OLD.type = 'word'
-        BEGIN
-          DELETE FROM words_fts WHERE id = OLD.id;
-        END;
       `;
 
       this.db.exec(sql, (err) => {
         if (err) {
           reject(err);
         } else {
-          // Populate FTS table for existing words if it's empty
+          // Handle FTS table creation/updates
+          this.createOrUpdateFTSTable().then(resolve).catch(reject);
+        }
+      });
+    });
+  }
+
+  private createOrUpdateFTSTable(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (!this.db) {
+        resolve();
+        return;
+      }
+
+      // Check if FTS table exists and get its schema
+      this.db.get(`
+        SELECT sql FROM sqlite_master
+        WHERE type='table' AND name='words_fts'
+      `, (err, row: { sql: string } | undefined) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+
+        const expectedSchema = 'CREATE VIRTUAL TABLE words_fts USING fts5(id UNINDEXED, word, one_line_desc, tags, synonyms, antonyms, tokenize = \'porter unicode61\')';
+        const currentSchema = row?.sql;
+
+        // If table doesn't exist or schema doesn't match, recreate it
+        if (!row || !this.schemasMatch(currentSchema, expectedSchema)) {
+          console.log('FTS table schema mismatch detected, recreating...');
+          console.log('Current schema:', currentSchema);
+          console.log('Expected schema:', expectedSchema);
+
+          // Drop existing table and triggers
+          const dropSql = `
+            DROP TRIGGER IF EXISTS words_fts_insert;
+            DROP TRIGGER IF EXISTS words_fts_update;
+            DROP TRIGGER IF EXISTS words_fts_delete;
+            DROP TABLE IF EXISTS words_fts;
+          `;
+
+          this.db!.exec(dropSql, (dropErr) => {
+            if (dropErr) {
+              console.error('Error dropping old FTS table/triggers:', dropErr);
+              // Continue anyway - triggers might not exist
+            }
+
+            // Create new FTS table with correct schema
+            const createSql = `
+              CREATE VIRTUAL TABLE words_fts USING fts5(
+                id UNINDEXED,
+                word,
+                one_line_desc,
+                tags,
+                synonyms,
+                antonyms,
+                tokenize = 'porter unicode61'
+              );
+
+              -- Triggers to keep FTS table in sync
+              CREATE TRIGGER words_fts_insert AFTER INSERT ON documents
+              WHEN NEW.type = 'word'
+              BEGIN
+                INSERT INTO words_fts(id, word, one_line_desc, tags, synonyms, antonyms)
+                VALUES (
+                  NEW.id,
+                  json_extract(NEW.data, '$.word'),
+                  json_extract(NEW.data, '$.one_line_desc'),
+                  json_extract(NEW.data, '$.tags'),
+                  json_extract(NEW.data, '$.synonyms'),
+                  json_extract(NEW.data, '$.antonyms')
+                );
+              END;
+
+              CREATE TRIGGER words_fts_update AFTER UPDATE ON documents
+              WHEN NEW.type = 'word'
+              BEGIN
+                UPDATE words_fts SET
+                  word = json_extract(NEW.data, '$.word'),
+                  one_line_desc = json_extract(NEW.data, '$.one_line_desc'),
+                  tags = json_extract(NEW.data, '$.tags'),
+                  synonyms = json_extract(NEW.data, '$.synonyms'),
+                  antonyms = json_extract(NEW.data, '$.antonyms')
+                WHERE id = NEW.id;
+              END;
+
+              CREATE TRIGGER words_fts_delete AFTER DELETE ON documents
+              WHEN OLD.type = 'word'
+              BEGIN
+                DELETE FROM words_fts WHERE id = OLD.id;
+              END;
+            `;
+
+            this.db!.exec(createSql, (createErr) => {
+              if (createErr) {
+                console.error('Error creating new FTS table:', createErr);
+                reject(createErr);
+              } else {
+                console.log('FTS table created successfully with correct schema');
+                // Populate FTS table with existing data
+                this.populateFTSTable().then(() => {
+                  console.log('FTS table populated successfully');
+                  resolve();
+                }).catch(reject);
+              }
+            });
+          });
+        } else {
+          console.log('FTS table schema is correct, no migration needed');
+          // Schema matches, just populate if needed
           this.populateFTSTable().then(resolve).catch(reject);
         }
       });
     });
+  }
+
+  private schemasMatch(current: string | undefined, expected: string): boolean {
+    if (!current) return false;
+
+    // Normalize both schemas for comparison
+    const normalize = (sql: string) => {
+      return sql
+        .replace(/\s+/g, ' ')  // Replace multiple spaces with single space
+        .replace(/\s*\(\s*/g, '(')  // Remove spaces around parentheses
+        .replace(/\s*\)\s*/g, ')')
+        .replace(/\s*,\s*/g, ',')  // Remove spaces around commas
+        .trim()
+        .toLowerCase();
+    };
+
+    return normalize(current) === normalize(expected);
   }
 
   /**
@@ -547,7 +629,6 @@ export class DatabaseManager {
               OR LOWER(json_extract(data, '$.synonyms')) LIKE LOWER(?)
               OR LOWER(json_extract(data, '$.antonyms')) LIKE LOWER(?)
               OR LOWER(json_extract(data, '$.one_line_desc')) LIKE LOWER(?)
-              OR LOWER(json_extract(data, '$.details')) LIKE LOWER(?)
             )
           `;
 
@@ -556,8 +637,7 @@ export class DatabaseManager {
             searchPattern, // tags
             searchPattern, // synonyms
             searchPattern, // antonyms
-            searchPattern, // description
-            searchPattern  // details
+            searchPattern  // description (no details column anymore)
           ];
 
           this.db!.get(countSql, params, (err, row: { total: number } | undefined) => {
@@ -583,7 +663,6 @@ export class DatabaseManager {
               OR LOWER(json_extract(data, '$.synonyms')) LIKE LOWER(?)
               OR LOWER(json_extract(data, '$.antonyms')) LIKE LOWER(?)
               OR LOWER(json_extract(data, '$.one_line_desc')) LIKE LOWER(?)
-              OR LOWER(json_extract(data, '$.details')) LIKE LOWER(?)
             )
             ORDER BY
               CASE
@@ -600,8 +679,7 @@ export class DatabaseManager {
             searchPattern, // tags
             searchPattern, // synonyms
             searchPattern, // antonyms
-            searchPattern, // description
-            searchPattern,  // details
+            searchPattern, // description (no details column anymore)
             searchTerm,     // exact match priority
             `${searchTerm}%` // starts with priority
           ];
