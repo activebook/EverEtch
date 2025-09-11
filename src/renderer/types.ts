@@ -23,9 +23,7 @@ declare global {
             updateProfileConfig: (config: any) => Promise<boolean>;            
             processMarkdown: (markdown: string) => Promise<string>;
 
-            // UI
-            getUIState: () => Promise<any>;
-            savePanelWidths: (widths: { left: number; middle: number; right: number }) => Promise<void>;
+
 
             // Profile import/export
             exportProfile: () => Promise<any>;
