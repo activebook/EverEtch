@@ -25,43 +25,23 @@ marked.setOptions({
 });
 
 async function createWindow() {
+
+  // Set up proxy environment variables
+  getAndSetProxyEnvironment();
+  
   // Initialize managers first to get profile config
   dbManager = new DatabaseManager();
   profileManager = new ProfileManager(dbManager);
   aiClient = new AIModelClient();
 
-  // Load current profile to get saved window bounds
+  // Create window with minimal bounds first (invisible), then apply saved bounds
   let windowBounds: { width: number; height: number; x?: number; y?: number } = { width: 1200, height: 800 };
-  try {
-    await profileManager.loadProfiles();
-    const uiState = profileManager.getUIState();
-    if (uiState?.window_bounds) {
-      const savedBounds = uiState.window_bounds;
-      // Validate bounds are reasonable
-      const primaryDisplay = screen.getPrimaryDisplay();
-      const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
-
-      // Ensure window is not too small and fits on screen
-      windowBounds = {
-        width: Math.max(800, Math.min(savedBounds.width, screenWidth)),
-        height: Math.max(600, Math.min(savedBounds.height, screenHeight))
-      };
-
-      // Check if saved position is valid
-      if (savedBounds.x >= 0 && savedBounds.y >= 0 &&
-          savedBounds.x < screenWidth - 100 && savedBounds.y < screenHeight - 100) {
-        windowBounds.x = savedBounds.x;
-        windowBounds.y = savedBounds.y;
-      }
-    }
-  } catch (error) {
-    console.error('Error loading window bounds:', error);
-  }
 
   mainWindow = new BrowserWindow({
     ...windowBounds,
     minWidth: 800,
     minHeight: 600,
+    show: false, // Don't show until bounds are applied
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -71,8 +51,48 @@ async function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, 'renderer/index.html'));
 
-  // Set up proxy environment variables
-  getAndSetProxyEnvironment();
+  // Load and apply window bounds after the window is ready to show
+  mainWindow.once('ready-to-show', async () => {
+    try {
+      // Load window bounds from localStorage
+      const savedBounds = await mainWindow.webContents.executeJavaScript(`
+        try {
+          const data = localStorage.getItem('window-bounds');
+          data ? JSON.parse(data) : null;
+        } catch (error) {
+          console.error('Error loading window bounds from localStorage:', error);
+          null;
+        }
+      `);
+
+      if (savedBounds) {
+        // Validate bounds are reasonable
+        const primaryDisplay = screen.getPrimaryDisplay();
+        const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+
+        // Ensure window is not too small and fits on screen
+        const validatedBounds: { width: number; height: number; x?: number; y?: number } = {
+          width: Math.max(800, Math.min(savedBounds.width, screenWidth)),
+          height: Math.max(600, Math.min(savedBounds.height, screenHeight))
+        };
+
+        // Check if saved position is valid
+        if (savedBounds.x >= 0 && savedBounds.y >= 0 &&
+            savedBounds.x < screenWidth - 100 && savedBounds.y < screenHeight - 100) {
+          validatedBounds.x = savedBounds.x;
+          validatedBounds.y = savedBounds.y;
+        }
+
+        // Apply the validated bounds
+        mainWindow.setBounds(validatedBounds);
+      }
+    } catch (error) {
+      console.error('Error loading window bounds:', error);
+    }
+
+    // Show the window after bounds are applied
+    mainWindow.show();
+  });  
 
   if (process.env.NODE_ENV === 'development') {
     // Open DevTools(cmd + alt + i)
@@ -86,12 +106,15 @@ async function createWindow() {
 
     try {
       const bounds = mainWindow.getBounds();
-      profileManager.saveWindowBounds({
-        x: bounds.x,
-        y: bounds.y,
-        width: bounds.width,
-        height: bounds.height
-      });
+      // Save window bounds to localStorage via renderer process
+      await mainWindow.webContents.executeJavaScript(`
+        try {
+          const bounds = ${JSON.stringify(bounds)};
+          localStorage.setItem('window-bounds', JSON.stringify(bounds));
+        } catch (error) {
+          console.error('Error saving window bounds to localStorage:', error);
+        }
+      `);
     } catch (error) {
       console.error('Error saving window bounds:', error);
     }
@@ -276,13 +299,7 @@ ipcMain.handle('update-profile-config', async (event, config: any) => {
   return await profileManager.updateProfileConfig(currentProfile, config);
 });
 
-ipcMain.handle('save-panel-widths', async (event, widths: { left: number; middle: number; right: number }) => {
-  profileManager.savePanelWidths(widths);
-});
 
-ipcMain.handle('get-ui-state', async (event) => {
-  return profileManager.getUIState();
-});
 
 // Markdown processing
 ipcMain.handle('process-markdown', async (event, markdown: string) => {
