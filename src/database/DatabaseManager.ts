@@ -120,9 +120,9 @@ export class DatabaseManager {
 
         // If table doesn't exist or schema doesn't match, recreate it
         if (!row || !this.schemasMatch(currentSchema, expectedSchema)) {
-          console.log('FTS table schema mismatch detected, recreating...');
-          console.log('Current schema:', currentSchema);
-          console.log('Expected schema:', expectedSchema);
+          console.debug('FTS table schema mismatch detected, recreating...');
+          console.debug('Current schema:', currentSchema);
+          console.debug('Expected schema:', expectedSchema);
 
           // Drop existing table and triggers
           const dropSql = `
@@ -189,17 +189,17 @@ export class DatabaseManager {
                 console.error('Error creating new FTS table:', createErr);
                 reject(createErr);
               } else {
-                console.log('FTS table created successfully with correct schema');
+                console.debug('FTS table created successfully with correct schema');
                 // Populate FTS table with existing data
                 this.populateFTSTable().then(() => {
-                  console.log('FTS table populated successfully');
+                  console.debug('FTS table populated successfully');
                   resolve();
                 }).catch(reject);
               }
             });
           });
         } else {
-          console.log('FTS table schema is correct, no migration needed');
+          console.debug('FTS table schema is correct, no migration needed');
           // Schema matches, just populate if needed
           this.populateFTSTable().then(resolve).catch(reject);
         }
@@ -380,7 +380,7 @@ export class DatabaseManager {
           reject(err);
           return;
         }
-        console.log('Word: ', row?.data);
+        console.debug('Word: ', row?.data);
         resolve(row ? JSON.parse(row.data) : null);
       });
     });
