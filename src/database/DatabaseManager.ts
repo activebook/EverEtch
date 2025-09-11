@@ -496,16 +496,16 @@ export class DatabaseManager {
     });
   }
 
-  // Tag operations - optimized to only fetch required fields
-  getAssociatedWords(tag: string): Promise<WordListItem[]> {
+  // Unified method for getting related words by field (tags, synonyms, antonyms)
+  getRelatedWordsByField(field: 'tags' | 'synonyms' | 'antonyms', term: string): Promise<WordListItem[]> {
     return new Promise((resolve, reject) => {
       if (!this.db) {
         resolve([]);
         return;
       }
 
-      // Use FTS5 for fast tag search
-      const ftsQuery = `tags:"${tag}"`;
+      // Use FTS5 for fast field-specific search
+      const ftsQuery = `${field}:"${term}"`;
       const sql = `
         SELECT
           f.id,
@@ -519,8 +519,8 @@ export class DatabaseManager {
       this.db.all(sql, [ftsQuery], (err, rows: { id: string, word: string, one_line_desc: string }[]) => {
         if (err) {
           // Fallback to JSON search if FTS5 fails
-          console.warn('FTS5 tag search failed, falling back to JSON search:', err);
-          this.fallbackGetAssociatedWords(tag).then(resolve).catch(reject);
+          console.warn(`FTS5 ${field} search failed, falling back to JSON search:`, err);
+          this.fallbackGetRelatedWordsByField(field, term).then(resolve).catch(reject);
           return;
         }
 
@@ -532,6 +532,21 @@ export class DatabaseManager {
         resolve(words);
       });
     });
+  }
+
+  // Tag operations - now uses unified FTS5 approach
+  getAssociatedWords(tag: string): Promise<WordListItem[]> {
+    return this.getRelatedWordsByField('tags', tag);
+  }
+
+  // Get words by synonym
+  getWordsBySynonym(synonym: string): Promise<WordListItem[]> {
+    return this.getRelatedWordsByField('synonyms', synonym);
+  }
+
+  // Get words by antonym
+  getWordsByAntonym(antonym: string): Promise<WordListItem[]> {
+    return this.getRelatedWordsByField('antonyms', antonym);
   }
 
   // Comprehensive search for related words (searches across all fields)
@@ -743,9 +758,9 @@ export class DatabaseManager {
   }
 
   /**
-   * Fallback method for tag search using LIKE with case-insensitive comparison
+   * Fallback method for unified field search using LIKE with case-insensitive comparison
    */
-  private fallbackGetAssociatedWords(tag: string): Promise<WordListItem[]> {
+  private fallbackGetRelatedWordsByField(field: 'tags' | 'synonyms' | 'antonyms', term: string): Promise<WordListItem[]> {
     return new Promise((resolve, reject) => {
       if (!this.db) {
         resolve([]);
@@ -757,9 +772,9 @@ export class DatabaseManager {
           id,
           json_extract(data, '$.word') as word,
           json_extract(data, '$.one_line_desc') as one_line_desc
-        FROM documents WHERE type = 'word' AND LOWER(json_extract(data, '$.tags')) LIKE LOWER(?)
+        FROM documents WHERE type = 'word' AND LOWER(json_extract(data, '$.${field}')) LIKE LOWER(?)
         ORDER BY json_extract(data, '$.word')`,
-        [`%${tag}%`],
+        [`%${term}%`],
         (err, rows: { id: string, word: string, one_line_desc: string }[]) => {
           if (err) {
             reject(err);
@@ -775,6 +790,13 @@ export class DatabaseManager {
         }
       );
     });
+  }
+
+  /**
+   * Fallback method for tag search using LIKE with case-insensitive comparison
+   */
+  private fallbackGetAssociatedWords(tag: string): Promise<WordListItem[]> {
+    return this.fallbackGetRelatedWordsByField('tags', tag);
   }
 
   // Paginated associated words loading for lazy loading - optimized to only fetch required fields
