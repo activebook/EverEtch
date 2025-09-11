@@ -91,13 +91,14 @@ export class DatabaseManager {
         -- Tag-specific indexes
         CREATE INDEX IF NOT EXISTS idx_tag_lookup ON documents(type, json_extract(data, '$.tag'));
 
-        -- Full-text search virtual table for words
+        -- Full-text search virtual table for words (optimized for related words search)
         CREATE VIRTUAL TABLE IF NOT EXISTS words_fts USING fts5(
           id UNINDEXED,
           word,
           one_line_desc,
-          details,
           tags,
+          synonyms,
+          antonyms,
           tokenize = 'porter unicode61'
         );
 
@@ -105,13 +106,14 @@ export class DatabaseManager {
         CREATE TRIGGER IF NOT EXISTS words_fts_insert AFTER INSERT ON documents
         WHEN NEW.type = 'word'
         BEGIN
-          INSERT INTO words_fts(id, word, one_line_desc, details, tags)
+          INSERT INTO words_fts(id, word, one_line_desc, tags, synonyms, antonyms)
           VALUES (
             NEW.id,
             json_extract(NEW.data, '$.word'),
             json_extract(NEW.data, '$.one_line_desc'),
-            json_extract(NEW.data, '$.details'),
-            json_extract(NEW.data, '$.tags')
+            json_extract(NEW.data, '$.tags'),
+            json_extract(NEW.data, '$.synonyms'),
+            json_extract(NEW.data, '$.antonyms')
           );
         END;
 
@@ -121,8 +123,9 @@ export class DatabaseManager {
           UPDATE words_fts SET
             word = json_extract(NEW.data, '$.word'),
             one_line_desc = json_extract(NEW.data, '$.one_line_desc'),
-            details = json_extract(NEW.data, '$.details'),
-            tags = json_extract(NEW.data, '$.tags')
+            tags = json_extract(NEW.data, '$.tags'),
+            synonyms = json_extract(NEW.data, '$.synonyms'),
+            antonyms = json_extract(NEW.data, '$.antonyms')
           WHERE id = NEW.id;
         END;
 
@@ -163,13 +166,14 @@ export class DatabaseManager {
 
         // Populate FTS table with existing words
         const sql = `
-          INSERT INTO words_fts(id, word, one_line_desc, details, tags)
+          INSERT INTO words_fts(id, word, one_line_desc, tags, synonyms, antonyms)
           SELECT
             id,
             json_extract(data, '$.word'),
             json_extract(data, '$.one_line_desc'),
-            json_extract(data, '$.details'),
-            json_extract(data, '$.tags')
+            json_extract(data, '$.tags'),
+            json_extract(data, '$.synonyms'),
+            json_extract(data, '$.antonyms')
           FROM documents
           WHERE type = 'word'
         `;
@@ -500,21 +504,22 @@ export class DatabaseManager {
         return;
       }
 
-      // Use json_each for efficient array searching with case-insensitive comparison
+      // Use FTS5 for fast tag search
+      const ftsQuery = `tags:"${tag}"`;
       const sql = `
-        SELECT DISTINCT
-          d.id,
-          json_extract(d.data, '$.word') as word,
-          json_extract(d.data, '$.one_line_desc') as one_line_desc
-        FROM documents d, json_each(d.data, '$.tags') as t
-        WHERE d.type = 'word' AND LOWER(t.value) = LOWER(?)
-        ORDER BY json_extract(d.data, '$.word')
+        SELECT
+          f.id,
+          f.word,
+          f.one_line_desc
+        FROM words_fts f
+        WHERE words_fts MATCH ?
+        ORDER BY bm25(words_fts), f.word
       `;
 
-      this.db.all(sql, [tag], (err, rows: { id: string, word: string, one_line_desc: string }[]) => {
+      this.db.all(sql, [ftsQuery], (err, rows: { id: string, word: string, one_line_desc: string }[]) => {
         if (err) {
-          // Fallback to LIKE search if json_each fails
-          console.warn('JSON array search failed, falling back to LIKE search:', err);
+          // Fallback to JSON search if FTS5 fails
+          console.warn('FTS5 tag search failed, falling back to JSON search:', err);
           this.fallbackGetAssociatedWords(tag).then(resolve).catch(reject);
           return;
         }
@@ -598,54 +603,33 @@ export class DatabaseManager {
         return;
       }
 
-      // Search across word, tags, synonyms, antonyms, and description fields - optimized to only fetch required fields
+      // Use FTS5 for fast full-text search across all relevant fields
+      const ftsQuery = `"${searchTerm}" OR "${searchTerm}"*`;
       const sql = `
-        SELECT DISTINCT
-          d.id,
-          json_extract(d.data, '$.word') as word,
-          json_extract(d.data, '$.one_line_desc') as one_line_desc,
+        SELECT
+          f.id,
+          f.word,
+          f.one_line_desc,
           CASE
-            WHEN LOWER(json_extract(d.data, '$.word')) = LOWER(?) THEN 1  -- Exact word match (highest priority)
-            WHEN LOWER(json_extract(d.data, '$.word')) LIKE LOWER(?) THEN 2  -- Word starts with term
+            WHEN LOWER(f.word) = LOWER(?) THEN 1  -- Exact word match (highest priority)
+            WHEN LOWER(f.word) LIKE LOWER(?) THEN 2  -- Word starts with term
             ELSE 3  -- Other matches
           END as priority
-        FROM documents d
-        WHERE d.type = 'word' AND (
-          -- Exact word match
-          LOWER(json_extract(d.data, '$.word')) = LOWER(?)
-          -- Word contains term
-          OR LOWER(json_extract(d.data, '$.word')) LIKE LOWER(?)
-          -- Tags contain term
-          OR EXISTS (SELECT 1 FROM json_each(d.data, '$.tags') WHERE LOWER(value) = LOWER(?))
-          -- Synonyms contain term
-          OR EXISTS (SELECT 1 FROM json_each(d.data, '$.synonyms') WHERE LOWER(value) = LOWER(?))
-          -- Antonyms contain term
-          OR EXISTS (SELECT 1 FROM json_each(d.data, '$.antonyms') WHERE LOWER(value) = LOWER(?))
-          -- Description contains term
-          OR LOWER(json_extract(d.data, '$.one_line_desc')) LIKE LOWER(?)
-          -- Details contain term
-          OR LOWER(json_extract(d.data, '$.details')) LIKE LOWER(?)
-        )
-        ORDER BY priority, json_extract(d.data, '$.word')
+        FROM words_fts f
+        WHERE words_fts MATCH ?
+        ORDER BY priority, bm25(words_fts), f.word
         LIMIT 20
       `;
 
-      const searchPattern = `%${searchTerm}%`;
       const params = [
         searchTerm,      // exact word match priority
         `${searchTerm}%`, // word starts with priority
-        searchTerm,      // exact word match
-        searchPattern,   // word contains
-        searchTerm,      // tags contain
-        searchTerm,      // synonyms contain
-        searchTerm,      // antonyms contain
-        searchPattern,   // description contains
-        searchPattern    // details contain
+        ftsQuery         // FTS5 search query
       ];
 
       this.db.all(sql, params, (err, rows: { id: string, word: string, one_line_desc: string }[]) => {
         if (err) {
-          console.warn('Optimized comprehensive search failed, falling back to simple search:', err);
+          console.warn('FTS5 optimized search failed, falling back to JSON search:', err);
           this.fallbackGetRelatedWordsOptimized(searchTerm).then(resolve).catch(reject);
           return;
         }
