@@ -109,6 +109,10 @@ ipcMain.handle('search-words', async (event, query: string) => {
   return await dbManager.searchWords(query);
 });
 
+ipcMain.handle('search-words-optimized', async (event, query: string) => {
+  return await dbManager.searchWordsOptimized(query);
+});
+
 ipcMain.handle('get-word', async (event, wordId: string) => {
   return await dbManager.getWord(wordId);
 });
@@ -210,6 +214,10 @@ ipcMain.handle('get-associated-words-paginated', async (event, tag: string, offs
 
 ipcMain.handle('get-related-words', async (event, searchTerm: string) => {
   return await dbManager.getRelatedWords(searchTerm);
+});
+
+ipcMain.handle('get-related-words-optimized', async (event, searchTerm: string) => {
+  return await dbManager.getRelatedWordsOptimized(searchTerm);
 });
 
 // Profile config operations

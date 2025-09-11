@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getWords: () => ipcRenderer.invoke('get-words'),
   getWordsPaginated: (offset: number, limit: number) => ipcRenderer.invoke('get-words-paginated', offset, limit),
   searchWords: (query: string) => ipcRenderer.invoke('search-words', query),
+  searchWordsOptimized: (query: string) => ipcRenderer.invoke('search-words-optimized', query),
   getWord: (wordId: string) => ipcRenderer.invoke('get-word', wordId),
   addWord: (wordData: any) => ipcRenderer.invoke('add-word', wordData),
   updateWord: (wordId: string, wordData: any) => ipcRenderer.invoke('update-word', wordId, wordData),
@@ -28,6 +29,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAssociatedWords: (tag: string) => ipcRenderer.invoke('get-associated-words', tag),
   getAssociatedWordsPaginated: (tag: string, offset: number, limit: number) => ipcRenderer.invoke('get-associated-words-paginated', tag, offset, limit),
   getRelatedWords: (searchTerm: string) => ipcRenderer.invoke('get-related-words', searchTerm),
+  getRelatedWordsOptimized: (searchTerm: string) => ipcRenderer.invoke('get-related-words-optimized', searchTerm),
 
   // Profile config
   getProfileConfig: () => ipcRenderer.invoke('get-profile-config'),

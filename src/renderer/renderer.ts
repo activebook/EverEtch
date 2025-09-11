@@ -9,8 +9,9 @@ declare global {
   renameProfile: (oldName: string, newName: string) => Promise<boolean>;
   deleteProfile: (profileName: string) => Promise<boolean>;
       getWords: () => Promise<any[]>;
-      getWordsPaginated: (offset: number, limit: number) => Promise<{ words: any[], hasMore: boolean, total: number }>;
+      getWordsPaginated: (offset: number, limit: number) => Promise<{ words: WordListItem[], hasMore: boolean, total: number }>;
       searchWords: (query: string) => Promise<any[]>;
+      searchWordsOptimized: (query: string) => Promise<WordListItem[]>;
       getWord: (wordId: string) => Promise<any>;
       addWord: (wordData: any) => Promise<any>;
       updateWord: (wordId: string, wordData: any) => Promise<any>;
@@ -19,8 +20,9 @@ declare global {
       generateWordMetas: (word: string, meaning: string, generationId: string) => Promise<any>;
       generateMeaning: (word: string) => Promise<string>;
       getAssociatedWords: (tag: string) => Promise<any[]>;
-      getAssociatedWordsPaginated: (tag: string, offset: number, limit: number) => Promise<{ words: any[], hasMore: boolean, total: number }>;
+      getAssociatedWordsPaginated: (tag: string, offset: number, limit: number) => Promise<{ words: WordListItem[], hasMore: boolean, total: number }>;
       getRelatedWords: (searchTerm: string) => Promise<any[]>;
+      getRelatedWordsOptimized: (searchTerm: string) => Promise<WordListItem[]>;
       getProfileConfig: () => Promise<any>;
       updateProfileConfig: (config: any) => Promise<boolean>;
       processMarkdown: (markdown: string) => Promise<string>;
@@ -51,6 +53,12 @@ interface WordDocument {
   updated_at: string;
 }
 
+interface WordListItem {
+  id: string;
+  word: string;
+  one_line_desc: string;
+}
+
 class EverEtchApp {
   private currentWord: WordDocument | null = null;
   private currentGenerationId: string = '';
@@ -64,8 +72,8 @@ class EverEtchApp {
   private startMiddleWidth: number = 0;
   private startRightWidth: number = 0;
 
-  // Lazy loading state
-  private words: WordDocument[] = [];
+  // Lazy loading state - now using WordListItem for efficiency
+  private words: WordListItem[] = [];
   private currentOffset: number = 0;
   private pageSize: number = 5;
   private isLoading: boolean = false;
@@ -73,8 +81,8 @@ class EverEtchApp {
   private totalWords: number = 0;
   private scrollObserver: IntersectionObserver | null = null;
 
-  // Associated words lazy loading state
-  private associatedWords: WordDocument[] = [];
+  // Associated words lazy loading state - now using WordListItem for efficiency
+  private associatedWords: WordListItem[] = [];
   private associatedCurrentOffset: number = 0;
   private associatedPageSize: number = 5;
   private associatedIsLoading: boolean = false;
@@ -451,7 +459,7 @@ class EverEtchApp {
 
   private async handleSearchInput(query: string) {
     try {
-      const suggestions = await window.electronAPI.searchWords(query);
+      const suggestions = await window.electronAPI.searchWordsOptimized(query);
       this.renderSuggestions(suggestions);
 
       // Check if there's an exact match and update button accordingly
@@ -879,7 +887,7 @@ class EverEtchApp {
     });
   }
 
-  private renderWordListIncremental(newWords: WordDocument[]) {
+  private renderWordListIncremental(newWords: WordListItem[]) {
     const wordList = document.getElementById('word-list')!;
 
     // Ensure loading indicator exists and is at the end
@@ -901,7 +909,7 @@ class EverEtchApp {
     }
 
     newWords.forEach(word => {
-      const wordItem = this.createWordItem(word);
+      const wordItem = this.createWordItemFromList(word);
       // Insert before loading indicator if it exists, otherwise append
       if (loadingIndicator && wordList.contains(loadingIndicator)) {
         wordList.insertBefore(wordItem, loadingIndicator);
@@ -914,7 +922,7 @@ class EverEtchApp {
     this.updateLoadingIndicator();
   }
 
-  private createWordItem(word: WordDocument): HTMLElement {
+  private createWordItem(word: WordListItem): HTMLElement {
     const wordItem = document.createElement('div');
     wordItem.className = 'word-item p-1.5 mb-0.5 cursor-pointer transition-all duration-200 hover:bg-amber-50/20 relative';
     wordItem.setAttribute('data-word-id', word.id); // Add data attribute for scrolling
@@ -926,6 +934,48 @@ class EverEtchApp {
 
     wordItem.addEventListener('click', () => {
       this.selectWord(word);
+    });
+
+    // Add hover effect for underline
+    wordItem.addEventListener('mouseenter', () => {
+      const underline = wordItem.querySelector('div:last-child') as HTMLElement;
+      if (underline) {
+        underline.style.opacity = '1';
+      }
+    });
+
+    wordItem.addEventListener('mouseleave', () => {
+      const underline = wordItem.querySelector('div:last-child') as HTMLElement;
+      if (underline) {
+        underline.style.opacity = '0.0';
+      }
+    });
+
+    return wordItem;
+  }
+
+  private createWordItemFromList(word: WordListItem): HTMLElement {
+    const wordItem = document.createElement('div');
+    wordItem.className = 'word-item p-1.5 mb-0.5 cursor-pointer transition-all duration-200 hover:bg-amber-50/20 relative';
+    wordItem.setAttribute('data-word-id', word.id); // Add data attribute for scrolling
+    wordItem.innerHTML = `
+      <div class="font-semibold text-slate-800 text-base mb-0.5">${word.word}</div>
+      <div class="text-sm text-slate-500 line-clamp-2">${word.one_line_desc || 'No description'}</div>
+      <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-amber-200/60 via-amber-300/80 to-amber-200/60 opacity-0 transition-opacity duration-200"></div>
+    `;
+
+    wordItem.addEventListener('click', async () => {
+      // For WordListItem, we need to fetch the full WordDocument when clicked
+      try {
+        const fullWord = await window.electronAPI.getWord(word.id);
+        if (fullWord) {
+          this.selectWord(fullWord);
+        } else {
+          console.error('Failed to fetch full word details for:', word.id);
+        }
+      } catch (error) {
+        console.error('Error fetching word details:', error);
+      }
     });
 
     // Add hover effect for underline
@@ -964,7 +1014,7 @@ class EverEtchApp {
     }
   }
 
-  private renderSuggestions(suggestions: WordDocument[]) {
+  private renderSuggestions(suggestions: WordListItem[]) {
     const suggestionsDiv = document.getElementById('suggestions')!;
 
     if (suggestions.length === 0) {
@@ -982,9 +1032,18 @@ class EverEtchApp {
         <div class="text-sm text-slate-600 line-clamp-2">${word.one_line_desc || 'No description'}</div>
       `;
 
-      suggestionItem.addEventListener('click', () => {
-        // Always show the word details directly when clicking a suggestion
-        this.selectWord(word);
+      suggestionItem.addEventListener('click', async () => {
+        // For WordListItem, we need to fetch the full WordDocument when clicked
+        try {
+          const fullWord = await window.electronAPI.getWord(word.id);
+          if (fullWord) {
+            this.selectWord(fullWord);
+          } else {
+            console.error('Failed to fetch full word details for:', word.id);
+          }
+        } catch (error) {
+          console.error('Error fetching word details:', error);
+        }
         this.hideSuggestions();
       });
 
@@ -1341,7 +1400,7 @@ class EverEtchApp {
     }
   }
 
-  private renderAssociatedList(words: WordDocument[], tag: string) {
+  private renderAssociatedList(words: WordListItem[], tag: string) {
     const associatedList = document.getElementById('associated-list')!;
     const isRelatedWords = this.currentTag !== tag; // If currentTag != tag, it's related words
 
@@ -1394,25 +1453,47 @@ class EverEtchApp {
 
 
 
-  private selectWord(word: WordDocument) {
+  private async selectWord(word: WordDocument | WordListItem) {
     // Prevent selecting a word while generation is in progress
     if (this.isGenerating) {
       console.log('⚠️ selectWord: Generation in progress, ignoring word selection');
       return;
     }
 
-    this.currentWord = word;
-    this.renderWordDetails(word);
+    let fullWord: WordDocument;
+
+    // If it's already a WordDocument, use it directly
+    if ('details' in word && 'tags' in word && 'tag_colors' in word) {
+      fullWord = word as WordDocument;
+    } else {
+      // If it's a WordListItem, fetch the full details from database
+      try {
+        const fetchedWord = await window.electronAPI.getWord(word.id);
+        if (!fetchedWord) {
+          console.error('Failed to fetch full word details for:', word.id);
+          this.showError('Failed to load word details');
+          return;
+        }
+        fullWord = fetchedWord;
+      } catch (error) {
+        console.error('Error fetching word details:', error);
+        this.showError('Failed to load word details');
+        return;
+      }
+    }
+
+    this.currentWord = fullWord;
+    this.renderWordDetails(fullWord);
 
     // Update input field
     const wordInput = document.getElementById('word-input') as HTMLInputElement;
-    wordInput.value = word.word;
+    wordInput.value = fullWord.word;
 
     // Clear suggestions
     this.clearSuggestions();
 
     // Update button state for the input value and switch to search mode
-    this.updateGenerateBtnState(word.word, true);
+    this.updateGenerateBtnState(fullWord.word, true);
   }
 
   private clearWordDetails() {
@@ -2198,7 +2279,7 @@ class EverEtchApp {
     }
   }
 
-  private renderAssociatedListIncremental(newWords: WordDocument[]) {
+  private renderAssociatedListIncremental(newWords: WordListItem[]) {
     const associatedList = document.getElementById('associated-list')!;
 
     // Ensure loading indicator exists and is at the end
