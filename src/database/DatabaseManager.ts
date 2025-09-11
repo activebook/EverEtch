@@ -1,5 +1,6 @@
 import sqlite3 from 'sqlite3';
 import { getDatabasePath, ensureDataDirectory, generateId, formatDate } from '../utils/utils.js';
+import { DatabaseRecovery } from './DatabaseRecovery.js';
 
 export interface WordDocument {
   id: string;
@@ -99,171 +100,15 @@ export class DatabaseManager {
   }
 
   private createOrUpdateFTSTable(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (!this.db) {
-        resolve();
-        return;
-      }
+    if (!this.db) {
+      return Promise.resolve();
+    }
 
-      // Check if FTS table exists and get its schema
-      this.db.get(`
-        SELECT sql FROM sqlite_master
-        WHERE type='table' AND name='words_fts'
-      `, (err, row: { sql: string } | undefined) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-
-        const expectedSchema = 'CREATE VIRTUAL TABLE words_fts USING fts5(id UNINDEXED, word, one_line_desc, tags, synonyms, antonyms, tokenize = \'porter unicode61\')';
-        const currentSchema = row?.sql;
-
-        // If table doesn't exist or schema doesn't match, recreate it
-        if (!row || !this.schemasMatch(currentSchema, expectedSchema)) {
-          console.debug('FTS table schema mismatch detected, recreating...');
-          console.debug('Current schema:', currentSchema);
-          console.debug('Expected schema:', expectedSchema);
-
-          // Drop existing table and triggers
-          const dropSql = `
-            DROP TRIGGER IF EXISTS words_fts_insert;
-            DROP TRIGGER IF EXISTS words_fts_update;
-            DROP TRIGGER IF EXISTS words_fts_delete;
-            DROP TABLE IF EXISTS words_fts;
-          `;
-
-          this.db!.exec(dropSql, (dropErr) => {
-            if (dropErr) {
-              console.error('Error dropping old FTS table/triggers:', dropErr);
-              // Continue anyway - triggers might not exist
-            }
-
-            // Create new FTS table with correct schema
-            const createSql = `
-              CREATE VIRTUAL TABLE words_fts USING fts5(
-                id UNINDEXED,
-                word,
-                one_line_desc,
-                tags,
-                synonyms,
-                antonyms,
-                tokenize = 'porter unicode61'
-              );
-
-              -- Triggers to keep FTS table in sync
-              CREATE TRIGGER words_fts_insert AFTER INSERT ON documents
-              WHEN NEW.type = 'word'
-              BEGIN
-                INSERT INTO words_fts(id, word, one_line_desc, tags, synonyms, antonyms)
-                VALUES (
-                  NEW.id,
-                  json_extract(NEW.data, '$.word'),
-                  json_extract(NEW.data, '$.one_line_desc'),
-                  json_extract(NEW.data, '$.tags'),
-                  json_extract(NEW.data, '$.synonyms'),
-                  json_extract(NEW.data, '$.antonyms')
-                );
-              END;
-
-              CREATE TRIGGER words_fts_update AFTER UPDATE ON documents
-              WHEN NEW.type = 'word'
-              BEGIN
-                UPDATE words_fts SET
-                  word = json_extract(NEW.data, '$.word'),
-                  one_line_desc = json_extract(NEW.data, '$.one_line_desc'),
-                  tags = json_extract(NEW.data, '$.tags'),
-                  synonyms = json_extract(NEW.data, '$.synonyms'),
-                  antonyms = json_extract(NEW.data, '$.antonyms')
-                WHERE id = NEW.id;
-              END;
-
-              CREATE TRIGGER words_fts_delete AFTER DELETE ON documents
-              WHEN OLD.type = 'word'
-              BEGIN
-                DELETE FROM words_fts WHERE id = OLD.id;
-              END;
-            `;
-
-            this.db!.exec(createSql, (createErr) => {
-              if (createErr) {
-                console.error('Error creating new FTS table:', createErr);
-                reject(createErr);
-              } else {
-                console.debug('FTS table created successfully with correct schema');
-                // Populate FTS table with existing data
-                this.populateFTSTable().then(() => {
-                  console.debug('FTS table populated successfully');
-                  resolve();
-                }).catch(reject);
-              }
-            });
-          });
-        } else {
-          console.debug('FTS table schema is correct, no migration needed');
-          // Schema matches, just populate if needed
-          this.populateFTSTable().then(resolve).catch(reject);
-        }
-      });
-    });
+    const recovery = new DatabaseRecovery(this.db);
+    return recovery.createOrUpdateFTSTable();
   }
 
-  private schemasMatch(current: string | undefined, expected: string): boolean {
-    if (!current) return false;
 
-    // Normalize both schemas for comparison
-    const normalize = (sql: string) => {
-      return sql
-        .replace(/\s+/g, ' ')  // Replace multiple spaces with single space
-        .replace(/\s*\(\s*/g, '(')  // Remove spaces around parentheses
-        .replace(/\s*\)\s*/g, ')')
-        .replace(/\s*,\s*/g, ',')  // Remove spaces around commas
-        .trim()
-        .toLowerCase();
-    };
-
-    return normalize(current) === normalize(expected);
-  }
-
-  /**
-   * Populate FTS table with existing words (for migration)
-   */
-  private populateFTSTable(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (!this.db) {
-        resolve();
-        return;
-      }
-
-      // Check if FTS table is empty
-      this.db.get('SELECT COUNT(*) as count FROM words_fts', (err, row: { count: number } | undefined) => {
-        if (err || (row && row.count > 0)) {
-          resolve();
-          return;
-        }
-
-        // Populate FTS table with existing words
-        const sql = `
-          INSERT INTO words_fts(id, word, one_line_desc, tags, synonyms, antonyms)
-          SELECT
-            id,
-            json_extract(data, '$.word'),
-            json_extract(data, '$.one_line_desc'),
-            json_extract(data, '$.tags'),
-            json_extract(data, '$.synonyms'),
-            json_extract(data, '$.antonyms')
-          FROM documents
-          WHERE type = 'word'
-        `;
-
-        this.db!.run(sql, (err) => {
-          if (err) {
-            console.error('Error populating FTS table:', err);
-          }
-          resolve();
-        });
-      });
-    });
-  }
 
   // Paginated word loading for lazy loading - optimized to only fetch required fields
   getWordsPaginated(offset: number, limit: number): Promise<{words: WordListItem[], hasMore: boolean, total: number}> {
