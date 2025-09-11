@@ -1,9 +1,9 @@
-# EverEtch - Smart Word Learning
+# EverEtch - Smart Word Memo
 
 A slim, AI-powered app to help you learn and remember words.
 
 - No fxxking ads, no tracking, and completely free.
-- Fuck youdao! Fuck baicizhan!
+- Fuck Youdao dict! Fuck Baicizhan!
 
 ![UI Screenshot](screenshots/UI_EN.png)
 ![UI Screenshot](screenshots/UI_JP.png)
