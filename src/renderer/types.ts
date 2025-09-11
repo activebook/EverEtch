@@ -20,8 +20,12 @@ declare global {
             generateMeaning: (word: string) => Promise<string>;
             getRelatedWordsPaginated: (searchTerm: string, offset: number, limit: number) => Promise<{ words: WordListItem[], hasMore: boolean, total: number }>;
             getProfileConfig: () => Promise<any>;
-            updateProfileConfig: (config: any) => Promise<boolean>;
+            updateProfileConfig: (config: any) => Promise<boolean>;            
             processMarkdown: (markdown: string) => Promise<string>;
+
+            // UI
+            getUIState: () => Promise<any>;
+            savePanelWidths: (widths: { left: number; middle: number; right: number }) => Promise<void>;
 
             // Profile import/export
             exportProfile: () => Promise<any>;

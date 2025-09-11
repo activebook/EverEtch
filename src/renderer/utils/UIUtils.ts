@@ -5,6 +5,7 @@ export class UIUtils {
   private startLeftWidth: number = 0;
   private startMiddleWidth: number = 0;
   private startRightWidth: number = 0;
+  private savedPanelWidths: { left: number; middle: number; right: number } | null = null;
 
   startResize(e: MouseEvent): void {
     const mainContent = document.getElementById('main-content') as HTMLElement;
@@ -104,6 +105,9 @@ export class UIUtils {
     // Restore normal cursor and text selection
     document.body.style.userSelect = '';
     document.body.style.cursor = '';
+
+    // Save panel widths after resize
+    this.savePanelWidths();
   }
 
   updateWordCount(count: number): void {
@@ -242,6 +246,65 @@ export class UIUtils {
       // Hide with animation
       expandedActions.classList.remove('opacity-100', 'scale-100', 'pointer-events-auto');
       expandedActions.classList.add('opacity-0', 'scale-95', 'pointer-events-none');
+    }
+  }
+
+  // Panel width persistence methods
+  async loadPanelWidths(): Promise<void> {
+    try {
+      const uiState = await window.electronAPI.getUIState();
+      if (uiState?.panel_widths) {
+        this.savedPanelWidths = uiState.panel_widths;
+        this.applySavedPanelWidths();
+      }
+    } catch (error) {
+      console.error('Error loading panel widths:', error);
+    }
+  }
+
+  private applySavedPanelWidths(): void {
+    if (!this.savedPanelWidths) return;
+
+    const leftPanel = document.getElementById('left-panel') as HTMLElement;
+    const middlePanel = document.getElementById('middle-panel') as HTMLElement;
+    const rightPanel = document.getElementById('right-panel') as HTMLElement;
+
+    if (leftPanel && middlePanel && rightPanel) {
+      leftPanel.style.width = `${this.savedPanelWidths.left}%`;
+      middlePanel.style.width = `${this.savedPanelWidths.middle}%`;
+      rightPanel.style.width = `${this.savedPanelWidths.right}%`;
+    }
+  }
+
+  private async savePanelWidths(): Promise<void> {
+    try {
+      const leftPanel = document.getElementById('left-panel') as HTMLElement;
+      const middlePanel = document.getElementById('middle-panel') as HTMLElement;
+      const rightPanel = document.getElementById('right-panel') as HTMLElement;
+
+      if (!leftPanel || !middlePanel || !rightPanel) return;
+
+      const mainContent = document.getElementById('main-content') as HTMLElement;
+      if (!mainContent) return;
+
+      const mainRect = mainContent.getBoundingClientRect();
+      const panelWidths = {
+        left: (leftPanel.offsetWidth / mainRect.width) * 100,
+        middle: (middlePanel.offsetWidth / mainRect.width) * 100,
+        right: (rightPanel.offsetWidth / mainRect.width) * 100
+      };
+
+      // Only save if widths have actually changed
+      if (!this.savedPanelWidths ||
+          Math.abs(this.savedPanelWidths.left - panelWidths.left) > 0.1 ||
+          Math.abs(this.savedPanelWidths.middle - panelWidths.middle) > 0.1 ||
+          Math.abs(this.savedPanelWidths.right - panelWidths.right) > 0.1) {
+
+        await window.electronAPI.savePanelWidths(panelWidths);
+        this.savedPanelWidths = panelWidths;
+      }
+    } catch (error) {
+      console.error('Error saving panel widths:', error);
     }
   }
 }

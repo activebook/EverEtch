@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, screen } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -25,9 +25,43 @@ marked.setOptions({
 });
 
 async function createWindow() {
+  // Initialize managers first to get profile config
+  dbManager = new DatabaseManager();
+  profileManager = new ProfileManager(dbManager);
+  aiClient = new AIModelClient();
+
+  // Load current profile to get saved window bounds
+  let windowBounds: { width: number; height: number; x?: number; y?: number } = { width: 1200, height: 800 };
+  try {
+    await profileManager.loadProfiles();
+    const uiState = profileManager.getUIState();
+    if (uiState?.window_bounds) {
+      const savedBounds = uiState.window_bounds;
+      // Validate bounds are reasonable
+      const primaryDisplay = screen.getPrimaryDisplay();
+      const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+
+      // Ensure window is not too small and fits on screen
+      windowBounds = {
+        width: Math.max(800, Math.min(savedBounds.width, screenWidth)),
+        height: Math.max(600, Math.min(savedBounds.height, screenHeight))
+      };
+
+      // Check if saved position is valid
+      if (savedBounds.x >= 0 && savedBounds.y >= 0 &&
+          savedBounds.x < screenWidth - 100 && savedBounds.y < screenHeight - 100) {
+        windowBounds.x = savedBounds.x;
+        windowBounds.y = savedBounds.y;
+      }
+    }
+  } catch (error) {
+    console.error('Error loading window bounds:', error);
+  }
+
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    ...windowBounds,
+    minWidth: 800,
+    minHeight: 600,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -40,16 +74,48 @@ async function createWindow() {
   // Set up proxy environment variables
   getAndSetProxyEnvironment();
 
-  // Initialize managers
-  dbManager = new DatabaseManager();
-  profileManager = new ProfileManager(dbManager);
-  aiClient = new AIModelClient();
-
   if (process.env.NODE_ENV === 'development') {
     // Open DevTools(cmd + alt + i)
     // mainWindow.webContents.openDevTools();
   }
 
+  // Set up window event listeners for saving bounds
+  let saveTimeout: NodeJS.Timeout;
+  const saveWindowBounds = async () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+
+    try {
+      const bounds = mainWindow.getBounds();
+      profileManager.saveWindowBounds({
+        x: bounds.x,
+        y: bounds.y,
+        width: bounds.width,
+        height: bounds.height
+      });
+    } catch (error) {
+      console.error('Error saving window bounds:', error);
+    }
+  };
+
+  // Debounced save on resize/move
+  const debouncedSave = () => {
+    clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(saveWindowBounds, 500);
+  };
+
+  mainWindow.on('resize', debouncedSave);
+  mainWindow.on('move', debouncedSave);
+
+  // Save immediately when window is closed (but don't block the close)
+  mainWindow.on('close', async () => {
+    clearTimeout(saveTimeout);
+    try {
+      await saveWindowBounds();
+    } catch (error) {
+      // Silently ignore errors during window close to prevent crashes
+      console.debug('Window bounds save failed during close (expected):', error);
+    }
+  });
 }
 
 app.whenReady().then(createWindow);
@@ -208,6 +274,14 @@ ipcMain.handle('update-profile-config', async (event, config: any) => {
   const currentProfile = profileManager.getLastOpenedProfile();
   if (!currentProfile) return false;
   return await profileManager.updateProfileConfig(currentProfile, config);
+});
+
+ipcMain.handle('save-panel-widths', async (event, widths: { left: number; middle: number; right: number }) => {
+  profileManager.savePanelWidths(widths);
+});
+
+ipcMain.handle('get-ui-state', async (event) => {
+  return profileManager.getUIState();
 });
 
 // Markdown processing
