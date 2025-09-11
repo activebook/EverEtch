@@ -3,12 +3,12 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import { getAndSetProxyEnvironment } from './sys_proxy.js';
+import { getAndSetProxyEnvironment } from './utils/sys_proxy.js';
 import { DatabaseManager } from './database/DatabaseManager.js';
 import { ProfileManager } from './database/ProfileManager.js';
 import { AIModelClient, WORD_DUMMY_METAS } from './ai/AIModelClient.js';
 import { marked } from 'marked';
-import { getDatabasePath, getDataPath, ensureDataDirectory } from './utils.js';
+import { getDatabasePath, ensureDataDirectory } from './utils/utils.js';
 
 
 const __filename = fileURLToPath(import.meta.url);

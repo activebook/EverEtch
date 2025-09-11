@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import { DatabaseManager, ProfileConfig } from './DatabaseManager.js';
-import { getProfilesPath, getDatabasePath, ensureDataDirectory, generateId, formatDate } from '../utils.js';
+import { getProfilesPath, getDatabasePath, ensureDataDirectory, generateId, formatDate } from '../utils/utils.js';
 
 export class ProfileManager {
   private dbManager: DatabaseManager;
