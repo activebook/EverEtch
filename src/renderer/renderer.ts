@@ -5,9 +5,9 @@ declare global {
       getProfiles: () => Promise<string[]>;
       getCurrentProfileName: () => Promise<string | null>;
       switchProfile: (profileName: string) => Promise<boolean>;
-  createProfile: (profileName: string) => Promise<boolean>;
-  renameProfile: (oldName: string, newName: string) => Promise<boolean>;
-  deleteProfile: (profileName: string) => Promise<boolean>;
+      createProfile: (profileName: string) => Promise<boolean>;
+      renameProfile: (oldName: string, newName: string) => Promise<boolean>;
+      deleteProfile: (profileName: string) => Promise<boolean>;
       getWordsPaginated: (offset: number, limit: number) => Promise<{ words: WordListItem[], hasMore: boolean, total: number }>;
       searchWords: (query: string) => Promise<WordListItem[]>;
       getWord: (wordId: string) => Promise<any>;
@@ -552,8 +552,8 @@ class EverEtchApp {
         setTimeout(() => {
           // Only update if this is still the current generation and word has loading states
           if (this.currentGenerationId === generationId &&
-              this.currentWord &&
-              this.currentWord.tags.includes('Analyzing word...')) {
+            this.currentWord &&
+            this.currentWord.tags.includes('Analyzing word...')) {
             console.log('Tool result timeout - forcing UI update');
             // Force update with fallback data
             this.currentWord.one_line_desc = `Summary for: ${word}`;
@@ -1469,7 +1469,7 @@ class EverEtchApp {
     // }
 
     associatedList.innerHTML = '';
-    
+
     words.forEach(word => {
       const wordItem = this.createWordItem(word);
       associatedList.appendChild(wordItem);
