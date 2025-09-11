@@ -1,5 +1,5 @@
 import sqlite3 from 'sqlite3';
-import { getDatabasePath, ensureDataDirectory, generateId, formatDate } from '../utils.js';
+import { getDatabasePath, ensureDataDirectory, generateId, formatDate } from '../utils/utils.js';
 
 export interface WordDocument {
   id: string;
