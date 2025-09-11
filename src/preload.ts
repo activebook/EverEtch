@@ -4,6 +4,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electronAPI', {
   // Profile management
+  loadProfiles: () => ipcRenderer.invoke('load-profiles'),
   getProfiles: () => ipcRenderer.invoke('get-profiles'),
   getCurrentProfileName: () => ipcRenderer.invoke('get-current-profile-name'),
   switchProfile: (profileName: string) => ipcRenderer.invoke('switch-profile', profileName),

@@ -52,6 +52,16 @@ export class EverEtchApp {
     this.initializeApp();
   }
 
+  private showLoadingOverlay(): void {
+    const loadingOverlay = document.getElementById('loading-overlay')!;
+    loadingOverlay.classList.remove('hidden');
+  }
+
+  private hideLoadingOverlay(): void {
+    const loadingOverlay = document.getElementById('loading-overlay')!;
+    loadingOverlay.classList.add('hidden');
+  }
+
   private setupWordRendererCallbacks(): void {
     this.wordRenderer.onTagClick = (tag: string) => this.loadAssociatedWords(tag);
     this.wordRenderer.onSynonymClick = (synonym: string) => this.loadAssociatedWords(synonym);
@@ -64,13 +74,48 @@ export class EverEtchApp {
 
   private async initializeApp(): Promise<void> {
     try {
-      // Load profiles
+      // Load profiles first
       console.log('Loading profiles...');
       await this.profileService.loadProfiles();
       console.log('Loaded profiles:', this.profileService.getProfiles());
 
-      // Load words for current profile
-      await this.loadWords();
+      // Check if there's a last opened profile and switch to it with loading overlay
+      const currentProfile = this.profileService.getCurrentProfile();
+      if (currentProfile) {
+        console.log('Switching to last opened profile:', currentProfile);
+
+        // Show loading overlay
+        this.showLoadingOverlay();
+
+        try {
+          // Switch to the last opened profile
+          const success = await this.profileService.switchProfile(currentProfile);
+          if (success) {
+            console.log('Successfully switched to profile:', currentProfile);        
+            // Load words for the switched profile
+            await this.loadWords();
+          } else {            
+            console.error('Failed to switch to profile:', currentProfile);
+            this.toastManager.showError('Failed to load last opened profile');
+            // Still try to load words with whatever profile is current
+            await this.loadWords();
+          }
+        } catch (error) {
+          console.error('Error switching to profile:', error);
+          this.toastManager.showError('Failed to load last opened profile');
+          // Still try to load words
+          await this.loadWords();
+        } finally {
+          setTimeout(() => {
+            // Hide loading overlay
+            this.hideLoadingOverlay();
+          }, 500);
+        }
+      } else {
+        // No current profile, just load words
+        console.log('No current profile found, loading words...');
+        await this.loadWords();
+      }
 
       // Set up event listeners
       this.setupEventListeners();
@@ -250,10 +295,28 @@ export class EverEtchApp {
       const target = e.target as HTMLSelectElement;
       const newProfile = target.value;
       if (newProfile && newProfile !== this.profileService.getCurrentProfile()) {
-        const success = await this.profileService.switchProfile(newProfile);
-        if (success) {
-          this.resetUIForProfileSwitch();
-          await this.loadWords();
+        // Show loading overlay
+        this.showLoadingOverlay();
+
+        // Disable profile select during switching
+        profileSelect.disabled = true;
+
+        try {
+          const success = await this.profileService.switchProfile(newProfile);
+          if (success) {
+            this.resetUIForProfileSwitch();
+            await this.loadWords();
+          } else {
+            this.toastManager.showError('Failed to switch profile');
+          }
+        } catch (error) {
+          console.error('Error switching profile:', error);
+          this.toastManager.showError('Failed to switch profile');
+        } finally {
+          setTimeout(() => {
+              this.hideLoadingOverlay();
+              profileSelect.disabled = false;
+            }, 500);
         }
       }
     });
