@@ -231,7 +231,7 @@ export class DatabaseManager {
               json_extract(data, '$.one_line_desc') as one_line_desc
             FROM documents
             WHERE type = 'word'
-            ORDER BY updated_at DESC, created_at DESC
+            ORDER BY created_at DESC, updated_at DESC
             LIMIT ${limit} OFFSET ${offset}
           `;
 
@@ -492,8 +492,8 @@ export class DatabaseManager {
     });
   }
 
-  // Tag operations
-  getAssociatedWords(tag: string): Promise<WordDocument[]> {
+  // Tag operations - optimized to only fetch required fields
+  getAssociatedWords(tag: string): Promise<WordListItem[]> {
     return new Promise((resolve, reject) => {
       if (!this.db) {
         resolve([]);
@@ -502,20 +502,29 @@ export class DatabaseManager {
 
       // Use json_each for efficient array searching with case-insensitive comparison
       const sql = `
-        SELECT DISTINCT d.data
+        SELECT DISTINCT
+          d.id,
+          json_extract(d.data, '$.word') as word,
+          json_extract(d.data, '$.one_line_desc') as one_line_desc
         FROM documents d, json_each(d.data, '$.tags') as t
         WHERE d.type = 'word' AND LOWER(t.value) = LOWER(?)
         ORDER BY json_extract(d.data, '$.word')
       `;
 
-      this.db.all(sql, [tag], (err, rows: { data: string }[]) => {
+      this.db.all(sql, [tag], (err, rows: { id: string, word: string, one_line_desc: string }[]) => {
         if (err) {
           // Fallback to LIKE search if json_each fails
           console.warn('JSON array search failed, falling back to LIKE search:', err);
           this.fallbackGetAssociatedWords(tag).then(resolve).catch(reject);
           return;
         }
-        resolve(rows.map(row => JSON.parse(row.data)));
+
+        const words: WordListItem[] = rows.map(row => ({
+          id: row.id,
+          word: row.word,
+          one_line_desc: row.one_line_desc || 'No description'
+        }));
+        resolve(words);
       });
     });
   }
@@ -752,7 +761,7 @@ export class DatabaseManager {
   /**
    * Fallback method for tag search using LIKE with case-insensitive comparison
    */
-  private fallbackGetAssociatedWords(tag: string): Promise<WordDocument[]> {
+  private fallbackGetAssociatedWords(tag: string): Promise<WordListItem[]> {
     return new Promise((resolve, reject) => {
       if (!this.db) {
         resolve([]);
@@ -760,14 +769,25 @@ export class DatabaseManager {
       }
 
       this.db.all(
-        `SELECT data FROM documents WHERE type = 'word' AND LOWER(json_extract(data, '$.tags')) LIKE LOWER(?) ORDER BY json_extract(data, '$.word')`,
+        `SELECT
+          id,
+          json_extract(data, '$.word') as word,
+          json_extract(data, '$.one_line_desc') as one_line_desc
+        FROM documents WHERE type = 'word' AND LOWER(json_extract(data, '$.tags')) LIKE LOWER(?)
+        ORDER BY json_extract(data, '$.word')`,
         [`%${tag}%`],
-        (err, rows: { data: string }[]) => {
+        (err, rows: { id: string, word: string, one_line_desc: string }[]) => {
           if (err) {
             reject(err);
             return;
           }
-          resolve(rows.map(row => JSON.parse(row.data)));
+
+          const words: WordListItem[] = rows.map(row => ({
+            id: row.id,
+            word: row.word,
+            one_line_desc: row.one_line_desc || 'No description'
+          }));
+          resolve(words);
         }
       );
     });
