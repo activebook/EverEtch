@@ -103,7 +103,7 @@ const WORD_METAS_TOOL_PARAMETERS = {
 
 // Provider interface for different AI services
 export interface AIProvider {
-  generateWordMeaning(word: string, profile: ProfileConfig, onStreamingContent?: (content: string) => void): Promise<string>;
+  generateWordMeaning(word: string, profile: ProfileConfig, onWordMeaningStreaming?: (content: string) => void): Promise<string>;
   generateWordMetas(word: string, meaning: string, profile: ProfileConfig): Promise<ProcessedToolData>;
   getAvailableModels?(profile: ProfileConfig): Promise<string[]>;
 }
@@ -112,7 +112,7 @@ export interface AIProvider {
 export class OpenAIProvider implements AIProvider {
   private openai: OpenAI | null = null;
 
-  async generateWordMeaning(word: string, profile: ProfileConfig, onStreamingContent?: (content: string) => void): Promise<string> {
+  async generateWordMeaning(word: string, profile: ProfileConfig, onWordMeaningStreaming?: (content: string) => void): Promise<string> {
     if (!profile.model_config.api_key) {
       throw new Error('API key not configured for this profile');
     }
@@ -148,8 +148,8 @@ export class OpenAIProvider implements AIProvider {
         if (delta?.content) {
           fullContent += delta.content;
           // Emit streaming content to renderer
-          if (onStreamingContent) {
-            onStreamingContent(delta.content);
+          if (onWordMeaningStreaming) {
+            onWordMeaningStreaming(delta.content);
           }
         }
       }
@@ -247,7 +247,7 @@ export class OpenAIProvider implements AIProvider {
 export class GeminiProvider implements AIProvider {
   private genAI: GoogleGenAI | null = null;
 
-  async generateWordMeaning(word: string, profile: ProfileConfig, onStreamingContent?: (content: string) => void): Promise<string> {
+  async generateWordMeaning(word: string, profile: ProfileConfig, onWordMeaningStreaming?: (content: string) => void): Promise<string> {
     if (!profile.model_config.api_key) {
       throw new Error('API key not configured for this profile');
     }
@@ -273,9 +273,9 @@ export class GeminiProvider implements AIProvider {
       for await (const chunk of responseStream) {
         if (chunk.text) {
           fullContent += chunk.text;
-          if (onStreamingContent) {
+          if (onWordMeaningStreaming) {
             // Emit streaming content to renderer
-            onStreamingContent(chunk.text);
+            onWordMeaningStreaming(chunk.text);
           }
         }
       }
@@ -442,9 +442,9 @@ function createProvider(profile: ProfileConfig): AIProvider {
 
 // Main AIModelClient that delegates to appropriate provider
 export class AIModelClient {
-  async generateWordMeaning(word: string, profile: ProfileConfig, onStreamingContent?: (content: string) => void): Promise<string> {
+  async generateWordMeaning(word: string, profile: ProfileConfig, onWordMeaningStreaming?: (content: string) => void): Promise<string> {
     const provider = createProvider(profile);
-    return provider.generateWordMeaning(word, profile, onStreamingContent);
+    return provider.generateWordMeaning(word, profile, onWordMeaningStreaming);
   }
 
   async generateWordMetas(word: string, meaning: string, profile: ProfileConfig): Promise<ProcessedToolData> {

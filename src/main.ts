@@ -114,11 +114,11 @@ ipcMain.handle('generate-word-meaning', async (event, word: string) => {
   if (!profile) return null;
 
   // Set up streaming callback to send content to renderer
-  const onStreamingContent = (content: string) => {
-    mainWindow.webContents.send('streaming-content', content);
+  const onWordMeaningStreaming = (content: string) => {
+    mainWindow.webContents.send('word-meaning-streaming', content);
   };
 
-  const meaning = await aiClient.generateWordMeaning(word, profile, onStreamingContent);
+  const meaning = await aiClient.generateWordMeaning(word, profile, onWordMeaningStreaming);
   return meaning;
 });
 

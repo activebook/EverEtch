@@ -26,7 +26,7 @@ declare global {
       exportProfile: () => Promise<any>;
       importProfile: () => Promise<any>;
 
-      onStreamingContent: (callback: Function) => void;
+      onWordMeaningStreaming: (callback: Function) => void;
       onWordMetadataReady: (callback: Function) => void;
       removeAllListeners: (event: string) => void;
     };
@@ -304,14 +304,14 @@ class EverEtchApp {
   }
 
   private setupEventListeners() {
-    // Set up streaming content listener
-    window.electronAPI.onStreamingContent((content: string) => {
-      this.handleStreamingContent(content);
+    // Set up word meaning streaming listener
+    window.electronAPI.onWordMeaningStreaming((content: string) => {
+      this.handleWordMeaningStreaming(content);
     });
 
     // Set up word metadata ready listener
-    window.electronAPI.onWordMetadataReady((toolData: any) => {
-      this.handleWordMetadataReady(toolData);
+    window.electronAPI.onWordMetadataReady((wordMeta: any) => {
+      this.handleWordMetadataReady(wordMeta);
     });
 
     // Profile selector
@@ -1685,7 +1685,7 @@ class EverEtchApp {
     this.showToast(message, 'success');
   }
 
-  private handleStreamingContent(content: string) {
+  private handleWordMeaningStreaming(content: string) {
     this.streamingContent += content;
     if (this.currentWord && this.currentWord.id === 'temp') {
       const streamingWord = { ...this.currentWord, details: this.streamingContent };
@@ -1700,19 +1700,19 @@ class EverEtchApp {
     }
   }
 
-  private handleWordMetadataReady(toolData: any) {
-    console.log('📨 Renderer: Received tool result event:', toolData);
+  private handleWordMetadataReady(wordMeta: any) {
+    console.log('📨 Renderer: Received tool result event:', wordMeta);
     console.log('📨 Renderer: Current generation ID:', this.currentGenerationId);
-    console.log('📨 Renderer: Tool data generation ID:', toolData?.generationId);
+    console.log('📨 Renderer: Tool data generation ID:', wordMeta?.generationId);
 
-    // Defensive checks: ensure toolData is valid
-    if (!toolData) {
-      console.error('❌ Renderer: Received null/undefined toolData');
+    // Defensive checks: ensure wordMeta is valid
+    if (!wordMeta) {
+      console.error('❌ Renderer: Received null/undefined wordMeta');
       return;
     }
 
-    if (!toolData.generationId || typeof toolData.generationId !== 'string') {
-      console.error('❌ Renderer: Invalid generationId in toolData:', toolData.generationId);
+    if (!wordMeta.generationId || typeof wordMeta.generationId !== 'string') {
+      console.error('❌ Renderer: Invalid generationId in wordMeta:', wordMeta.generationId);
       return;
     }
 
@@ -1723,7 +1723,7 @@ class EverEtchApp {
 
     // CRITICAL: Only process tool results for the current generation
     // This prevents old tool results from updating the current word
-    if (toolData.generationId === this.currentGenerationId) {
+    if (wordMeta.generationId === this.currentGenerationId) {
       console.log('✅ Renderer: Processing tool result for current generation');
 
       // Double-check that this tool result is for the current word
@@ -1732,25 +1732,25 @@ class EverEtchApp {
         console.log('✅ Renderer: Current word is temp, proceeding with update');
 
         // Update the current word with tool data
-        if (toolData.summary) {
-          console.log('📝 Renderer: Updating summary:', toolData.summary);
-          this.currentWord.one_line_desc = toolData.summary;
+        if (wordMeta.summary) {
+          console.log('📝 Renderer: Updating summary:', wordMeta.summary);
+          this.currentWord.one_line_desc = wordMeta.summary;
         }
-        if (toolData.tags) {
-          console.log('🏷️ Renderer: Updating tags:', toolData.tags);
-          this.currentWord.tags = toolData.tags;
+        if (wordMeta.tags) {
+          console.log('🏷️ Renderer: Updating tags:', wordMeta.tags);
+          this.currentWord.tags = wordMeta.tags;
         }
-        if (toolData.tag_colors) {
-          console.log('🎨 Renderer: Updating tag colors:', toolData.tag_colors);
-          this.currentWord.tag_colors = toolData.tag_colors;
+        if (wordMeta.tag_colors) {
+          console.log('🎨 Renderer: Updating tag colors:', wordMeta.tag_colors);
+          this.currentWord.tag_colors = wordMeta.tag_colors;
         }
-        if (toolData.synonyms) {
-          console.log('🔄 Renderer: Updating synonyms:', toolData.synonyms);
-          this.currentWord.synonyms = toolData.synonyms;
+        if (wordMeta.synonyms) {
+          console.log('🔄 Renderer: Updating synonyms:', wordMeta.synonyms);
+          this.currentWord.synonyms = wordMeta.synonyms;
         }
-        if (toolData.antonyms) {
-          console.log('🔄 Renderer: Updating antonyms:', toolData.antonyms);
-          this.currentWord.antonyms = toolData.antonyms;
+        if (wordMeta.antonyms) {
+          console.log('🔄 Renderer: Updating antonyms:', wordMeta.antonyms);
+          this.currentWord.antonyms = wordMeta.antonyms;
         }
 
         console.log('🔄 Renderer: Re-rendering word details');
@@ -1764,7 +1764,7 @@ class EverEtchApp {
       }
     } else {
       console.log('❌ Renderer: Ignoring tool result - generation ID mismatch');
-      console.log('❌ Renderer: Expected:', this.currentGenerationId, 'Got:', toolData.generationId);
+      console.log('❌ Renderer: Expected:', this.currentGenerationId, 'Got:', wordMeta.generationId);
       console.log('❌ Renderer: Current word ID:', this.currentWord?.id);
     }
   }
