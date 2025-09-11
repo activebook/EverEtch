@@ -20,6 +20,7 @@ declare global {
       generateMeaning: (word: string) => Promise<string>;
       getAssociatedWords: (tag: string) => Promise<any[]>;
       getAssociatedWordsPaginated: (tag: string, offset: number, limit: number) => Promise<{ words: any[], hasMore: boolean, total: number }>;
+      getRelatedWords: (searchTerm: string) => Promise<any[]>;
       getProfileConfig: () => Promise<any>;
       updateProfileConfig: (config: any) => Promise<boolean>;
       processMarkdown: (markdown: string) => Promise<string>;
@@ -1109,13 +1110,13 @@ class EverEtchApp {
       synonymEl.addEventListener('click', async (e) => {
         const target = e.target as HTMLElement;
         const synonym = target.textContent!.trim();
-        // Set the input field to the synonym and trigger search
+        // Set the input field to the synonym and show related words
         const wordInput = document.getElementById('word-input') as HTMLInputElement;
         wordInput.value = synonym;
         this.updateGenerateBtnState(synonym);
-        // Trigger search if synonym exists
+        // Show related words if synonym exists
         if (synonym.length > 0) {
-          this.handleSearchInput(synonym);
+          await this.loadRelatedWords(synonym);
         }
       });
     });
@@ -1126,13 +1127,13 @@ class EverEtchApp {
       antonymEl.addEventListener('click', async (e) => {
         const target = e.target as HTMLElement;
         const antonym = target.textContent!.trim();
-        // Set the input field to the antonym and trigger search
+        // Set the input field to the antonym and show related words
         const wordInput = document.getElementById('word-input') as HTMLInputElement;
         wordInput.value = antonym;
         this.updateGenerateBtnState(antonym);
-        // Trigger search if antonym exists
+        // Show related words if antonym exists
         if (antonym.length > 0) {
-          this.handleSearchInput(antonym);
+          await this.loadRelatedWords(antonym);
         }
       });
     });
@@ -1247,6 +1248,58 @@ class EverEtchApp {
     }, 100);
   }
 
+  private async loadRelatedWords(searchTerm: string) {
+    // Clean up existing observer first
+    if (this.associatedScrollObserver) {
+      this.associatedScrollObserver.disconnect();
+      this.associatedScrollObserver = null;
+    }
+
+    // Reset associated words pagination state
+    this.associatedWords = [];
+    this.associatedCurrentOffset = 0;
+    this.associatedHasMore = false; // Related words don't use pagination for now
+    this.associatedIsLoading = false;
+    this.currentTag = searchTerm;
+
+    // Clear the associated list DOM
+    const associatedList = document.getElementById('associated-list')!;
+    associatedList.innerHTML = '';
+
+    // Load related words
+    await this.loadRelatedWordsData(searchTerm);
+  }
+
+  private async loadRelatedWordsData(searchTerm: string) {
+    this.associatedIsLoading = true;
+    this.showAssociatedLoadingIndicator();
+
+    try {
+      const words: WordDocument[] = await window.electronAPI.getRelatedWords(searchTerm);
+
+      // Filter out duplicates based on word ID
+      const existingIds = new Set(this.associatedWords.map(word => word.id));
+      const newWords = words.filter(word => !existingIds.has(word.id));
+
+      // Add new words to our collection
+      this.associatedWords.push(...newWords);
+
+      // Render the words using the existing associated list method
+      if (newWords.length > 0) {
+        this.renderAssociatedList(newWords, searchTerm);
+      }
+
+      // Update associated count
+      this.updateAssociatedCount(words.length);
+    } catch (error) {
+      console.error('Error loading related words:', error);
+      this.showError('Failed to load related words');
+    } finally {
+      this.associatedIsLoading = false;
+      this.updateAssociatedLoadingIndicator();
+    }
+  }
+
   private async loadMoreAssociatedWords() {
     if (this.associatedIsLoading || !this.associatedHasMore) {
       return;
@@ -1290,29 +1343,35 @@ class EverEtchApp {
 
   private renderAssociatedList(words: WordDocument[], tag: string) {
     const associatedList = document.getElementById('associated-list')!;
-    associatedList.innerHTML = `
-      <div class="mb-4 p-3 bg-gradient-to-r from-purple-50/80 to-pink-50/80 rounded-lg border border-purple-200/60">
-        <h4 class="font-semibold text-slate-800 flex items-center text-sm">
-          <svg class="w-3 h-3 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
-          </svg>
-          Words tagged with "${tag}"
-        </h4>
-      </div>
-    `;
+    const isRelatedWords = this.currentTag !== tag; // If currentTag != tag, it's related words
 
+    // Only show header for actual tags, not for related words
+    // if (!isRelatedWords) {
+    //   const headerText = `Words tagged with "${tag}"`;
+    //   const headerIcon = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>`;
+    //   const headerColor = 'text-purple-500';
+    //   const bgGradient = 'from-purple-50/80 to-pink-50/80';
+    //   const borderColor = 'border-purple-200/60';
+
+    //   associatedList.innerHTML = `
+    //     <div class="mb-4 p-3 bg-gradient-to-r ${bgGradient} rounded-lg border ${borderColor}">
+    //       <h4 class="font-semibold text-slate-800 flex items-center text-sm">
+    //         <svg class="w-3 h-3 mr-2 ${headerColor}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    //           ${headerIcon}
+    //         </svg>
+    //         ${headerText}
+    //       </h4>
+    //     </div>
+    //   `;
+    // } else {
+    //   // For related words, just clear and start fresh without header
+    //   associatedList.innerHTML = '';
+    // }
+
+    associatedList.innerHTML = '';
+    
     words.forEach(word => {
-      const wordItem = document.createElement('div');
-      wordItem.className = 'word-item p-3 mb-2 bg-amber-50/60 backdrop-blur-sm border border-amber-200/60 rounded-lg shadow-sm hover:bg-amber-100/70 hover:border-amber-300/70 transition-all duration-200';
-      wordItem.innerHTML = `
-        <div class="font-semibold text-slate-800 text-base mb-0.5">${word.word}</div>
-        <div class="text-sm text-slate-600 line-clamp-2">${word.one_line_desc || 'No description'}</div>
-      `;
-
-      wordItem.addEventListener('click', () => {
-        this.selectWord(word);
-      });
-
+      const wordItem = this.createWordItem(word);
       associatedList.appendChild(wordItem);
     });
 
@@ -1332,6 +1391,8 @@ class EverEtchApp {
     // Always update the loading indicator state
     this.updateAssociatedLoadingIndicator();
   }
+
+
 
   private selectWord(word: WordDocument) {
     // Prevent selecting a word while generation is in progress
@@ -2155,34 +2216,7 @@ class EverEtchApp {
     }
 
     newWords.forEach(word => {
-      const wordItem = document.createElement('div');
-      wordItem.className = 'word-item p-1.5 mb-0.5 cursor-pointer transition-all duration-200 hover:bg-amber-50/20 relative';
-      wordItem.setAttribute('data-word-id', word.id); // Add data attribute for scrolling
-      wordItem.innerHTML = `
-        <div class="font-semibold text-slate-800 text-base mb-0.5">${word.word}</div>
-        <div class="text-sm text-slate-500 line-clamp-2">${word.one_line_desc || 'No description'}</div>
-        <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-amber-200/60 via-amber-300/80 to-amber-200/60 opacity-0 transition-opacity duration-200"></div>
-      `;
-
-      wordItem.addEventListener('click', () => {
-        this.selectWord(word);
-      });
-
-      // Add hover effect for underline
-      wordItem.addEventListener('mouseenter', () => {
-        const underline = wordItem.querySelector('div:last-child') as HTMLElement;
-        if (underline) {
-          underline.style.opacity = '1';
-        }
-      });
-
-      wordItem.addEventListener('mouseleave', () => {
-        const underline = wordItem.querySelector('div:last-child') as HTMLElement;
-        if (underline) {
-          underline.style.opacity = '0.0';
-        }
-      });
-
+      const wordItem = this.createWordItem(word);
       // Insert before loading indicator
       associatedList.insertBefore(wordItem, loadingIndicator);
     });

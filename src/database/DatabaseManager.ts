@@ -461,6 +461,111 @@ export class DatabaseManager {
     });
   }
 
+  // Comprehensive search for related words (searches across all fields)
+  getRelatedWords(searchTerm: string): Promise<WordDocument[]> {
+    return new Promise((resolve, reject) => {
+      if (!this.db) {
+        resolve([]);
+        return;
+      }
+
+      // Search across word, tags, synonyms, antonyms, and description fields
+      const sql = `
+        SELECT DISTINCT d.data,
+               CASE
+                 WHEN LOWER(json_extract(d.data, '$.word')) = LOWER(?) THEN 1  -- Exact word match (highest priority)
+                 WHEN LOWER(json_extract(d.data, '$.word')) LIKE LOWER(?) THEN 2  -- Word starts with term
+                 ELSE 3  -- Other matches
+               END as priority
+        FROM documents d
+        WHERE d.type = 'word' AND (
+          -- Exact word match
+          LOWER(json_extract(d.data, '$.word')) = LOWER(?)
+          -- Word contains term
+          OR LOWER(json_extract(d.data, '$.word')) LIKE LOWER(?)
+          -- Tags contain term
+          OR EXISTS (SELECT 1 FROM json_each(d.data, '$.tags') WHERE LOWER(value) = LOWER(?))
+          -- Synonyms contain term
+          OR EXISTS (SELECT 1 FROM json_each(d.data, '$.synonyms') WHERE LOWER(value) = LOWER(?))
+          -- Antonyms contain term
+          OR EXISTS (SELECT 1 FROM json_each(d.data, '$.antonyms') WHERE LOWER(value) = LOWER(?))
+          -- Description contains term
+          OR LOWER(json_extract(d.data, '$.one_line_desc')) LIKE LOWER(?)
+          -- Details contain term
+          OR LOWER(json_extract(d.data, '$.details')) LIKE LOWER(?)
+        )
+        ORDER BY priority, json_extract(d.data, '$.word')
+        LIMIT 20
+      `;
+
+      const searchPattern = `%${searchTerm}%`;
+      const params = [
+        searchTerm,      // exact word match priority
+        `${searchTerm}%`, // word starts with priority
+        searchTerm,      // exact word match
+        searchPattern,   // word contains
+        searchTerm,      // tags contain
+        searchTerm,      // synonyms contain
+        searchTerm,      // antonyms contain
+        searchPattern,   // description contains
+        searchPattern    // details contain
+      ];
+
+      this.db.all(sql, params, (err, rows: { data: string }[]) => {
+        if (err) {
+          console.warn('Comprehensive search failed, falling back to simple search:', err);
+          this.fallbackGetRelatedWords(searchTerm).then(resolve).catch(reject);
+          return;
+        }
+        resolve(rows.map(row => JSON.parse(row.data)));
+      });
+    });
+  }
+
+  /**
+   * Fallback method for comprehensive search using simpler LIKE queries
+   */
+  private fallbackGetRelatedWords(searchTerm: string): Promise<WordDocument[]> {
+    return new Promise((resolve, reject) => {
+      if (!this.db) {
+        resolve([]);
+        return;
+      }
+
+      const searchPattern = `%${searchTerm}%`;
+      const sql = `
+        SELECT DISTINCT data FROM documents
+        WHERE type = 'word' AND (
+          LOWER(json_extract(data, '$.word')) LIKE LOWER(?)
+          OR LOWER(json_extract(data, '$.tags')) LIKE LOWER(?)
+          OR LOWER(json_extract(data, '$.synonyms')) LIKE LOWER(?)
+          OR LOWER(json_extract(data, '$.antonyms')) LIKE LOWER(?)
+          OR LOWER(json_extract(data, '$.one_line_desc')) LIKE LOWER(?)
+          OR LOWER(json_extract(data, '$.details')) LIKE LOWER(?)
+        )
+        ORDER BY json_extract(data, '$.word')
+        LIMIT 20
+      `;
+
+      const params = [
+        searchPattern, // word
+        searchPattern, // tags
+        searchPattern, // synonyms
+        searchPattern, // antonyms
+        searchPattern, // description
+        searchPattern  // details
+      ];
+
+      this.db.all(sql, params, (err, rows: { data: string }[]) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        resolve(rows.map(row => JSON.parse(row.data)));
+      });
+    });
+  }
+
   /**
    * Fallback method for tag search using LIKE with case-insensitive comparison
    */
