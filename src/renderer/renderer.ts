@@ -539,6 +539,14 @@ class EverEtchApp {
       tempWord.tag_colors = { 'Analyzing word...': '#6b7280' };
       this.renderWordDetails(tempWord);
 
+      // Auto-scroll to bottom to show the "Analyzing word..." loading state
+      setTimeout(() => {
+        const wordDetails = document.getElementById('word-details');
+        if (wordDetails && wordDetails.parentElement) {
+          wordDetails.parentElement.scrollTop = wordDetails.parentElement.scrollHeight;
+        }
+      }, 100);
+
       // Second call: Generate tags and summary using the meaning
       try {
         console.log('Starting generateWordMetas call...');
