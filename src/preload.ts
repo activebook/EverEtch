@@ -31,6 +31,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getProfileConfig: () => ipcRenderer.invoke('get-profile-config'),
   updateProfileConfig: (config: any) => ipcRenderer.invoke('update-profile-config', config),
 
+  // UI state
+  getUIState: () => ipcRenderer.invoke('get-ui-state'),
+  savePanelWidths: (widths: { left: number; middle: number; right: number }) => ipcRenderer.invoke('save-panel-widths', widths),
+
   // Markdown processing
   processMarkdown: (markdown: string) => ipcRenderer.invoke('process-markdown', markdown),
 

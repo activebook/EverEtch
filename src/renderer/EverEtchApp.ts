@@ -120,6 +120,9 @@ export class EverEtchApp {
       // Set up event listeners
       this.setupEventListeners();
 
+      // Load saved panel widths
+      await this.uiUtils.loadPanelWidths();
+
     } catch (error) {
       console.error('Error initializing app:', error);
       this.toastManager.showError('Failed to initialize application');
@@ -936,6 +939,9 @@ export class EverEtchApp {
 
     this.uiUtils.updateWordCount(0);
     this.uiUtils.updateAssociatedCount(0);
+
+    // Reload panel widths for the new profile
+    this.uiUtils.loadPanelWidths();
   }
 
   private handleWordMeaningStreaming(content: string): void {

@@ -2,10 +2,25 @@ import * as fs from 'fs';
 import { DatabaseManager, ProfileConfig } from './DatabaseManager.js';
 import { getProfilesPath, getDatabasePath, ensureDataDirectory, generateId, formatDate } from '../utils/utils.js';
 
+export interface UIState {
+  window_bounds?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  panel_widths?: {
+    left: number;
+    middle: number;
+    right: number;
+  };
+}
+
 export class ProfileManager {
   private dbManager: DatabaseManager;
   private profiles: string[] = [];
   private currentProfile: string | null = null;
+  private uiState: UIState = {};
   private profilesPath: string;
 
   constructor(dbManager: DatabaseManager) {
@@ -21,6 +36,7 @@ export class ProfileManager {
         const profilesData = JSON.parse(data);
         this.profiles = profilesData.profiles || [];
         this.currentProfile = profilesData.currentProfile || null;
+        this.uiState = profilesData.ui_state || {};
       } else {
         // Create default profile
         await this.createProfile('Default');
@@ -31,6 +47,7 @@ export class ProfileManager {
       console.error('Error loading profiles:', error);
       this.profiles = [];
       this.currentProfile = null;
+      this.uiState = {};
     }
     return [...this.profiles];
   }
@@ -39,7 +56,8 @@ export class ProfileManager {
     try {
       const data = {
         profiles: this.profiles,
-        currentProfile: this.currentProfile
+        currentProfile: this.currentProfile,
+        ui_state: this.uiState
       };
       fs.writeFileSync(this.profilesPath, JSON.stringify(data, null, 2));
     } catch (error) {
@@ -252,5 +270,25 @@ export class ProfileManager {
     this.profiles.push(profileName);
     this.saveProfiles();
     return true;
+  }
+
+  // UI State management methods
+  getUIState(): UIState {
+    return { ...this.uiState };
+  }
+
+  saveUIState(uiState: Partial<UIState>): void {
+    this.uiState = { ...this.uiState, ...uiState };
+    this.saveProfiles();
+  }
+
+  saveWindowBounds(bounds: { x: number; y: number; width: number; height: number }): void {
+    this.uiState.window_bounds = bounds;
+    this.saveProfiles();
+  }
+
+  savePanelWidths(widths: { left: number; middle: number; right: number }): void {
+    this.uiState.panel_widths = widths;
+    this.saveProfiles();
   }
 }
