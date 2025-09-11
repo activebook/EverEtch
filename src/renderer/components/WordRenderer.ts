@@ -5,10 +5,16 @@ import { ToastManager } from './ToastManager.js';
 export class WordRenderer {
   private wordService: WordService;
   private toastManager: ToastManager;
+  private isCurrentlyGenerating: boolean = false;
 
   constructor(wordService: WordService, toastManager: ToastManager) {
     this.wordService = wordService;
     this.toastManager = toastManager;
+  }
+
+  // Method to update generation state from main app
+  setGenerationState(isGenerating: boolean): void {
+    this.isCurrentlyGenerating = isGenerating;
   }
 
   createWordItem(word: WordListItem): HTMLElement {
@@ -457,6 +463,23 @@ export class WordRenderer {
     });
   }
 
+  renderAssociatedWordListIncremental(newWords: WordListItem[]): void {
+    const associatedList = document.getElementById('associated-list')!;
+
+    // Find the loading indicator if it exists
+    const loadingIndicator = document.getElementById('associated-loading-indicator');
+
+    newWords.forEach(word => {
+      const wordItem = this.createWordItemFromList(word);
+      // Insert before loading indicator if it exists, otherwise append
+      if (loadingIndicator && associatedList.contains(loadingIndicator)) {
+        associatedList.insertBefore(wordItem, loadingIndicator);
+      } else {
+        associatedList.appendChild(wordItem);
+      }
+    });
+  }
+
   renderWordItemAtTop(word: WordDocument): void {
     const wordList = document.getElementById('word-list')!;
 
@@ -502,8 +525,7 @@ export class WordRenderer {
   }
 
   private isGenerating(): boolean {
-    // This will be checked by the main app
-    return false;
+    return this.isCurrentlyGenerating;
   }
 
   private showSuggestions(): void {
