@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getWord: (wordId: string) => ipcRenderer.invoke('get-word', wordId),
   addWord: (wordData: any) => ipcRenderer.invoke('add-word', wordData),
   updateWord: (wordId: string, wordData: any) => ipcRenderer.invoke('update-word', wordId, wordData),
+  updateWordRemark: (wordId: string, remark: string) => ipcRenderer.invoke('update-word-remark', wordId, remark),
   deleteWord: (wordId: string) => ipcRenderer.invoke('delete-word', wordId),
 
   // AI operations
