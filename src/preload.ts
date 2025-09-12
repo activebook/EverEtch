@@ -13,7 +13,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   deleteProfile: (profileName: string) => ipcRenderer.invoke('delete-profile', profileName),
 
   // Word operations
-  getWordsPaginated: (offset: number, limit: number) => ipcRenderer.invoke('get-words-paginated', offset, limit),
+  getWordsPaginated: (offset: number, limit: number, sortOrder?: 'asc' | 'desc') => ipcRenderer.invoke('get-words-paginated', offset, limit, sortOrder),
   searchWords: (query: string) => ipcRenderer.invoke('search-words', query),
   getWord: (wordId: string) => ipcRenderer.invoke('get-word', wordId),
   getWordByName: (wordName: string) => ipcRenderer.invoke('get-word-by-name', wordName),
@@ -41,6 +41,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Store operations
   loadPanelWidths: () => ipcRenderer.invoke('load-panel-widths'),
   savePanelWidths: (widths: any) => ipcRenderer.invoke('save-panel-widths', widths),
+  loadSortOrder: () => ipcRenderer.invoke('load-sort-order'),
+  saveSortOrder: (sortOrder: 'asc' | 'desc') => ipcRenderer.invoke('save-sort-order', sortOrder),
 
   // Profile import/export
   exportProfile: () => ipcRenderer.invoke('export-profile'),
