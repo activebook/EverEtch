@@ -38,6 +38,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Markdown processing
   processMarkdown: (markdown: string) => ipcRenderer.invoke('process-markdown', markdown),
 
+  // Store operations
+  loadPanelWidths: () => ipcRenderer.invoke('load-panel-widths'),
+  savePanelWidths: (widths: any) => ipcRenderer.invoke('save-panel-widths', widths),
+
   // Profile import/export
   exportProfile: () => ipcRenderer.invoke('export-profile'),
   importProfile: () => ipcRenderer.invoke('import-profile'),
