@@ -28,6 +28,7 @@ export interface WordListItem {
   id: string;
   word: string;
   one_line_desc: string;
+  remark?: string;
 }
 
 export interface ProfileConfig {
@@ -132,19 +133,20 @@ export class DatabaseManager {
         });
 
         // Get paginated data using indexes - only fetch required fields for performance
-        const dataResult = await new Promise<{ id: string, word: string, one_line_desc: string }[]>((resolveData, rejectData) => {
+        const dataResult = await new Promise<{ id: string, word: string, one_line_desc: string, remark: string }[]>((resolveData, rejectData) => {
           const query = `
             SELECT
               id,
               json_extract(data, '$.word') as word,
-              json_extract(data, '$.one_line_desc') as one_line_desc
+              json_extract(data, '$.one_line_desc') as one_line_desc,
+              json_extract(data, '$.remark') as remark
             FROM documents
             WHERE type = 'word'
             ORDER BY created_at DESC, updated_at DESC
             LIMIT ${limit} OFFSET ${offset}
           `;
 
-          this.db!.all(query, (err, rows: { id: string, word: string, one_line_desc: string }[]) => {
+          this.db!.all(query, (err, rows: { id: string, word: string, one_line_desc: string, remark: string }[]) => {
             if (err) {
               rejectData(err);
               return;
@@ -156,7 +158,8 @@ export class DatabaseManager {
         const words: WordListItem[] = dataResult.map(row => ({
           id: row.id,
           word: row.word,
-          one_line_desc: row.one_line_desc || 'No description'
+          one_line_desc: row.one_line_desc || '',
+          remark: row.remark || undefined
         }));
         const total = totalResult.total;
         const hasMore = offset + limit < total;
@@ -182,7 +185,8 @@ export class DatabaseManager {
         SELECT
           id,
           json_extract(data, '$.word') as word,
-          json_extract(data, '$.one_line_desc') as one_line_desc
+          json_extract(data, '$.one_line_desc') as one_line_desc,
+          json_extract(data, '$.remark') as remark
         FROM documents
         WHERE type = 'word'
         AND json_extract(data, '$.word') LIKE ?
@@ -197,7 +201,7 @@ export class DatabaseManager {
       // Prioritize words that start with the query
       const prefixPattern = `${query}%`;
 
-      this.db.all(sql, [searchPattern, prefixPattern], (err, rows: { id: string, word: string, one_line_desc: string }[]) => {
+      this.db.all(sql, [searchPattern, prefixPattern], (err, rows: { id: string, word: string, one_line_desc: string, remark: string }[]) => {
         if (err) {
           reject(err);
           return;
@@ -206,7 +210,8 @@ export class DatabaseManager {
         const words: WordListItem[] = rows.map(row => ({
           id: row.id,
           word: row.word,
-          one_line_desc: row.one_line_desc || 'No description'
+          one_line_desc: row.one_line_desc || 'No description',
+          remark: row.remark || undefined
         }));
         resolve(words);
       });
@@ -398,12 +403,13 @@ export class DatabaseManager {
         });
 
         // Then get paginated results
-        const dataResult = await new Promise<{ id: string, word: string, one_line_desc: string }[]>((resolveData, rejectData) => {
+        const dataResult = await new Promise<{ id: string, word: string, one_line_desc: string, remark: string }[]>((resolveData, rejectData) => {
           const sql = `
             SELECT
               f.id,
               f.word,
-              f.one_line_desc
+              f.one_line_desc,
+              f.remark
             FROM words_fts f
             WHERE words_fts MATCH ?
             ORDER BY
@@ -423,7 +429,7 @@ export class DatabaseManager {
             `${searchTerm}%`  // word starts with priority
           ];
 
-          this.db!.all(sql, params, (err, rows: { id: string, word: string, one_line_desc: string }[]) => {
+          this.db!.all(sql, params, (err, rows: { id: string, word: string, one_line_desc: string, remark: string }[]) => {
             if (err) {
               rejectData(err);
               return;
@@ -435,7 +441,8 @@ export class DatabaseManager {
         const words: WordListItem[] = dataResult.map(row => ({
           id: row.id,
           word: row.word,
-          one_line_desc: row.one_line_desc || 'No description'
+          one_line_desc: row.one_line_desc || 'No description',
+          remark: row.remark || undefined
         }));
 
         const total = totalResult.total;
@@ -496,12 +503,13 @@ export class DatabaseManager {
         });
 
         // Get paginated results
-        const dataResult = await new Promise<{ id: string, word: string, one_line_desc: string }[]>((resolveData, rejectData) => {
+        const dataResult = await new Promise<{ id: string, word: string, one_line_desc: string, remark: string }[]>((resolveData, rejectData) => {
           const sql = `
             SELECT DISTINCT
               id,
               json_extract(data, '$.word') as word,
-              json_extract(data, '$.one_line_desc') as one_line_desc
+              json_extract(data, '$.one_line_desc') as one_line_desc,
+              json_extract(data, '$.remark') as remark
             FROM documents
             WHERE type = 'word' AND (
               LOWER(json_extract(data, '$.word')) LIKE LOWER(?)
@@ -530,7 +538,7 @@ export class DatabaseManager {
             `${searchTerm}%` // starts with priority
           ];
 
-          this.db!.all(sql, params, (err, rows: { id: string, word: string, one_line_desc: string }[]) => {
+          this.db!.all(sql, params, (err, rows: { id: string, word: string, one_line_desc: string, remark: string }[]) => {
             if (err) {
               rejectData(err);
               return;
@@ -542,7 +550,8 @@ export class DatabaseManager {
         const words: WordListItem[] = dataResult.map(row => ({
           id: row.id,
           word: row.word,
-          one_line_desc: row.one_line_desc || 'No description'
+          one_line_desc: row.one_line_desc || 'No description',
+          remark: row.remark || undefined
         }));
 
         const total = totalResult.total;
