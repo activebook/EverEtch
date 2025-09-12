@@ -39,6 +39,13 @@ Just enter any word and get instant meanings, examples, and related words all po
 - Find words instantly by typing any part of the word
 - Click on tags or related words to discover more
 
+### Importing Words
+- Click the "Import Words" button in the header
+- Select a text file (.txt, .md, or .csv) containing words
+- Each word should be on a separate line
+- The app will automatically import all words and generate their meanings
+- View import progress and results in real-time
+
 ## ⚙️ Settings
 
 ### AI Configuration
