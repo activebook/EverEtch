@@ -93,6 +93,10 @@
                                         d="M.213.342.092.221.11.203.2.294v-.27h.025v.27L.316.203l.018.018zM.4.226v.162a.013.013 0 0 1-.013.013h-.35A.013.013 0 0 1 .024.388V.226H0v.162c0 .021.017.038.038.038h.35A.04.04 0 0 0 .426.388V.226z" />
                                 </svg>
                             </button>
+                            <button id="import-words-btn" title="Import Words from File"
+                                class="p-2 bg-amber-50/60 hover:bg-amber-100/70 text-slate-600 hover:text-slate-700 rounded-lg transition-all duration-200 hover:shadow-md group">                                
+                                <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17.5 12a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11M17 2a2.5 2.5 0 0 1 2.5 2.5v6.813a6.5 6.5 0 0 0-1.5-.294V4.5a1 1 0 0 0-1-1H5.5a1 1 0 0 0-1 1V18h6.519q.061.782.294 1.5H4.5a1 1 0 0 0 1 1h6.232A6.5 6.5 0 0 0 12.81 22H5.5A2.5 2.5 0 0 1 3 19.5v-15A2.5 2.5 0 0 1 5.5 2zm.5 12a.5.5 0 0 0-.5.5V17h-2.504a.5.5 0 0 0 0 1h2.505v2.503a.5.5 0 1 0 1 0V18h2.502a.5.5 0 1 0 0-1H18v-2.5a.5.5 0 0 0-.5-.5M15 5a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zm-.5 1.5h-7v1h7z" fill="#212121"/></svg>
+                            </button>
                             <button id="howto-btn" title="How to Use Guide"
                                 class="p-2 bg-amber-50/60 hover:bg-amber-100/70 text-slate-600 hover:text-slate-700 rounded-lg transition-all duration-200 hover:shadow-md group">
                                 <svg class="w-4 h-4" viewBox="0 0 1.4 1.4" xmlns="http://www.w3.org/2000/svg"><path d="M.672.938C.712.938.731.91.731.872v-.02C.732.775.76.742.854.678c.1-.068.164-.147.164-.26C1.018.242.875.141.697.141.565.141.448.204.398.317A.2.2 0 0 0 .38.394c0 .033.019.057.055.057.03 0 .05-.018.059-.046C.524.294.598.252.693.252c.114 0 .203.064.203.166 0 .084-.052.131-.127.183C.677.665.61.733.61.837v.037c0 .038.021.064.061.064m0 .321a.083.083 0 0 0 .083-.083.083.083 0 0 0-.083-.083.084.084 0 0 0-.084.083c0 .046.038.083.084.083"/></svg>
@@ -348,6 +352,91 @@
                         <button id="close-howto-btn"
                             class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all duration-200 hover:shadow-lg font-medium">
                             Got it!
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Import Words Modal -->
+        <div id="import-words-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden z-50">
+            <div class="flex items-center justify-center min-h-screen p-4">
+                <div class="bg-amber-50/95 backdrop-blur-md rounded-2xl shadow-2xl max-w-md w-full border border-amber-200/60">
+                    <div class="p-5 border-b border-amber-200/60 bg-gradient-to-r from-amber-25/40 to-amber-50/60 rounded-t-2xl">
+                        <h3 class="text-lg font-semibold text-slate-800 flex items-center">
+                            <svg class="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                            </svg>
+                            Import Words from File
+                        </h3>
+                    </div>
+                    <div class="p-5 space-y-4">
+                        <div>
+                            <p class="text-sm text-slate-600 mb-3">
+                                Select a text file (.txt .md or .) containing words to import. Each word should be on a separate line.
+                            </p>
+                            <div class="border-2 border-dashed border-amber-300 rounded-lg p-4 text-center bg-amber-50/50">
+                                <svg class="w-8 h-8 mx-auto mb-2 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                                <p id="import-file-name" class="text-sm text-slate-500">No file selected</p>
+                                <button id="select-import-file" class="mt-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm rounded-lg transition-colors">
+                                    Choose File
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-5 border-t border-amber-200/60 flex justify-end space-x-3 bg-amber-50/50 rounded-b-2xl">
+                        <button id="close-import-modal" class="px-4 py-2 bg-slate-500 hover:bg-slate-600 text-white rounded-lg transition-all duration-200 hover:shadow-lg font-medium text-sm">
+                            Cancel
+                        </button>
+                        <button id="start-import-btn" disabled class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all duration-200 hover:shadow-lg font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                            Start Import
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Import Progress Overlay -->
+        <div id="import-progress-overlay" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden z-[10002] flex items-center justify-center">
+            <div class="bg-amber-50/95 backdrop-blur-md rounded-2xl shadow-2xl max-w-md w-full mx-4 border border-amber-200/60">
+                <div class="p-6">
+                    <div class="text-center mb-6">
+                        <div class="animate-spin rounded-full h-12 w-12 border-b-4 border-amber-500 mx-auto mb-4"></div>
+                        <h3 class="text-lg font-semibold text-slate-800 mb-2">Importing Words...</h3>
+                        <p id="import-progress-text" class="text-sm text-slate-600">Processing words...</p>
+                    </div>
+
+                    <div class="w-full bg-amber-200 rounded-full h-3 mb-6">
+                        <div id="import-progress-bar" class="bg-amber-500 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+
+                    <div class="flex justify-center">
+                        <button id="cancel-import-btn" class="px-6 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all duration-200 hover:shadow-lg font-medium">
+                            Cancel Import
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Import Complete Modal -->
+        <div id="import-complete-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden z-50">
+            <div class="flex items-center justify-center min-h-screen p-4">
+                <div class="bg-amber-50/95 backdrop-blur-md rounded-2xl shadow-2xl max-w-md w-full border border-amber-200/60">
+                    <div class="p-6 text-center">
+                        <div class="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg class="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-slate-800 mb-2">Import Complete!</h3>
+                        <div id="import-complete-message" class="text-sm text-slate-600 mb-6 space-y-1">
+                            <!-- Import message parts will be populated here -->
+                        </div>
+                        <button id="import-complete-ok" class="px-6 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all duration-200 hover:shadow-lg font-medium">
+                            OK
                         </button>
                     </div>
                 </div>
