@@ -49,20 +49,21 @@ export class DatabaseRecovery {
         });
       });
 
-      const expectedTableSchema = 'CREATE VIRTUAL TABLE words_fts USING fts5(id UNINDEXED, word, one_line_desc, tags, synonyms, antonyms, tokenize = \'porter unicode61\')';
+      const expectedTableSchema = 'CREATE VIRTUAL TABLE words_fts USING fts5(id UNINDEXED, word, one_line_desc, tags, synonyms, antonyms, remark, tokenize = \'porter unicode61\')';
 
       const expectedTriggers = {
         words_fts_insert: `CREATE TRIGGER words_fts_insert AFTER INSERT ON documents
               WHEN NEW.type = 'word'
               BEGIN
-                INSERT INTO words_fts(id, word, one_line_desc, tags, synonyms, antonyms)
+                INSERT INTO words_fts(id, word, one_line_desc, tags, synonyms, antonyms, remark)
                 VALUES (
                   NEW.id,
                   json_extract(NEW.data, '$.word'),
                   json_extract(NEW.data, '$.one_line_desc'),
                   json_extract(NEW.data, '$.tags'),
                   json_extract(NEW.data, '$.synonyms'),
-                  json_extract(NEW.data, '$.antonyms')
+                  json_extract(NEW.data, '$.antonyms'),
+                  json_extract(NEW.data, '$.remark')
                 );
               END`,
         words_fts_update: `CREATE TRIGGER words_fts_update AFTER UPDATE ON documents
@@ -73,7 +74,8 @@ export class DatabaseRecovery {
                   one_line_desc = json_extract(NEW.data, '$.one_line_desc'),
                   tags = json_extract(NEW.data, '$.tags'),
                   synonyms = json_extract(NEW.data, '$.synonyms'),
-                  antonyms = json_extract(NEW.data, '$.antonyms')
+                  antonyms = json_extract(NEW.data, '$.antonyms'),
+                  remark = json_extract(NEW.data, '$.remark')
                 WHERE id = NEW.id;
               END`,
         words_fts_delete: `CREATE TRIGGER words_fts_delete AFTER DELETE ON documents
@@ -134,73 +136,6 @@ export class DatabaseRecovery {
   }
 
   /**
-   * Create FTS table and triggers for the first time
-   */
-  private async createFTSTableAndTriggers(): Promise<void> {
-    console.debug('FTS table does not exist, creating...');
-
-    // Clean up any orphaned triggers first
-    await this.dropFTSTriggers();
-
-    const createSql = `
-      CREATE VIRTUAL TABLE words_fts USING fts5(
-        id UNINDEXED,
-        word,
-        one_line_desc,
-        tags,
-        synonyms,
-        antonyms,
-        tokenize = 'porter unicode61'
-      );
-
-      -- Triggers to keep FTS table in sync
-      CREATE TRIGGER words_fts_insert AFTER INSERT ON documents
-      WHEN NEW.type = 'word'
-      BEGIN
-        INSERT INTO words_fts(id, word, one_line_desc, tags, synonyms, antonyms)
-        VALUES (
-          NEW.id,
-          json_extract(NEW.data, '$.word'),
-          json_extract(NEW.data, '$.one_line_desc'),
-          json_extract(NEW.data, '$.tags'),
-          json_extract(NEW.data, '$.synonyms'),
-          json_extract(NEW.data, '$.antonyms')
-        );
-      END;
-
-      CREATE TRIGGER words_fts_update AFTER UPDATE ON documents
-      WHEN NEW.type = 'word'
-      BEGIN
-        UPDATE words_fts SET
-          word = json_extract(NEW.data, '$.word'),
-          one_line_desc = json_extract(NEW.data, '$.one_line_desc'),
-          tags = json_extract(NEW.data, '$.tags'),
-          synonyms = json_extract(NEW.data, '$.synonyms'),
-          antonyms = json_extract(NEW.data, '$.antonyms')
-        WHERE id = NEW.id;
-      END;
-
-      CREATE TRIGGER words_fts_delete AFTER DELETE ON documents
-      WHEN OLD.type = 'word'
-      BEGIN
-        DELETE FROM words_fts WHERE id = OLD.id;
-      END;
-    `;
-
-    await new Promise<void>((resolveCreate, rejectCreate) => {
-      this.db!.exec(createSql, (createErr) => {
-        if (createErr) {
-          console.error('Error creating FTS table:', createErr);
-          rejectCreate(createErr);
-        } else {
-          console.debug('FTS table and triggers created successfully');
-          resolveCreate();
-        }
-      });
-    });
-  }
-
-  /**
    * Recreate FTS table and triggers when table schema is invalid
    */
   private async recreateFTSTableAndTriggers(): Promise<void> {
@@ -231,6 +166,7 @@ export class DatabaseRecovery {
         tags,
         synonyms,
         antonyms,
+        remark,
         tokenize = 'porter unicode61'
       );
 
@@ -238,14 +174,15 @@ export class DatabaseRecovery {
       CREATE TRIGGER words_fts_insert AFTER INSERT ON documents
       WHEN NEW.type = 'word'
       BEGIN
-        INSERT INTO words_fts(id, word, one_line_desc, tags, synonyms, antonyms)
+        INSERT INTO words_fts(id, word, one_line_desc, tags, synonyms, antonyms, remark)
         VALUES (
           NEW.id,
           json_extract(NEW.data, '$.word'),
           json_extract(NEW.data, '$.one_line_desc'),
           json_extract(NEW.data, '$.tags'),
           json_extract(NEW.data, '$.synonyms'),
-          json_extract(NEW.data, '$.antonyms')
+          json_extract(NEW.data, '$.antonyms'),
+          json_extract(NEW.data, '$.remark')
         );
       END;
 
@@ -257,7 +194,8 @@ export class DatabaseRecovery {
           one_line_desc = json_extract(NEW.data, '$.one_line_desc'),
           tags = json_extract(NEW.data, '$.tags'),
           synonyms = json_extract(NEW.data, '$.synonyms'),
-          antonyms = json_extract(NEW.data, '$.antonyms')
+          antonyms = json_extract(NEW.data, '$.antonyms'),
+          remark = json_extract(NEW.data, '$.remark')
         WHERE id = NEW.id;
       END;
 
@@ -310,14 +248,15 @@ export class DatabaseRecovery {
       CREATE TRIGGER words_fts_insert AFTER INSERT ON documents
       WHEN NEW.type = 'word'
       BEGIN
-        INSERT INTO words_fts(id, word, one_line_desc, tags, synonyms, antonyms)
+        INSERT INTO words_fts(id, word, one_line_desc, tags, synonyms, antonyms, remark)
         VALUES (
           NEW.id,
           json_extract(NEW.data, '$.word'),
           json_extract(NEW.data, '$.one_line_desc'),
           json_extract(NEW.data, '$.tags'),
           json_extract(NEW.data, '$.synonyms'),
-          json_extract(NEW.data, '$.antonyms')
+          json_extract(NEW.data, '$.antonyms'),
+          json_extract(NEW.data, '$.remark')
         );
       END;
 
@@ -329,7 +268,8 @@ export class DatabaseRecovery {
           one_line_desc = json_extract(NEW.data, '$.one_line_desc'),
           tags = json_extract(NEW.data, '$.tags'),
           synonyms = json_extract(NEW.data, '$.synonyms'),
-          antonyms = json_extract(NEW.data, '$.antonyms')
+          antonyms = json_extract(NEW.data, '$.antonyms'),
+          remark = json_extract(NEW.data, '$.remark')
         WHERE id = NEW.id;
       END;
 
@@ -375,14 +315,15 @@ export class DatabaseRecovery {
 
         // Populate FTS table with existing words
         const sql = `
-          INSERT INTO words_fts(id, word, one_line_desc, tags, synonyms, antonyms)
+          INSERT INTO words_fts(id, word, one_line_desc, tags, synonyms, antonyms, remark)
           SELECT
             id,
             json_extract(data, '$.word'),
             json_extract(data, '$.one_line_desc'),
             json_extract(data, '$.tags'),
             json_extract(data, '$.synonyms'),
-            json_extract(data, '$.antonyms')
+            json_extract(data, '$.antonyms'),
+            json_extract(data, '$.remark')
           FROM documents
           WHERE type = 'word'
         `;

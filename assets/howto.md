@@ -48,6 +48,48 @@ When you open EverEtch for the first time:
 
 ---
 
+## 📝 Adding Personal Remarks
+
+### Remark Feature
+EverEtch allows you to add personal notes and remarks to any saved word in your collection. This is perfect for:
+- **Personal associations**: Link words to memories or experiences
+- **Usage examples**: Note how you've seen the word used
+- **Learning progress**: Track your understanding over time
+- **Custom definitions**: Add your own simplified explanations
+- **Study notes**: Include mnemonics or pronunciation tips
+
+### How to Add Remarks
+1. **Select a saved word** from your word list (left panel)
+2. **View word details** in the center panel
+3. **Click the edit icon** (✏️ pencil) in the action buttons
+4. **Type your remark** in the input field that appears
+5. **Press Enter** or click outside to save
+6. **Your remark appears** below the word with a violet pencil icon
+
+### Remark Examples
+```
+"serendipity" → "That lucky bookstore find last summer!"
+"ephemeral" → "Like morning dew - beautiful but temporary"
+"gregarious" → "My extroverted cousin at family gatherings"
+"ubiquitous" → "Smartphones in 2025 - everywhere!"
+```
+
+### Remark Management
+- **Edit anytime**: Click the pencil icon to modify remarks
+- **Remove remarks**: Save an empty remark to delete it
+- **Live updates**: Changes appear instantly in word lists
+- **Visual indicator**: Violet pencil icon shows words with remarks
+- **Search integration**: Remarks don't affect search but help with context
+
+### Remark Tips
+- **Keep it personal**: Use associations that work for you
+- **Be concise**: Short notes are easier to scan
+- **Use triggers**: Include memory hooks or images
+- **Track progress**: Note when you feel confident with a word
+- **Context matters**: Include where you encountered the word
+
+---
+
 ## 🔍 Finding & Exploring Words
 
 ### Search Functionality

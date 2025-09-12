@@ -69,6 +69,7 @@ export class EverEtchApp {
     this.wordRenderer.onAddWord = (word: WordDocument) => this.handleAddWord(word);
     this.wordRenderer.onRefreshWord = (word: WordDocument) => this.handleRefreshWord(word);
     this.wordRenderer.onDeleteWord = (word: WordDocument) => this.handleDeleteWord(word);
+    this.wordRenderer.onWriteRemark = (word: WordDocument) => this.handleWriteRemark(word);
     this.wordRenderer.onWordSelect = (word: WordDocument | WordListItem) => this.selectWord(word);
   }
 
@@ -1321,5 +1322,246 @@ export class EverEtchApp {
   private hideHowtoModal(): void {
     const modal = document.getElementById('howto-modal')!;
     modal.classList.add('hidden');
+  }
+
+  private async handleWriteRemark(word: WordDocument): Promise<void> {
+    if (!word || word.id === 'temp') {
+      this.toastManager.showError('Cannot add remark to temporary word');
+      return;
+    }
+
+    // Find the word details container
+    const wordDetails = document.getElementById('word-details');
+    if (!wordDetails) {
+      this.toastManager.showError('Word details not found');
+      return;
+    }
+
+    let remarkContainer: HTMLElement;
+    let remarkDisplay: HTMLElement | null = document.querySelector('.remark-display') as HTMLElement;
+
+    if (remarkDisplay) {
+      // Existing remark - replace the display
+      remarkContainer = remarkDisplay.parentElement!;
+    } else {
+      // No existing remark - create the remark section
+      remarkContainer = document.createElement('div');
+      remarkContainer.innerHTML = `
+        <h4 class="text-lg font-semibold text-slate-800 mb-3 flex items-center">
+          <svg class="w-4 h-4 mr-2 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+          </svg>
+          Remark
+        </h4>
+      `;
+
+      // Find the action buttons container and its parent (the content container)
+      const actionButtonsContainer = document.getElementById('action-buttons-container');
+      if (actionButtonsContainer) {
+        const contentContainer = actionButtonsContainer.parentNode as HTMLElement;
+        if (contentContainer) {
+          // Insert the remark section right before the action buttons
+          contentContainer.insertBefore(remarkContainer, actionButtonsContainer);
+        } else {
+          // Fallback: append to word details
+          wordDetails.appendChild(remarkContainer);
+        }
+      } else {
+        // Fallback: append to word details
+        wordDetails.appendChild(remarkContainer);
+      }
+    }
+
+    // Create input field
+    const input = document.createElement('input');
+    const originalRemark = word.remark || '';
+    input.type = 'text';
+    input.value = originalRemark;
+    input.className = 'w-full px-3 py-2 focus:outline-none focus:ring-0 text-slate-700';
+    input.style.background = 'transparent';
+    input.style.border = 'none';
+    input.style.outline = 'none';
+    input.style.boxShadow = 'none';
+    input.style.borderRadius = '0';
+    input.style.padding = '0.5rem 0.75rem';
+    input.style.color = '#334155';
+    input.placeholder = 'Enter your remark...';
+
+    if (remarkDisplay) {
+      // Replace existing display
+      remarkContainer.replaceChild(input, remarkDisplay);
+    } else {
+      // Add to new container
+      remarkContainer.appendChild(input);
+    }
+
+    // Focus and select all text
+    input.focus();
+    input.select();
+
+    let saved = false;
+    let cancelled = false;
+
+    const saveRemark = async () => {
+      if (saved) return;
+      saved = true;
+
+      const remarkValue = input.value.trim();
+
+      // Check if the remark has actually changed
+      if (remarkValue === originalRemark) {
+        // No change, just restore the display without saving
+        if (remarkDisplay) {
+          remarkContainer.replaceChild(remarkDisplay, input);
+        } else {
+          // If there was no original display, remove the input and the remark section
+          remarkContainer.remove();
+        }
+        return;
+      }
+
+      try {
+        // Update word in database
+        const updatedWord = await this.wordService.updateWord(word.id, { remark: remarkValue });
+
+        if (updatedWord) {
+          // Update current word
+          this.currentWord = { ...this.currentWord!, remark: remarkValue };
+
+          // Update word in list if it exists
+          const wordIndex = this.words.findIndex(w => w.id === word.id);
+          if (wordIndex !== -1) {
+            this.words[wordIndex] = {
+              ...this.words[wordIndex],
+              remark: remarkValue
+            };
+          }
+
+          // Update the DOM element for this word in the word list
+          const wordItem = document.querySelector(`[data-word-id="${word.id}"]`) as HTMLElement;
+          if (wordItem) {
+            // Find the existing remark display
+            const existingRemark = wordItem.querySelector('.text-orange-600');
+            if (existingRemark) {
+              if (remarkValue && remarkValue.trim()) {
+                // Update existing remark
+                const remarkText = existingRemark.querySelector('.truncate') as HTMLElement;
+                if (remarkText) {
+                  remarkText.textContent = remarkValue;
+                }
+              } else {
+                // Remove remark if it's empty
+                existingRemark.remove();
+              }
+            } else if (remarkValue && remarkValue.trim()) {
+              // Add new remark if it didn't exist before
+              const remarkHtml = `
+                <div class="text-xs text-orange-600 mt-1 italic flex items-center pr-1">
+                  <svg class="w-3 h-3 mr-1 flex-shrink-0 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5m-1.414-9.414a2 2 0 1 1 2.828 2.828L11.828 15H9v-2.828z"/>
+                  </svg>
+                  <span class="truncate pr-0.5">${remarkValue}</span>
+                </div>
+              `;
+
+              // Find the description element and add remark after it
+              const description = wordItem.querySelector('.text-slate-500');
+              if (description && description.parentNode) {
+                const remarkDiv = document.createElement('div');
+                remarkDiv.innerHTML = remarkHtml;
+                description.parentNode.insertBefore(remarkDiv.firstElementChild!, description.nextSibling);
+              }
+            }
+          }
+
+          // Also update in associated words list if it exists there
+          const associatedWordItem = document.querySelector(`#associated-list [data-word-id="${word.id}"]`) as HTMLElement;
+          if (associatedWordItem) {
+            const existingRemark = associatedWordItem.querySelector('.text-orange-600');
+            if (existingRemark) {
+              if (remarkValue && remarkValue.trim()) {
+                // Update existing remark
+                const remarkText = existingRemark.querySelector('.truncate') as HTMLElement;
+                if (remarkText) {
+                  remarkText.textContent = remarkValue;
+                }
+              } else {
+                // Remove remark if it's empty
+                existingRemark.remove();
+              }
+            } else if (remarkValue && remarkValue.trim()) {
+              // Add new remark if it didn't exist before
+              const remarkHtml = `
+                <div class="text-xs text-orange-600 mt-1 italic flex items-center pr-1">
+                  <svg class="w-3 h-3 mr-1 flex-shrink-0 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5m-1.414-9.414a2 2 0 1 1 2.828 2.828L11.828 15H9v-2.828z"/>
+                  </svg>
+                  <span class="truncate pr-0.5">${remarkValue}</span>
+                </div>
+              `;
+
+              // Find the description element and add remark after it
+              const description = associatedWordItem.querySelector('.text-slate-500');
+              if (description && description.parentNode) {
+                const remarkDiv = document.createElement('div');
+                remarkDiv.innerHTML = remarkHtml;
+                description.parentNode.insertBefore(remarkDiv.firstElementChild!, description.nextSibling);
+              }
+            }
+          }
+
+          // Re-render word details to show updated remark
+          await this.wordRenderer.renderWordDetails(this.currentWord);
+
+          if (remarkValue) {
+            this.toastManager.showSuccess('Remark saved successfully');
+          } else {
+            this.toastManager.showSuccess('Remark removed');
+          }
+        } else {
+          this.toastManager.showError('Failed to save remark');
+          // Restore original display
+          await this.wordRenderer.renderWordDetails(word);
+        }
+      } catch (error) {
+        console.error('Error saving remark:', error);
+        this.toastManager.showError('Failed to save remark');
+        // Restore original display
+        await this.wordRenderer.renderWordDetails(word);
+      }
+    };
+
+    const cancelEdit = () => {
+      if (saved) return;
+      // Restore original display
+      if (remarkDisplay) {
+        remarkContainer.replaceChild(remarkDisplay, input);
+      } else {
+        // If there was no original display, remove the input and the remark section
+        remarkContainer.remove();
+      }
+    };
+
+    // Handle key events
+    input.addEventListener('keydown', async (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        await saveRemark();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        cancelled = true;
+        cancelEdit();
+      }
+    });
+
+    // Handle blur (clicking outside)
+    input.addEventListener('blur', async () => {
+      // Small delay to allow for button clicks
+      setTimeout(async () => {
+        if (!saved && !cancelled) {
+          await saveRemark();
+        }
+      }, 150);
+    });
   }
 }
