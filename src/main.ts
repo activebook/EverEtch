@@ -173,8 +173,8 @@ ipcMain.handle('delete-profile', async (event, profileName: string) => {
   return await profileManager.deleteProfile(profileName);
 });
 
-ipcMain.handle('get-words-paginated', async (event, offset: number, limit: number) => {
-  return await dbManager.getWordsPaginated(offset, limit);
+ipcMain.handle('get-words-paginated', async (event, offset: number, limit: number, sortOrder?: 'asc' | 'desc') => {
+  return await dbManager.getWordsPaginated(offset, limit, sortOrder);
 });
 
 ipcMain.handle('search-words', async (event, query: string) => {
@@ -291,6 +291,14 @@ ipcMain.handle('load-panel-widths', () => {
 
 ipcMain.handle('save-panel-widths', (event, widths: any) => {
   storeManager.savePanelWidths(widths);
+});
+
+ipcMain.handle('load-sort-order', () => {
+  return storeManager.loadSortOrder();
+});
+
+ipcMain.handle('save-sort-order', (event, sortOrder: 'asc' | 'desc') => {
+  storeManager.saveSortOrder(sortOrder);
 });
 
 // Profile config operations

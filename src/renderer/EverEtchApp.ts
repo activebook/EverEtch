@@ -45,6 +45,7 @@ export class EverEtchApp {
   private isGenerating: boolean = false;
   private isImporting: boolean = false;
   private scrollObserver: IntersectionObserver | null = null;
+  private sortOrder: 'asc' | 'desc' = 'desc';
 
   constructor() {
     this.profileService = new ProfileService();
@@ -89,6 +90,9 @@ export class EverEtchApp {
       await this.profileService.loadProfiles();
       console.log('Loaded profiles:', this.profileService.getProfiles());
 
+      // Load saved sort order BEFORE loading words
+      await this.loadSortOrder();
+
       // Check if there's a last opened profile and switch to it with loading overlay
       const currentProfile = this.profileService.getCurrentProfile();
       if (currentProfile) {
@@ -101,10 +105,10 @@ export class EverEtchApp {
           // Switch to the last opened profile
           const success = await this.profileService.switchProfile(currentProfile);
           if (success) {
-            console.log('Successfully switched to profile:', currentProfile);        
-            // Load words for the switched profile
+            console.log('Successfully switched to profile:', currentProfile);
+            // Load words for the switched profile (with correct sort order)
             await this.loadWords();
-          } else {            
+          } else {
             console.error('Failed to switch to profile:', currentProfile);
             this.toastManager.showError('Failed to load last opened profile');
             // Still try to load words with whatever profile is current
@@ -133,6 +137,9 @@ export class EverEtchApp {
       // Load saved panel widths
       await this.uiUtils.loadPanelWidths();
 
+      // Update sort button icon after loading
+      this.updateSortButtonIcon();
+
     } catch (error) {
       console.error('Error initializing app:', error);
       this.toastManager.showError('Failed to initialize application');
@@ -155,6 +162,12 @@ export class EverEtchApp {
       if (this.scrollObserver) {
         this.scrollObserver.disconnect();
         this.scrollObserver = null;
+      }
+
+      // Clear the word list UI before loading new data
+      const wordList = document.getElementById('word-list')!;
+      if (wordList) {
+        wordList.innerHTML = '';
       }
 
       // Load first page first, then setup observer after content is rendered
@@ -184,7 +197,8 @@ export class EverEtchApp {
     try {
       const result = await window.electronAPI.getWordsPaginated(
         this.wordsPagination.offset,
-        this.wordsPagination.pageSize
+        this.wordsPagination.pageSize,
+        this.sortOrder
       );
 
       // Filter out duplicates based on word ID
@@ -495,10 +509,18 @@ export class EverEtchApp {
     const cancelSettingsBtn = document.getElementById('cancel-settings') as HTMLButtonElement;
     const saveSettingsBtn = document.getElementById('save-settings') as HTMLButtonElement;
     const deleteProfileBtn = document.getElementById('delete-profile-btn') as HTMLButtonElement;
+    const toggleApiKeyBtn = document.getElementById('toggle-api-key-visibility') as HTMLButtonElement;
 
     cancelSettingsBtn.addEventListener('click', () => this.hideSettingsModal());
     saveSettingsBtn.addEventListener('click', () => this.saveSettings());
     deleteProfileBtn.addEventListener('click', () => this.handleDeleteProfile());
+    toggleApiKeyBtn.addEventListener('click', () => this.toggleApiKeyVisibility());
+
+    // Sort button
+    const sortBtn = document.getElementById('sort-btn') as HTMLButtonElement;
+    if (sortBtn) {
+      sortBtn.addEventListener('click', () => this.handleSortToggle());
+    }
 
     // Resize functionality
     const mainContent = document.getElementById('main-content') as HTMLElement;
@@ -1734,7 +1756,6 @@ export class EverEtchApp {
     }
 
     // Refresh word list
-    this.resetUIForProfileSwitch();
     this.loadWords();
 
     if (okBtn) {
@@ -1753,7 +1774,6 @@ export class EverEtchApp {
     // If we have progress info and at least one word was successfully imported, reload the word list
     if (progress && progress.success > 0) {
       console.log(`Import failed but ${progress.success} words were successfully imported. Reloading word list...`);
-      this.resetUIForProfileSwitch();
       this.loadWords();
     }
 
@@ -1768,10 +1788,87 @@ export class EverEtchApp {
     // If we have progress info and at least one word was successfully imported, reload the word list
     if (progress && progress.success > 0) {
       console.log(`Import cancelled but ${progress.success} words were successfully imported. Reloading word list...`);
-      this.resetUIForProfileSwitch();
       this.loadWords();
     }
 
     this.toastManager.showWarning('Import cancelled');
+  }
+
+  private toggleApiKeyVisibility(): void {
+    const apiKeyInput = document.getElementById('api-key') as HTMLInputElement;
+    const eyeIcon = document.getElementById('eye-icon') as HTMLElement;
+    const eyeOffIcon = document.getElementById('eye-off-icon') as HTMLElement;
+
+    if (apiKeyInput && eyeIcon && eyeOffIcon) {
+      if (apiKeyInput.type === 'password') {
+        // Show password
+        apiKeyInput.type = 'text';
+        eyeIcon.classList.add('hidden');
+        eyeOffIcon.classList.remove('hidden');
+      } else {
+        // Hide password
+        apiKeyInput.type = 'password';
+        eyeIcon.classList.remove('hidden');
+        eyeOffIcon.classList.add('hidden');
+      }
+    }
+  }
+
+  private async handleSortToggle(): Promise<void> {
+    // Toggle sort order
+    this.sortOrder = this.sortOrder === 'desc' ? 'asc' : 'desc';
+
+    // Save to StoreManager
+    await this.saveSortOrder();
+
+    // Update sort button icon
+    this.updateSortButtonIcon();
+
+    // Reload words with new sort order
+    await this.loadWords();
+  }
+
+  private async saveSortOrder(): Promise<void> {
+    try {
+      // Save to electron-store via IPC
+      await window.electronAPI.saveSortOrder(this.sortOrder);
+    } catch (error) {
+      console.error('Error saving sort order:', error);
+    }
+  }
+
+  private async loadSortOrder(): Promise<void> {
+    try {
+      // Load from electron-store via IPC
+      const savedSortOrder = await window.electronAPI.loadSortOrder();
+      if (savedSortOrder) {
+        this.sortOrder = savedSortOrder;
+      }
+    } catch (error) {
+      console.error('Error loading sort order:', error);
+      // Keep default 'desc'
+    }
+  }
+
+  private updateSortButtonIcon(): void {
+    const sortBtn = document.getElementById('sort-btn') as HTMLButtonElement;
+    if (!sortBtn) return;
+
+    const iconContainer = sortBtn.querySelector('.sort-icon');
+    if (!iconContainer) return;
+
+    if (this.sortOrder === 'desc') {
+      // Down arrow for descending (newest first) - more elegant design
+      iconContainer.innerHTML = `
+        <svg class="w-4 h-4" viewBox="0 0 6.4 6.4" xmlns="http://www.w3.org/2000/svg"><path d="m5.741 4.341-1 1-.001.001-.014.013-.007.005-.009.006-.009.005-.008.005-.009.004-.009.004-.009.003-.019.005-.01.002-.01.002-.009.001h-.039l-.009-.001-.011-.002-.01-.002-.009-.002-.01-.003-.009-.003-.009-.004-.009-.004-.008-.005-.009-.005-.008-.006-.008-.006-.013-.011-.002-.002-1-1a.2.2 0 0 1 .283-.283l.662.659V2.8a.2.2 0 0 1 .4 0v1.917l.659-.658a.2.2 0 1 1 .283.283M3 3H1.2a.2.2 0 0 0 0 .4H3A.2.2 0 1 0 3 3M1.2 1.8h3.4a.2.2 0 0 0 0-.4H1.2a.2.2 0 1 0 0 .4m1.4 2.8H1.2a.2.2 0 0 0 0 .4h1.4a.2.2 0 0 0 0-.4"/></svg>
+      `;
+      sortBtn.title = 'Newest first → Oldest first';
+    } else {
+      // Up arrow for ascending (oldest first) - more elegant design
+      iconContainer.innerHTML = `
+        <svg class="w-4 h-4" viewBox="0 0 6.4 6.4" xmlns="http://www.w3.org/2000/svg"><path d="M5.741 2.341a.2.2 0 0 1-.283 0L4.8 1.683V3.6a.2.2 0 0 1-.4 0V1.683l-.659.658a.2.2 0 0 1-.283-.283l1-1 .002-.002.013-.011.007-.006.008-.006.009-.005.008-.005.009-.004.009-.004.009-.003.01-.004.008-.002.011-.003.009-.001.01-.001L4.595 1h.009l.015.001.01.002.009.001.011.003.008.002.01.004.008.003.009.004.009.004.009.005.008.005.009.007.007.005.014.013.001.001 1 1a.2.2 0 0 1 0 .283M1.2 3.4H3A.2.2 0 1 0 3 3H1.2a.2.2 0 0 0 0 .4m0-1.6h1.4a.2.2 0 0 0 0-.4H1.2a.2.2 0 1 0 0 .4m3.4 2.8H1.2a.2.2 0 0 0 0 .4h3.4a.2.2 0 0 0 0-.4"/></svg>
+      `;
+      sortBtn.title = 'Oldest first → Newest first';
+    }
   }
 }

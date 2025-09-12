@@ -9,7 +9,7 @@ declare global {
             createProfile: (profileName: string) => Promise<boolean>;
             renameProfile: (oldName: string, newName: string) => Promise<boolean>;
             deleteProfile: (profileName: string) => Promise<boolean>;
-            getWordsPaginated: (offset: number, limit: number) => Promise<{ words: WordListItem[], hasMore: boolean, total: number }>;
+            getWordsPaginated: (offset: number, limit: number, sortOrder?: 'asc' | 'desc') => Promise<{ words: WordListItem[], hasMore: boolean, total: number }>;
             searchWords: (query: string) => Promise<WordListItem[]>;
             getWord: (wordId: string) => Promise<any>;
             getWordByName: (wordName: string) => Promise<any>;
@@ -30,6 +30,10 @@ declare global {
             // Profile import/export
             exportProfile: () => Promise<any>;
             importProfile: () => Promise<any>;
+
+            // Sort order persistence
+            loadSortOrder: () => Promise<'asc' | 'desc'>;
+            saveSortOrder: (sortOrder: 'asc' | 'desc') => Promise<void>;
 
             onWordMeaningStreaming: (callback: Function) => void;
             onWordMetadataReady: (callback: Function) => void;
