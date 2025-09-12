@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=EverEtch
+Comment=A slim word memo application
+Exec=/path/to/EverEtch.AppImage %u
+Icon=everetch
+Type=Application
+Categories=Office;Education;
+MimeType=x-scheme-handler/everetch;
+StartupWMClass=EverEtch

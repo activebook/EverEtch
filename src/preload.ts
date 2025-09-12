@@ -57,6 +57,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('word-metadata-ready', (_event: any, toolData: any) => callback(toolData));
   },
 
+  // Protocol handlers for custom URL scheme
+  onProtocolNavigateWord: (callback: Function) => {
+    ipcRenderer.on('protocol-navigate-word', (_event: any, wordName: string) => callback(wordName));
+  },
+
+  onProtocolSwitchProfile: (callback: Function) => {
+    ipcRenderer.on('protocol-switch-profile', (_event: any, profileName: string) => callback(profileName));
+  },
+
   removeAllListeners: (event: string) => {
     ipcRenderer.removeAllListeners(event);
   }
