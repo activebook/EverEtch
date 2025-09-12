@@ -113,7 +113,7 @@ export class DatabaseManager {
 
 
   // Paginated word loading for lazy loading - optimized to only fetch required fields
-  getWordsPaginated(offset: number, limit: number): Promise<{words: WordListItem[], hasMore: boolean, total: number}> {
+  getWordsPaginated(offset: number, limit: number, sortOrder: 'asc' | 'desc' = 'desc'): Promise<{words: WordListItem[], hasMore: boolean, total: number}> {
     return new Promise(async (resolve, reject) => {
       if (!this.db) {
         resolve({words: [], hasMore: false, total: 0});
@@ -134,6 +134,7 @@ export class DatabaseManager {
 
         // Get paginated data using indexes - only fetch required fields for performance
         const dataResult = await new Promise<{ id: string, word: string, one_line_desc: string, remark: string }[]>((resolveData, rejectData) => {
+          const orderDirection = sortOrder === 'asc' ? 'ASC' : 'DESC';
           const query = `
             SELECT
               id,
@@ -142,7 +143,7 @@ export class DatabaseManager {
               json_extract(data, '$.remark') as remark
             FROM documents
             WHERE type = 'word'
-            ORDER BY created_at DESC, updated_at DESC
+            ORDER BY created_at ${orderDirection}, updated_at ${orderDirection}
             LIMIT ${limit} OFFSET ${offset}
           `;
 

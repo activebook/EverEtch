@@ -16,6 +16,7 @@ interface PanelWidths {
 interface StoreSchema {
   windowBounds: WindowBounds | null;
   panelWidths: PanelWidths | null;
+  sortOrder: 'asc' | 'desc' | null;
 }
 
 export class StoreManager {
@@ -41,11 +42,16 @@ export class StoreManager {
             middle: { type: 'number' },
             right: { type: 'number' }
           }
+        },
+        sortOrder: {
+          type: ['string', 'null'],
+          enum: ['asc', 'desc', null]
         }
       },
       defaults: {
         windowBounds: null,
-        panelWidths: null
+        panelWidths: null,
+        sortOrder: 'desc'
       }
     }) as Store<StoreSchema>;
   }
@@ -79,11 +85,26 @@ export class StoreManager {
   }
 
   /**
+   * Save sort order
+   */
+  saveSortOrder(sortOrder: 'asc' | 'desc'): void {
+    this.store.set('sortOrder', sortOrder);
+  }
+
+  /**
+   * Load sort order
+   */
+  loadSortOrder(): 'asc' | 'desc' {
+    return this.store.get('sortOrder') || 'desc';
+  }
+
+  /**
    * Clear all UI state
    */
   clearUIState(): void {
     this.store.set('windowBounds', null);
     this.store.set('panelWidths', null);
+    this.store.set('sortOrder', 'desc');
   }
 
   /**

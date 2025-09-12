@@ -40,6 +40,7 @@ panacea
 paragon
 pragmatic
 quixotic
+recondite
 sanguine
 scrupulous
 spurious

@@ -47,11 +47,23 @@ const WORD_METAS_USER_PROMPT = (word: string, meaning: string) =>
 
   IMPORTANT: The meaning above is in a specific language. You MUST provide ALL your responses (summary, tags, synonyms, antonyms) in the SAME language as this meaning.
 
-  Provide comprehensive metadata including:
-  - A brief one-line summary in the same language
-  - 5-10 relevant tags in the same language with appropriate colors
-  - 3-6 synonyms in the same language
-  - 3-6 antonyms in the same language`;
+  Provide comprehensive metadata for the word. Follow these specific instructions for each field:
+
+  - summary: A brief one-line summary in the same language.
+
+  - tags: 5-10 tags for classification.
+    - **CRITICAL: Tags must NOT be synonyms or antonyms.**
+    - Tags should categorize the word by its grammatical and contextual properties.
+    - Include categories like:
+      - Part of Speech (e.g., noun, verb, adjective)
+      - Domain (e.g., science, emotion, technology)
+      - Connotation (e.g., positive, negative, neutral)
+      - Tone/Register (e.g., formal, informal, slang, technical)
+      - Concept Type (e.g., action, object, abstract idea, feeling)
+
+  - synonyms: 3-6 words with a similar meaning.
+
+  - antonyms: 3-6 words with an opposite meaning.`;
 
 // Shared tool definitions for word metadata generation
 const WORD_METAS_TOOL_NAME = 'generate_word_metas';
@@ -69,7 +81,7 @@ const WORD_METAS_TOOL_PARAMETERS = {
       items: { type: 'string' as const },
       minItems: 5,
       maxItems: 10,
-      description: '5-10 relevant tags that categorize the word by part of speech, category, usage, or characteristics. Use the same language as the word meaning. Examples should match the language context.'
+      description: '5-10 classification tags. IMPORTANT: These should NOT be synonyms. They should categorize the word by part of speech (noun, verb), domain (science, emotion), connotation (positive, negative), and tone (formal, slang). Use the same language as the word meaning.'
     },
     tag_colors: {
       type: 'object' as const,
@@ -88,14 +100,14 @@ const WORD_METAS_TOOL_PARAMETERS = {
       items: { type: 'string' as const },
       minItems: 3,
       maxItems: 6,
-      description: '3-6 relevant synonyms that have similar meanings to the word. Use the same language as the word meaning. Examples should match the language context.'
+      description: '3-6 relevant synonyms that have similar meanings to the word. Use the same language as the word meaning.'
     },
     antonyms: {
       type: 'array' as const,
       items: { type: 'string' as const },
       minItems: 3,
       maxItems: 6,
-      description: '3-6 relevant antonyms that have opposite meanings to the word. Use the same language as the word meaning. Examples should match the language context.'
+      description: '3-6 relevant antonyms that have opposite meanings to the word. Use the same language as the word meaning.'
     }
   },
   required: ['summary', 'tags', 'tag_colors', 'synonyms', 'antonyms']

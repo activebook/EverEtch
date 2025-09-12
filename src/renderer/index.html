@@ -124,8 +124,19 @@
                             </svg>
                             Words
                         </div>
-                        <span id="word-count"
-                            class="text-xs font-medium text-slate-600 bg-amber-100/70 px-2 py-0.5 rounded-full">0</span>
+                        <div class="flex items-center space-x-2">
+                            <button id="sort-btn" title="Sort by creation time"
+                                class="p-1 bg-amber-50/60 hover:bg-amber-100/70 text-slate-600 hover:text-slate-700 rounded-md transition-all duration-200 hover:shadow-sm group">
+                                <div class="sort-icon w-4 h-4">
+                                    <!-- Sort icon will be populated by JavaScript -->
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+                                    </svg>
+                                </div>
+                            </button>
+                            <span id="word-count"
+                                class="text-xs font-medium text-slate-600 bg-amber-100/70 px-2 py-0.5 rounded-full">0</span>
+                        </div>
                     </h2>
                 </div>
                 <div id="word-list" class="flex-1 overflow-y-auto scrollbar-thin p-3">
