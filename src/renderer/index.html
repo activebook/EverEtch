@@ -363,8 +363,8 @@
         <!-- Import Words Modal -->
         <div id="import-words-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden z-50">
             <div class="flex items-center justify-center min-h-screen p-4">
-                <div class="bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl max-w-md w-full border border-white/20">
-                    <div class="p-5 border-b border-slate-200/60 bg-gradient-to-r from-blue-50/80 to-purple-50/80 rounded-t-2xl">
+                <div class="bg-amber-50/95 backdrop-blur-md rounded-2xl shadow-2xl max-w-md w-full border border-amber-200/60">
+                    <div class="p-5 border-b border-amber-200/60 bg-gradient-to-r from-amber-25/40 to-amber-50/60 rounded-t-2xl">
                         <h3 class="text-lg font-semibold text-slate-800 flex items-center">
                             <svg class="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
@@ -377,22 +377,22 @@
                             <p class="text-sm text-slate-600 mb-3">
                                 Select a text file (.txt or .csv) containing words to import. Each word should be on a separate line.
                             </p>
-                            <div class="border-2 border-dashed border-slate-300 rounded-lg p-4 text-center">
-                                <svg class="w-8 h-8 mx-auto mb-2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div class="border-2 border-dashed border-amber-300 rounded-lg p-4 text-center bg-amber-50/50">
+                                <svg class="w-8 h-8 mx-auto mb-2 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                                 </svg>
                                 <p id="import-file-name" class="text-sm text-slate-500">No file selected</p>
-                                <button id="select-import-file" class="mt-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-lg transition-colors">
+                                <button id="select-import-file" class="mt-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm rounded-lg transition-colors">
                                     Choose File
                                 </button>
                             </div>
                         </div>
                     </div>
-                    <div class="p-5 border-t border-slate-200/60 flex justify-end space-x-3 bg-slate-50/50 rounded-b-2xl">
+                    <div class="p-5 border-t border-amber-200/60 flex justify-end space-x-3 bg-amber-50/50 rounded-b-2xl">
                         <button id="close-import-modal" class="px-4 py-2 bg-slate-500 hover:bg-slate-600 text-white rounded-lg transition-all duration-200 hover:shadow-lg font-medium text-sm">
                             Cancel
                         </button>
-                        <button id="start-import-btn" disabled class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all duration-200 hover:shadow-lg font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                        <button id="start-import-btn" disabled class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all duration-200 hover:shadow-lg font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed">
                             Start Import
                         </button>
                     </div>
@@ -402,16 +402,16 @@
 
         <!-- Import Progress Overlay -->
         <div id="import-progress-overlay" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden z-[10002] flex items-center justify-center">
-            <div class="bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl max-w-md w-full mx-4 border border-white/20">
+            <div class="bg-amber-50/95 backdrop-blur-md rounded-2xl shadow-2xl max-w-md w-full mx-4 border border-amber-200/60">
                 <div class="p-6">
                     <div class="text-center mb-6">
-                        <div class="animate-spin rounded-full h-12 w-12 border-b-4 border-blue-500 mx-auto mb-4"></div>
+                        <div class="animate-spin rounded-full h-12 w-12 border-b-4 border-amber-500 mx-auto mb-4"></div>
                         <h3 class="text-lg font-semibold text-slate-800 mb-2">Importing Words...</h3>
                         <p id="import-progress-text" class="text-sm text-slate-600">Processing words...</p>
                     </div>
 
-                    <div class="w-full bg-slate-200 rounded-full h-3 mb-6">
-                        <div id="import-progress-bar" class="bg-blue-500 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    <div class="w-full bg-amber-200 rounded-full h-3 mb-6">
+                        <div id="import-progress-bar" class="bg-amber-500 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
                     </div>
 
                     <div class="flex justify-center">
@@ -426,10 +426,10 @@
         <!-- Import Complete Modal -->
         <div id="import-complete-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden z-50">
             <div class="flex items-center justify-center min-h-screen p-4">
-                <div class="bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl max-w-md w-full border border-white/20">
+                <div class="bg-amber-50/95 backdrop-blur-md rounded-2xl shadow-2xl max-w-md w-full border border-amber-200/60">
                     <div class="p-6 text-center">
-                        <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div class="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg class="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                             </svg>
                         </div>
@@ -437,7 +437,7 @@
                         <p id="import-complete-message" class="text-sm text-slate-600 mb-6">
                             Words have been successfully imported.
                         </p>
-                        <button id="import-complete-ok" class="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-all duration-200 hover:shadow-lg font-medium">
+                        <button id="import-complete-ok" class="px-6 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all duration-200 hover:shadow-lg font-medium">
                             OK
                         </button>
                     </div>
