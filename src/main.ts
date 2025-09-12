@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { getAndSetProxyEnvironment } from './utils/sys_proxy.js';
 import { getDatabasePath, ensureDataDirectory } from './utils/utils.js';
+import { StoreManager } from './utils/StoreManager.js';
 import { DatabaseManager } from './database/DatabaseManager.js';
 import { ProfileManager } from './database/ProfileManager.js';
 import { AIModelClient, WORD_DUMMY_METAS } from './ai/AIModelClient.js';
@@ -17,6 +18,7 @@ let mainWindow: BrowserWindow;
 let dbManager: DatabaseManager;
 let profileManager: ProfileManager;
 let aiClient: AIModelClient;
+let storeManager: StoreManager;
 
 // Configure marked for proper line break handling
 marked.setOptions({
@@ -33,6 +35,7 @@ async function createWindow() {
   dbManager = new DatabaseManager();
   profileManager = new ProfileManager(dbManager);
   aiClient = new AIModelClient();
+  storeManager = new StoreManager();
 
   // Create window with minimal bounds first (invisible), then apply saved bounds
   let windowBounds: { width: number; height: number; x?: number; y?: number } = { width: 1200, height: 800 };
@@ -52,18 +55,10 @@ async function createWindow() {
   mainWindow.loadFile(path.join(__dirname, 'renderer/index.html'));
 
   // Load and apply window bounds after the window is ready to show
-  mainWindow.once('ready-to-show', async () => {
+  mainWindow.once('ready-to-show', () => {
     try {
-      // Load window bounds from localStorage
-      const savedBounds = await mainWindow.webContents.executeJavaScript(`
-        try {
-          const data = localStorage.getItem('window-bounds');
-          data ? JSON.parse(data) : null;
-        } catch (error) {
-          console.error('Error loading window bounds from localStorage:', error);
-          null;
-        }
-      `);
+      // Load window bounds from electron-store
+      const savedBounds = storeManager.loadWindowBounds();
 
       if (savedBounds) {
         // Validate bounds are reasonable
@@ -92,7 +87,7 @@ async function createWindow() {
 
     // Show the window after bounds are applied
     mainWindow.show();
-  });  
+  });
 
   if (process.env.NODE_ENV === 'development') {
     // Open DevTools(cmd + alt + i)
@@ -101,20 +96,13 @@ async function createWindow() {
 
   // Set up window event listeners for saving bounds
   let saveTimeout: NodeJS.Timeout;
-  const saveWindowBounds = async () => {
+  const saveWindowBounds = () => {
     if (!mainWindow || mainWindow.isDestroyed()) return;
 
     try {
       const bounds = mainWindow.getBounds();
-      // Save window bounds to localStorage via renderer process
-      await mainWindow.webContents.executeJavaScript(`
-        try {
-          const bounds = ${JSON.stringify(bounds)};
-          localStorage.setItem('window-bounds', JSON.stringify(bounds));
-        } catch (error) {
-          console.error('Error saving window bounds to localStorage:', error);
-        }
-      `);
+      // Save window bounds to electron-store
+      storeManager.saveWindowBounds(bounds);
     } catch (error) {
       console.error('Error saving window bounds:', error);
     }
@@ -294,6 +282,15 @@ ipcMain.handle('delete-word', async (event, wordId: string) => {
 
 ipcMain.handle('get-related-words-paginated', async (event, searchTerm: string, offset: number, limit: number) => {
   return await dbManager.getRelatedWordsPaginated(searchTerm, offset, limit);
+});
+
+// Store operations
+ipcMain.handle('load-panel-widths', () => {
+  return storeManager.loadPanelWidths();
+});
+
+ipcMain.handle('save-panel-widths', (event, widths: any) => {
+  storeManager.savePanelWidths(widths);
 });
 
 // Profile config operations

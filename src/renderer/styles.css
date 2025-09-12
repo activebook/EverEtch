@@ -55,32 +55,92 @@
 
 /* Custom Scrollbar - Beige Theme */
 .scrollbar-thin {
+    scrollbar-width: thin; /* Keep width for Firefox */
+    scrollbar-color: transparent transparent !important; /* Make transparent by default */
+    transition: all 0.2s ease-in-out;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+    width: 6px; /* Keep width to prevent layout shifts */
+    background: transparent;
+    transition: all 0.2s ease-in-out;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 3px;
+    margin: 1px;
+    transition: all 0.2s ease-in-out;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+    background: transparent; /* Make thumb transparent by default */
+    border-radius: 3px;
+    border: none;
+    transition: all 0.2s ease-in-out;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-corner {
+    background: transparent;
+    transition: all 0.2s ease-in-out;
+}
+
+/* Show scrollbar on hover for each panel */
+#word-list.scrollbar-thin:hover,
+#word-details-container.scrollbar-thin:hover,
+#associated-list.scrollbar-thin:hover,
+#suggestions.scrollbar-thin:hover,
+#howto-content.scrollbar-thin:hover {
     scrollbar-width: thin;
     scrollbar-color: #e8b871d1 rgba(245, 158, 11, 0.02) !important;
 }
 
-.scrollbar-thin::-webkit-scrollbar {
+#word-list.scrollbar-thin:hover::-webkit-scrollbar,
+#word-details-container.scrollbar-thin:hover::-webkit-scrollbar,
+#associated-list.scrollbar-thin:hover::-webkit-scrollbar,
+#suggestions.scrollbar-thin:hover::-webkit-scrollbar,
+#howto-content.scrollbar-thin:hover::-webkit-scrollbar {
     width: 6px;
     background: rgba(245, 158, 11, 0.02);
 }
 
-.scrollbar-thin::-webkit-scrollbar-track {
+#word-list.scrollbar-thin:hover::-webkit-scrollbar-track,
+#word-details-container.scrollbar-thin:hover::-webkit-scrollbar-track,
+#associated-list.scrollbar-thin:hover::-webkit-scrollbar-track,
+#suggestions.scrollbar-thin:hover::-webkit-scrollbar-track,
+#howto-content.scrollbar-thin:hover::-webkit-scrollbar-track {
     background: rgba(245, 158, 11, 0.02);
     border-radius: 3px;
     margin: 1px;
 }
 
-.scrollbar-thin::-webkit-scrollbar-thumb {
+#word-list.scrollbar-thin:hover::-webkit-scrollbar-thumb,
+#word-details-container.scrollbar-thin:hover::-webkit-scrollbar-thumb,
+#associated-list.scrollbar-thin:hover::-webkit-scrollbar-thumb,
+#suggestions.scrollbar-thin:hover::-webkit-scrollbar-thumb,
+#howto-content.scrollbar-thin:hover::-webkit-scrollbar-thumb {
     background: #ece4c4;
     border-radius: 3px;
     border: none;
 }
 
-.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+#word-list.scrollbar-thin:hover::-webkit-scrollbar-thumb:hover,
+#word-details-container.scrollbar-thin:hover::-webkit-scrollbar-thumb:hover,
+#associated-list.scrollbar-thin:hover::-webkit-scrollbar-thumb:hover,
+#suggestions.scrollbar-thin:hover::-webkit-scrollbar-thumb:hover,
+#howto-content.scrollbar-thin:hover::-webkit-scrollbar-thumb:hover {
     background: #d4c4a8;
 }
 
-.scrollbar-thin::-webkit-scrollbar-corner {
+#word-list.scrollbar-thin:hover::-webkit-scrollbar-corner,
+#word-details-container.scrollbar-thin:hover::-webkit-scrollbar-corner,
+#associated-list.scrollbar-thin:hover::-webkit-scrollbar-corner,
+#suggestions.scrollbar-thin:hover::-webkit-scrollbar-corner,
+#howto-content.scrollbar-thin:hover::-webkit-scrollbar-corner {
     background: rgba(245, 158, 11, 0.02);
 }
 
