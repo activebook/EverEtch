@@ -11,6 +11,7 @@ export interface WordDocument {
   tag_colors: Record<string, string>;
   synonyms: string[];
   antonyms: string[];
+  remark?: string;
   created_at: string;
   updated_at: string;
 }
