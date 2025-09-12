@@ -73,6 +73,15 @@ export class WordService {
     }
   }
 
+  async getWordByName(wordName: string): Promise<WordDocument | null> {
+    try {
+      return await window.electronAPI.getWordByName(wordName);
+    } catch (error) {
+      console.error('Error fetching word by name:', error);
+      return null;
+    }
+  }
+
   async copyWordToClipboard(word: WordDocument): Promise<void> {
     try {
       const wordText = `${word.word}\n\n${word.one_line_desc}\n\n${word.details}`;

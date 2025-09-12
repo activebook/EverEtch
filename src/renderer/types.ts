@@ -12,6 +12,7 @@ declare global {
             getWordsPaginated: (offset: number, limit: number) => Promise<{ words: WordListItem[], hasMore: boolean, total: number }>;
             searchWords: (query: string) => Promise<WordListItem[]>;
             getWord: (wordId: string) => Promise<any>;
+            getWordByName: (wordName: string) => Promise<any>;
             addWord: (wordData: any) => Promise<any>;
             updateWord: (wordId: string, wordData: any) => Promise<any>;
             updateWordRemark: (wordId: string, remark: string) => Promise<any>;

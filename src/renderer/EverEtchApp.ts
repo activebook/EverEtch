@@ -1,13 +1,20 @@
 import { WordDocument, WordListItem, PaginationState, AssociatedWordsState } from './types.js';
 import { ProfileService } from './services/ProfileService.js';
 import { WordService } from './services/WordService.js';
+import { WordImportService, ImportProgress, ImportCallbacks } from './services/WordImportService.js';
 import { ToastManager } from './components/ToastManager.js';
 import { WordRenderer } from './components/WordRenderer.js';
 import { UIUtils } from './utils/UIUtils.js';
+import { generateGenerationId } from './utils/Common.js';
+
+// Constants for pagination
+const WORDS_PAGE_SIZE = 10; // For release builds, set to 10, debug 5
+const ASSOCIATED_WORDS_PAGE_SIZE = 10; // For release builds, set to 10, debug 5
 
 export class EverEtchApp {
   private profileService: ProfileService;
   private wordService: WordService;
+  private wordImportService: WordImportService;
   private toastManager: ToastManager;
   private wordRenderer: WordRenderer;
   private uiUtils: UIUtils;
@@ -19,7 +26,7 @@ export class EverEtchApp {
   private words: WordListItem[] = [];
   private wordsPagination: PaginationState = {
     offset: 0,
-    pageSize: 10, // For release builds, set to 10, debug 5
+    pageSize: WORDS_PAGE_SIZE,
     isLoading: false,
     hasMore: true,
     total: 0
@@ -27,7 +34,7 @@ export class EverEtchApp {
   private associatedWordsState: AssociatedWordsState = {
     words: [],
     offset: 0,
-    pageSize: 10, // For release builds, set to 10, debug 5
+    pageSize: ASSOCIATED_WORDS_PAGE_SIZE,
     isLoading: false,
     hasMore: true,
     total: 0,
@@ -36,6 +43,7 @@ export class EverEtchApp {
   };
   private isSearchMode: boolean = false;
   private isGenerating: boolean = false;
+  private isImporting: boolean = false;
   private scrollObserver: IntersectionObserver | null = null;
 
   constructor() {
@@ -43,6 +51,7 @@ export class EverEtchApp {
     this.wordService = new WordService();
     this.toastManager = new ToastManager();
     this.uiUtils = new UIUtils();
+    this.wordImportService = new WordImportService(this.wordService, this.toastManager);
 
     this.wordRenderer = new WordRenderer(this.wordService, this.toastManager);
 
@@ -136,7 +145,7 @@ export class EverEtchApp {
       this.words = [];
       this.wordsPagination = {
         offset: 0,
-        pageSize: 5,
+        pageSize: WORDS_PAGE_SIZE,
         isLoading: false,
         hasMore: true,
         total: 0
@@ -423,6 +432,44 @@ export class EverEtchApp {
       this.handleImportProfile();
     });
 
+    // Import words button
+    const importWordsBtn = document.getElementById('import-words-btn') as HTMLButtonElement;
+    if (importWordsBtn) {
+      importWordsBtn.addEventListener('click', () => {
+        this.showImportWordsModal();
+      });
+    }
+
+    // Import words modal buttons
+    const selectFileBtn = document.getElementById('select-import-file') as HTMLButtonElement;
+    const startImportBtn = document.getElementById('start-import-btn') as HTMLButtonElement;
+    const cancelImportBtn = document.getElementById('cancel-import-btn') as HTMLButtonElement;
+    const closeImportModalBtn = document.getElementById('close-import-modal') as HTMLButtonElement;
+
+    if (selectFileBtn) {
+      selectFileBtn.addEventListener('click', () => {
+        this.selectImportFile();
+      });
+    }
+
+    if (startImportBtn) {
+      startImportBtn.addEventListener('click', () => {
+        this.startWordImport();
+      });
+    }
+
+    if (cancelImportBtn) {
+      cancelImportBtn.addEventListener('click', () => {
+        this.cancelWordImport();
+      });
+    }
+
+    if (closeImportModalBtn) {
+      closeImportModalBtn.addEventListener('click', () => {
+        this.hideImportWordsModal();
+      });
+    }
+
     // Howto button
     const howtoBtn = document.getElementById('howto-btn') as HTMLButtonElement;
     howtoBtn.addEventListener('click', () => {
@@ -489,7 +536,7 @@ export class EverEtchApp {
     const generateIcon = document.getElementById('generate-icon') as unknown as SVGElement;
     const loadingIcon = document.getElementById('loading-icon') as unknown as SVGElement;
 
-    const generationId = `gen_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const generationId = generateGenerationId();
     console.log('🔄 Renderer: Generated new generationId:', generationId);
 
     if (!generationId || typeof generationId !== 'string' || generationId.length === 0) {
@@ -731,7 +778,7 @@ export class EverEtchApp {
     this.associatedWordsState = {
       words: [],
       offset: 0,
-      pageSize: 5,
+      pageSize: ASSOCIATED_WORDS_PAGE_SIZE,
       isLoading: false,
       hasMore: true,
       total: 0,
@@ -930,7 +977,7 @@ export class EverEtchApp {
     this.words = [];
     this.wordsPagination = {
       offset: 0,
-      pageSize: 5,
+      pageSize: WORDS_PAGE_SIZE,
       isLoading: false,
       hasMore: true,
       total: 0
@@ -939,7 +986,7 @@ export class EverEtchApp {
     this.associatedWordsState = {
       words: [],
       offset: 0,
-      pageSize: 5,
+      pageSize: ASSOCIATED_WORDS_PAGE_SIZE,
       isLoading: false,
       hasMore: true,
       total: 0,
@@ -980,64 +1027,30 @@ export class EverEtchApp {
   }
 
   private handleWordMetadataReady(wordMeta: any): void {
-    console.log('📨 Renderer: Received tool result event:', wordMeta);
-    console.log('📨 Renderer: Current generation ID:', this.currentGenerationId);
-    console.log('📨 Renderer: Tool data generation ID:', wordMeta?.generationId);
-
-    if (!wordMeta) {
-      console.error('❌ Renderer: Received null/undefined wordMeta');
+    // Simple check: if we have metadata and a current word, update it
+    if (!wordMeta || !this.currentWord || this.currentWord.id !== 'temp') {
       return;
     }
 
-    if (!wordMeta.generationId || typeof wordMeta.generationId !== 'string') {
-      console.error('❌ Renderer: Invalid generationId in wordMeta:', wordMeta.generationId);
-      return;
+    // Update word metadata
+    if (wordMeta.summary) {
+      this.currentWord.one_line_desc = wordMeta.summary;
+    }
+    if (wordMeta.tags) {
+      this.currentWord.tags = wordMeta.tags;
+    }
+    if (wordMeta.tag_colors) {
+      this.currentWord.tag_colors = wordMeta.tag_colors;
+    }
+    if (wordMeta.synonyms) {
+      this.currentWord.synonyms = wordMeta.synonyms;
+    }
+    if (wordMeta.antonyms) {
+      this.currentWord.antonyms = wordMeta.antonyms;
     }
 
-    if (!this.currentWord) {
-      console.error('❌ Renderer: No current word to update');
-      return;
-    }
-
-    if (wordMeta.generationId === this.currentGenerationId) {
-      console.log('✅ Renderer: Processing tool result for current generation');
-
-      if (this.currentWord.id === 'temp') {
-        console.log('✅ Renderer: Current word is temp, proceeding with update');
-
-        if (wordMeta.summary) {
-          console.log('📝 Renderer: Updating summary:', wordMeta.summary);
-          this.currentWord.one_line_desc = wordMeta.summary;
-        }
-        if (wordMeta.tags) {
-          console.log('🏷️ Renderer: Updating tags:', wordMeta.tags);
-          this.currentWord.tags = wordMeta.tags;
-        }
-        if (wordMeta.tag_colors) {
-          console.log('🎨 Renderer: Updating tag colors:', wordMeta.tag_colors);
-          this.currentWord.tag_colors = wordMeta.tag_colors;
-        }
-        if (wordMeta.synonyms) {
-          console.log('🔄 Renderer: Updating synonyms:', wordMeta.synonyms);
-          this.currentWord.synonyms = wordMeta.synonyms;
-        }
-        if (wordMeta.antonyms) {
-          console.log('🔄 Renderer: Updating antonyms:', wordMeta.antonyms);
-          this.currentWord.antonyms = wordMeta.antonyms;
-        }
-
-        console.log('🔄 Renderer: Re-rendering word details');
-        if (this.currentWord) {
-          this.wordRenderer.renderWordDetails(this.currentWord);
-        }
-      } else {
-        console.log('⚠️ Renderer: Current word is not temp, skipping tool result update');
-      }
-    } else {
-      console.log('❌ Renderer: Ignoring tool result - generation ID mismatch');
-      console.log('❌ Renderer: Expected:', this.currentGenerationId, 'Got:', wordMeta.generationId);
-      console.log('❌ Renderer: Current word ID:', this.currentWord?.id);
-    }
+    // Re-render word details
+    this.wordRenderer.renderWordDetails(this.currentWord);
   }
 
   private updateGenerateBtnState(query: string, hasExactMatch?: boolean): void {
@@ -1563,5 +1576,198 @@ export class EverEtchApp {
         }
       }, 150);
     });
+  }
+
+  // Word Import methods
+  private selectedImportFile: File | null = null;
+
+  private showImportWordsModal(): void {
+    const modal = document.getElementById('import-words-modal')!;
+    if (modal) {
+      modal.classList.remove('hidden');
+    }
+  }
+
+  private hideImportWordsModal(): void {
+    const modal = document.getElementById('import-words-modal')!;
+    if (modal) {
+      modal.classList.add('hidden');
+    }
+    this.selectedImportFile = null;
+    this.updateImportUI();
+  }
+
+  private selectImportFile(): void {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.txt,.csv';
+    input.onchange = (e) => {
+      const target = e.target as HTMLInputElement;
+      const file = target.files?.[0];
+      if (file) {
+        this.selectedImportFile = file;
+        this.updateImportUI();
+      }
+    };
+    input.click();
+  }
+
+  private updateImportUI(): void {
+    const fileNameElement = document.getElementById('import-file-name') as HTMLElement;
+    const startBtn = document.getElementById('start-import-btn') as HTMLButtonElement;
+
+    if (fileNameElement && startBtn) {
+      if (this.selectedImportFile) {
+        fileNameElement.textContent = this.selectedImportFile.name;
+        startBtn.disabled = false;
+      } else {
+        fileNameElement.textContent = 'No file selected';
+        startBtn.disabled = true;
+      }
+    }
+  }
+
+  private async startWordImport(): Promise<void> {
+    if (!this.selectedImportFile || this.isImporting) {
+      return;
+    }
+
+    try {
+      const content = await this.readFileContent(this.selectedImportFile);
+      this.showImportProgressOverlay();
+
+      const callbacks: ImportCallbacks = {
+        onProgress: (progress: ImportProgress) => {
+          this.updateImportProgress(progress);
+        },
+        onComplete: (progress: ImportProgress) => {
+          this.handleImportComplete(progress);
+        },
+        onError: (progress: ImportProgress) => {
+          this.handleImportError(progress);
+        },
+        onCancel: (progress?: ImportProgress) => {
+          this.handleImportCancel(progress);
+        },
+      };
+
+      this.isImporting = true;
+      await this.wordImportService.startImport(content, callbacks);
+    } catch (error) {
+      console.error('Error starting import:', error);
+      this.toastManager.showError('Failed to start import');
+    }
+  }
+
+  private cancelWordImport(): void {
+    if (!this.isImporting) return;
+
+    this.wordImportService.cancelImport();
+  }
+
+  private async readFileContent(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const content = e.target?.result as string;
+        resolve(content);
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsText(file);
+    });
+  }
+
+  private showImportProgressOverlay(): void {
+    const overlay = document.getElementById('import-progress-overlay')!;
+    if (overlay) {
+      overlay.classList.remove('hidden');
+    }
+  }
+
+  private hideImportProgressOverlay(): void {
+    const overlay = document.getElementById('import-progress-overlay')!;
+    if (overlay) {
+      overlay.classList.add('hidden');
+    }
+  }
+
+  private updateImportProgress(progress: ImportProgress): void {
+    const progressText = document.getElementById('import-progress-text')!;
+    const progressBar = document.getElementById('import-progress-bar') as HTMLDivElement;
+
+    if (progressText) {
+      progressText.textContent = `${progress.current}/${progress.total} - ${progress.currentWord || 'Processing...'}`;
+    }
+
+    if (progressBar) {
+      const percentage = progress.total > 0 ? (progress.current / progress.total) * 100 : 0;
+      progressBar.style.width = `${percentage}%`;
+    }
+  }
+
+  private handleImportComplete(progress: ImportProgress): void {
+    this.isImporting = false;
+    this.hideImportProgressOverlay();
+
+    // Show completion modal
+    const modal = document.getElementById('import-complete-modal')!;
+    const messageElement = document.getElementById('import-complete-message')!;
+    const okBtn = document.getElementById('import-complete-ok') as HTMLButtonElement;
+
+    if (messageElement) {
+      const successCount = progress.total - progress.errors.length - progress.skipped;
+      messageElement.textContent = `Import completed! ${successCount}/${progress.total} words imported successfully.`;
+      if (progress.skipped > 0) {
+        messageElement.textContent += ` ${progress.skipped} words were skipped (already exist).`;
+      }
+      if (progress.errors.length > 0) {
+        messageElement.textContent += ` ${progress.errors.length} words had errors.`;
+      }
+    }
+
+    if (modal) {
+      modal.classList.remove('hidden');
+    }
+
+    // Refresh word list
+    this.resetUIForProfileSwitch();
+    this.loadWords();
+
+    if (okBtn) {
+      okBtn.onclick = () => {
+        if (modal) {
+          modal.classList.add('hidden');
+        }
+      };
+    }
+  }
+
+  private handleImportError(progress: ImportProgress): void {
+    this.isImporting = false;
+    this.hideImportProgressOverlay();
+
+    // If we have progress info and at least one word was successfully imported, reload the word list
+    if (progress && progress.success > 0) {
+      console.log(`Import failed but ${progress.success} words were successfully imported. Reloading word list...`);
+      this.resetUIForProfileSwitch();
+      this.loadWords();
+    }
+
+    const error = progress?.errors?.[0];
+    this.toastManager.showError(`Import failed: ${error}`);
+  }
+
+  private handleImportCancel(progress?: ImportProgress): void {
+    this.isImporting = false;
+    this.hideImportProgressOverlay();
+
+    // If we have progress info and at least one word was successfully imported, reload the word list
+    if (progress && progress.success > 0) {
+      console.log(`Import cancelled but ${progress.success} words were successfully imported. Reloading word list...`);
+      this.resetUIForProfileSwitch();
+      this.loadWords();
+    }
+
+    this.toastManager.showWarning('Import cancelled');
   }
 }

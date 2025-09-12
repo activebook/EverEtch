@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getWordsPaginated: (offset: number, limit: number) => ipcRenderer.invoke('get-words-paginated', offset, limit),
   searchWords: (query: string) => ipcRenderer.invoke('search-words', query),
   getWord: (wordId: string) => ipcRenderer.invoke('get-word', wordId),
+  getWordByName: (wordName: string) => ipcRenderer.invoke('get-word-by-name', wordName),
   addWord: (wordData: any) => ipcRenderer.invoke('add-word', wordData),
   updateWord: (wordId: string, wordData: any) => ipcRenderer.invoke('update-word', wordId, wordData),
   updateWordRemark: (wordId: string, remark: string) => ipcRenderer.invoke('update-word-remark', wordId, remark),
