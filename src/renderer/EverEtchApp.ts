@@ -316,6 +316,15 @@ export class EverEtchApp {
       this.handleWordMetadataReady(wordMeta);
     });
 
+    // Set up protocol handlers for custom URL scheme
+    window.electronAPI.onProtocolNavigateWord((wordName: string) => {
+      this.handleProtocolNavigateWord(wordName);
+    });
+
+    window.electronAPI.onProtocolSwitchProfile((profileName: string) => {
+      this.handleProtocolSwitchProfile(profileName);
+    });
+
     // Profile selector
     const profileSelect = document.getElementById('profile-select') as HTMLSelectElement;
     profileSelect.addEventListener('change', async (e) => {
@@ -1866,9 +1875,72 @@ export class EverEtchApp {
     } else {
       // Up arrow for ascending (oldest first) - more elegant design
       iconContainer.innerHTML = `
-        <svg class="w-4 h-4" viewBox="0 0 6.4 6.4" xmlns="http://www.w3.org/2000/svg"><path d="M5.741 2.341a.2.2 0 0 1-.283 0L4.8 1.683V3.6a.2.2 0 0 1-.4 0V1.683l-.659.658a.2.2 0 0 1-.283-.283l1-1 .002-.002.013-.011.007-.006.008-.006.009-.005.008-.005.009-.004.009-.004.009-.003.01-.004.008-.002.011-.003.009-.001.01-.001L4.595 1h.009l.015.001.01.002.009.001.011.003.008.002.01.004.008.003.009.004.009.004.009.005.008.005.009.007.007.005.014.013.001.001 1 1a.2.2 0 0 1 0 .283M1.2 3.4H3A.2.2 0 1 0 3 3H1.2a.2.2 0 0 0 0 .4m0-1.6h1.4a.2.2 0 0 0 0-.4H1.2a.2.2 0 1 0 0 .4m3.4 2.8H1.2a.2.2 0 0 0 0 .4h3.4a.2.2 0 0 0 0-.4"/></svg>
+        <svg class="w-4 h-4" viewBox="0 0 6.4 6.4" xmlns="http://www.w3.org/2000/svg"><path d="M5.741 2.341a.2.2 0 0 1-.283 0L4.8 1.683V3.6a.2.2 0 0 1-.4 0V1.683l-.659.658a.2.2 0 0 1-.283-.283l1-1 .002-.002.013-.011.007-.006.008-.006.009-.005.008-.005.009-.004.009-.004.009-.003.01-.004.008-.002.011-.003.009-.001.10-.001L4.595 1h.009l.015.001.01.002.009.001.011.003.008.002.01.004.008.003.009.004.009.004.009.005.008.005.009.007.007.005.014.013.001.001 1 1a.2.2 0 0 1 0 .283M1.2 3.4H3A.2.2 0 1 0 3 3H1.2a.2.2 0 0 0 0 .4m0-1.6h1.4a.2.2 0 0 0 0-.4H1.2a.2.2 0 1 0 0 .4m3.4 2.8H1.2a.2.2 0 0 0 0 .4h3.4a.2.2 0 0 0 0-.4"/></svg>
       `;
       sortBtn.title = 'Oldest first → Newest first';
+    }
+  }
+
+  // Protocol handlers
+  private async handleProtocolNavigateWord(wordName: string): Promise<void> {
+    try {
+      console.log('Handling protocol navigation to word:', wordName);
+
+      // Try to find the word by name
+      const word = await this.wordService.getWordByName(wordName);
+      if (word) {
+        // Word found, select it
+        this.selectWord(word);
+        this.toastManager.showSuccess(`Navigated to word: ${wordName}`);
+      } else {
+        // Word not found, set the input field and show a message
+        const wordInput = document.getElementById('word-input') as HTMLInputElement;
+        if (wordInput) {
+          wordInput.value = wordName;
+          this.updateGenerateBtnState(wordName);
+        }
+        this.toastManager.showInfo(`Word "${wordName}" not found. You can generate it now.`);
+      }
+    } catch (error) {
+      console.error('Error handling protocol navigation:', error);
+      this.toastManager.showError('Failed to navigate to word');
+    }
+  }
+
+  private async handleProtocolSwitchProfile(profileName: string): Promise<void> {
+    try {
+      console.log('Handling protocol profile switch to:', profileName);
+
+      // Check if the profile exists
+      const profiles = await this.profileService.getProfiles();
+      if (profiles.includes(profileName)) {
+        // Show loading overlay
+        this.showLoadingOverlay();
+
+        try {
+          const success = await this.profileService.switchProfile(profileName);
+          if (success) {
+            // Successful switch - load words normally
+            this.resetUIForProfileSwitch();
+            await this.loadWords();
+            this.toastManager.showSuccess(`Switched to profile: ${profileName}`);
+          } else {
+            this.toastManager.showError(`Failed to switch to profile: ${profileName}`);
+          }
+        } catch (error) {
+          console.error('Error switching profile:', error);
+          this.toastManager.showError(`Failed to switch to profile: ${profileName}`);
+        } finally {
+          setTimeout(() => {
+            this.hideLoadingOverlay();
+          }, 500);
+        }
+      } else {
+        this.toastManager.showError(`Profile "${profileName}" not found`);
+      }
+    } catch (error) {
+      console.error('Error handling protocol profile switch:', error);
+      this.toastManager.showError('Failed to switch profile');
     }
   }
 }
