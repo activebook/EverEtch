@@ -5,11 +5,11 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { getAndSetProxyEnvironment } from './utils/sys_proxy.js';
 import { getDatabasePath, ensureDataDirectory } from './utils/utils.js';
+import { StoreManager } from './utils/StoreManager.js';
 import { DatabaseManager } from './database/DatabaseManager.js';
 import { ProfileManager } from './database/ProfileManager.js';
 import { AIModelClient, WORD_DUMMY_METAS } from './ai/AIModelClient.js';
 import { marked } from 'marked';
-import { StoreManager } from './main/StoreManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
