@@ -280,6 +280,10 @@ ipcMain.handle('update-word', async (event, wordId: string, wordData: any) => {
   return await dbManager.updateWord(wordId, wordData);
 });
 
+ipcMain.handle('update-word-remark', async (event, wordId: string, remark: string) => {
+  return await dbManager.updateWord(wordId, { remark });
+});
+
 ipcMain.handle('delete-word', async (event, wordId: string) => {
   return await dbManager.deleteWord(wordId);
 });

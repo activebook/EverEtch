@@ -21,9 +21,21 @@ export class WordRenderer {
     const wordItem = document.createElement('div');
     wordItem.className = 'word-item p-1.5 mb-0.5 cursor-pointer transition-all duration-200 hover:bg-amber-50/20 relative';
     wordItem.setAttribute('data-word-id', word.id); // Add data attribute for scrolling
+
+    // Build remark HTML if remark exists and is not empty
+    const remarkHtml = (word.remark && word.remark.trim()) ? `
+      <div class="text-xs text-orange-600 mt-1 italic flex items-center pr-1">
+        <svg class="w-3 h-3 mr-1 flex-shrink-0 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5m-1.414-9.414a2 2 0 1 1 2.828 2.828L11.828 15H9v-2.828z"/>
+        </svg>
+        <span class="truncate pr-0.5">${word.remark}</span>
+      </div>
+    ` : '';
+
     wordItem.innerHTML = `
       <div class="font-semibold text-slate-800 text-base mb-0.5">${word.word}</div>
       <div class="text-sm text-slate-500 line-clamp-2">${word.one_line_desc || 'No description'}</div>
+      ${remarkHtml}
       <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-amber-200/60 via-amber-300/80 to-amber-200/60 opacity-0 transition-opacity duration-200"></div>
     `;
 
@@ -58,9 +70,21 @@ export class WordRenderer {
     const wordItem = document.createElement('div');
     wordItem.className = 'word-item p-1.5 mb-0.5 cursor-pointer transition-all duration-200 hover:bg-amber-50/20 relative';
     wordItem.setAttribute('data-word-id', word.id); // Add data attribute for scrolling
+
+    // Build remark HTML if remark exists and is not empty (use remark from database)
+    const remarkHtml = (word.remark && word.remark.trim()) ? `
+      <div class="text-xs text-orange-600 mt-1 italic flex items-center pr-1">
+        <svg class="w-3 h-3 mr-1 flex-shrink-0 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5m-1.414-9.414a2 2 0 1 1 2.828 2.828L11.828 15H9v-2.828z"/>
+        </svg>
+        <span class="truncate pr-0.5">${word.remark}</span>
+      </div>
+    ` : '';
+
     wordItem.innerHTML = `
       <div class="font-semibold text-slate-800 text-base mb-0.5">${word.word}</div>
       <div class="text-sm text-slate-500 line-clamp-2">${word.one_line_desc || 'No description'}</div>
+      ${remarkHtml}
       <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-amber-200/60 via-amber-300/80 to-amber-200/60 opacity-0 transition-opacity duration-200"></div>
     `;
 
@@ -187,6 +211,20 @@ export class WordRenderer {
           </div>
         ` : ''}
 
+        ${word.remark ? `
+          <div>
+            <h4 class="text-lg font-semibold text-slate-800 mb-3 flex items-center">
+              <svg class="w-4 h-4 mr-2 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+              </svg>
+              Remark
+            </h4>
+            <div class="remark-display text-sm text-slate-600 mb-4 px-3 py-2">
+              ${word.remark}
+            </div>
+          </div>
+        ` : ''}
+
         <!-- Action buttons will be loaded separately after word details are complete -->
         <div id="action-buttons-container"></div>
       </div>
@@ -292,6 +330,18 @@ export class WordRenderer {
           </button>
         `}
 
+        ${!isNewWord ? `
+          <button
+            id="write-btn"
+            title="Add/Edit remark"
+            class="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-amber-100/70 rounded-md transition-all duration-200 hover:shadow-sm"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+            </svg>
+          </button>
+        ` : ''}
+
         <button
           id="refresh-btn"
           title="Regenerate meaning"
@@ -307,6 +357,7 @@ export class WordRenderer {
     // Add click handlers for action buttons
     const copyBtn = document.getElementById('copy-btn');
     const addBtn = document.getElementById('add-btn');
+    const writeBtn = document.getElementById('write-btn');
     const refreshBtn = document.getElementById('refresh-btn');
     const deleteBtn = document.getElementById('delete-btn');
 
@@ -315,6 +366,9 @@ export class WordRenderer {
     }
     if (addBtn) {
       addBtn.addEventListener('click', () => this.onAddWord?.(word));
+    }
+    if (writeBtn) {
+      writeBtn.addEventListener('click', () => this.onWriteRemark?.(word));
     }
     if (refreshBtn) {
       refreshBtn.addEventListener('click', () => this.onRefreshWord?.(word));
@@ -487,7 +541,8 @@ export class WordRenderer {
     const wordItem = this.createWordItemFromList({
       id: word.id,
       word: word.word,
-      one_line_desc: word.one_line_desc
+      one_line_desc: word.one_line_desc,
+      remark: word.remark
     });
 
     // Insert at the top of the list
@@ -506,6 +561,7 @@ export class WordRenderer {
   onAddWord?: (word: WordDocument) => void;
   onRefreshWord?: (word: WordDocument) => void;
   onDeleteWord?: (word: WordDocument) => void;
+  onWriteRemark?: (word: WordDocument) => void;
   onWordSelect?: (word: WordDocument | WordListItem) => void;
 
   private async selectWord(word: WordDocument | WordListItem): Promise<void> {

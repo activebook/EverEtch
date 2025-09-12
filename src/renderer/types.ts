@@ -14,6 +14,7 @@ declare global {
             getWord: (wordId: string) => Promise<any>;
             addWord: (wordData: any) => Promise<any>;
             updateWord: (wordId: string, wordData: any) => Promise<any>;
+            updateWordRemark: (wordId: string, remark: string) => Promise<any>;
             deleteWord: (wordId: string) => Promise<boolean>;
             generateWordMeaning: (word: string) => Promise<string>;
             generateWordMetas: (word: string, meaning: string, generationId: string) => Promise<any>;
@@ -47,6 +48,7 @@ export interface WordDocument {
     tag_colors: Record<string, string>;
     synonyms: string[];
     antonyms: string[];
+    remark?: string;
     created_at: string;
     updated_at: string;
 }
@@ -55,6 +57,7 @@ export interface WordListItem {
     id: string;
     word: string;
     one_line_desc: string;
+    remark?: string;
 }
 
 export interface ProfileConfig {
