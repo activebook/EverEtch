@@ -197,6 +197,10 @@ ipcMain.handle('get-word', async (event, wordId: string) => {
   return await dbManager.getWord(wordId);
 });
 
+ipcMain.handle('get-word-by-name', async (event, wordName: string) => {
+  return await dbManager.getWordByName(wordName);
+});
+
 ipcMain.handle('generate-word-meaning', async (event, word: string) => {
   const profile = await profileManager.getCurrentProfile();
   if (!profile) return null;

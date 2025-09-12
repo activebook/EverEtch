@@ -451,11 +451,22 @@ export class WordRenderer {
     suggestionsDiv.innerHTML = '';
 
     suggestions.forEach(word => {
+      // Build remark HTML if remark exists and is not empty
+      const remarkHtml = (word.remark && word.remark.trim()) ? `
+        <div class="text-xs text-orange-600 mt-1 italic flex items-center pr-1">
+          <svg class="w-3 h-3 mr-1 flex-shrink-0 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5m-1.414-9.414a2 2 0 1 1 2.828 2.828L11.828 15H9v-2.828z"/>
+          </svg>
+          <span class="truncate pr-0.5">${word.remark}</span>
+        </div>
+      ` : '';
+
       const suggestionItem = document.createElement('div');
       suggestionItem.className = 'p-3 hover:bg-amber-100/70 cursor-pointer rounded-lg transition-colors duration-150 border-b border-amber-200/60 last:border-b-0';
       suggestionItem.innerHTML = `
         <div class="font-medium text-slate-800 mb-1">${word.word}</div>
         <div class="text-sm text-slate-600 line-clamp-2">${word.one_line_desc || 'No description'}</div>
+        ${remarkHtml}
       `;
 
       suggestionItem.addEventListener('click', async () => {
