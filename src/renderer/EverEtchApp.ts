@@ -495,10 +495,12 @@ export class EverEtchApp {
     const cancelSettingsBtn = document.getElementById('cancel-settings') as HTMLButtonElement;
     const saveSettingsBtn = document.getElementById('save-settings') as HTMLButtonElement;
     const deleteProfileBtn = document.getElementById('delete-profile-btn') as HTMLButtonElement;
+    const toggleApiKeyBtn = document.getElementById('toggle-api-key-visibility') as HTMLButtonElement;
 
     cancelSettingsBtn.addEventListener('click', () => this.hideSettingsModal());
     saveSettingsBtn.addEventListener('click', () => this.saveSettings());
     deleteProfileBtn.addEventListener('click', () => this.handleDeleteProfile());
+    toggleApiKeyBtn.addEventListener('click', () => this.toggleApiKeyVisibility());
 
     // Resize functionality
     const mainContent = document.getElementById('main-content') as HTMLElement;
@@ -1773,5 +1775,25 @@ export class EverEtchApp {
     }
 
     this.toastManager.showWarning('Import cancelled');
+  }
+
+  private toggleApiKeyVisibility(): void {
+    const apiKeyInput = document.getElementById('api-key') as HTMLInputElement;
+    const eyeIcon = document.getElementById('eye-icon') as HTMLElement;
+    const eyeOffIcon = document.getElementById('eye-off-icon') as HTMLElement;
+
+    if (apiKeyInput && eyeIcon && eyeOffIcon) {
+      if (apiKeyInput.type === 'password') {
+        // Show password
+        apiKeyInput.type = 'text';
+        eyeIcon.classList.add('hidden');
+        eyeOffIcon.classList.remove('hidden');
+      } else {
+        // Hide password
+        apiKeyInput.type = 'password';
+        eyeIcon.classList.remove('hidden');
+        eyeOffIcon.classList.add('hidden');
+      }
+    }
   }
 }
