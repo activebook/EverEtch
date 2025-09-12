@@ -339,6 +339,12 @@ export class DatabaseManager {
           updated_at: new Date().toISOString()
         };
 
+        // debug only the changed part:
+        console.debug('Updating word: ', {
+          ...wordData,
+          updated_at: new Date().toISOString()
+        });
+
         this.db.run(
           'UPDATE documents SET data = ?, updated_at = ? WHERE id = ?',
           [JSON.stringify(updated), updated.updated_at, wordId],

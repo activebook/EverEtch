@@ -1433,8 +1433,81 @@ export class EverEtchApp {
           if (wordIndex !== -1) {
             this.words[wordIndex] = {
               ...this.words[wordIndex],
-              // Keep existing properties, remark doesn't affect list display
+              remark: remarkValue
             };
+          }
+
+          // Update the DOM element for this word in the word list
+          const wordItem = document.querySelector(`[data-word-id="${word.id}"]`) as HTMLElement;
+          if (wordItem) {
+            // Find the existing remark display
+            const existingRemark = wordItem.querySelector('.text-orange-600');
+            if (existingRemark) {
+              if (remarkValue && remarkValue.trim()) {
+                // Update existing remark
+                const remarkText = existingRemark.querySelector('.truncate') as HTMLElement;
+                if (remarkText) {
+                  remarkText.textContent = remarkValue;
+                }
+              } else {
+                // Remove remark if it's empty
+                existingRemark.remove();
+              }
+            } else if (remarkValue && remarkValue.trim()) {
+              // Add new remark if it didn't exist before
+              const remarkHtml = `
+                <div class="text-xs text-orange-600 mt-1 italic flex items-center pr-1">
+                  <svg class="w-3 h-3 mr-1 flex-shrink-0 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5m-1.414-9.414a2 2 0 1 1 2.828 2.828L11.828 15H9v-2.828z"/>
+                  </svg>
+                  <span class="truncate pr-0.5">${remarkValue}</span>
+                </div>
+              `;
+
+              // Find the description element and add remark after it
+              const description = wordItem.querySelector('.text-slate-500');
+              if (description && description.parentNode) {
+                const remarkDiv = document.createElement('div');
+                remarkDiv.innerHTML = remarkHtml;
+                description.parentNode.insertBefore(remarkDiv.firstElementChild!, description.nextSibling);
+              }
+            }
+          }
+
+          // Also update in associated words list if it exists there
+          const associatedWordItem = document.querySelector(`#associated-list [data-word-id="${word.id}"]`) as HTMLElement;
+          if (associatedWordItem) {
+            const existingRemark = associatedWordItem.querySelector('.text-orange-600');
+            if (existingRemark) {
+              if (remarkValue && remarkValue.trim()) {
+                // Update existing remark
+                const remarkText = existingRemark.querySelector('.truncate') as HTMLElement;
+                if (remarkText) {
+                  remarkText.textContent = remarkValue;
+                }
+              } else {
+                // Remove remark if it's empty
+                existingRemark.remove();
+              }
+            } else if (remarkValue && remarkValue.trim()) {
+              // Add new remark if it didn't exist before
+              const remarkHtml = `
+                <div class="text-xs text-orange-600 mt-1 italic flex items-center pr-1">
+                  <svg class="w-3 h-3 mr-1 flex-shrink-0 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5m-1.414-9.414a2 2 0 1 1 2.828 2.828L11.828 15H9v-2.828z"/>
+                  </svg>
+                  <span class="truncate pr-0.5">${remarkValue}</span>
+                </div>
+              `;
+
+              // Find the description element and add remark after it
+              const description = associatedWordItem.querySelector('.text-slate-500');
+              if (description && description.parentNode) {
+                const remarkDiv = document.createElement('div');
+                remarkDiv.innerHTML = remarkHtml;
+                description.parentNode.insertBefore(remarkDiv.firstElementChild!, description.nextSibling);
+              }
+            }
           }
 
           // Re-render word details to show updated remark
