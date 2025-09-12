@@ -1600,7 +1600,7 @@ export class EverEtchApp {
   private selectImportFile(): void {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.txt,.csv';
+    input.accept = '.txt,.md,.csv';
     input.onchange = (e) => {
       const target = e.target as HTMLInputElement;
       const file = target.files?.[0];
@@ -1716,13 +1716,17 @@ export class EverEtchApp {
 
     if (messageElement) {
       const successCount = progress.total - progress.errors.length - progress.skipped;
-      messageElement.textContent = `Import completed! ${successCount}/${progress.total} words imported successfully.`;
+      let html = `<span>Import completed!</span><br><span>${successCount}/${progress.total} words imported successfully.</span>`;
+
       if (progress.skipped > 0) {
-        messageElement.textContent += ` ${progress.skipped} words were skipped (already exist).`;
+        html += `<br><span>${progress.skipped} words were skipped (already exist).</span>`;
       }
+
       if (progress.errors.length > 0) {
-        messageElement.textContent += ` ${progress.errors.length} words had errors.`;
+        html += `<br><span>${progress.errors.length} words had errors.</span>`;
       }
+
+      messageElement.innerHTML = html;
     }
 
     if (modal) {

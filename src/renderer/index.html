@@ -94,10 +94,8 @@
                                 </svg>
                             </button>
                             <button id="import-words-btn" title="Import Words from File"
-                                class="p-2 bg-amber-50/60 hover:bg-amber-100/70 text-slate-600 hover:text-slate-700 rounded-lg transition-all duration-200 hover:shadow-md group">
-                                <svg class="w-4 h-4" viewBox="0 0 0.4 0.4" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M.213.342.092.221.11.203.2.294v-.27h.025v.27L.316.203l.018.018zM.4.226v.162a.013.013 0 0 1-.013.013h-.35A.013.013 0 0 1 .024.388V.226H0v.162c0 .021.017.038.038.038h.35A.04.04 0 0 0 .426.388V.226z"/>
-                                </svg>
+                                class="p-2 bg-amber-50/60 hover:bg-amber-100/70 text-slate-600 hover:text-slate-700 rounded-lg transition-all duration-200 hover:shadow-md group">                                
+                                <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17.5 12a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11M17 2a2.5 2.5 0 0 1 2.5 2.5v6.813a6.5 6.5 0 0 0-1.5-.294V4.5a1 1 0 0 0-1-1H5.5a1 1 0 0 0-1 1V18h6.519q.061.782.294 1.5H4.5a1 1 0 0 0 1 1h6.232A6.5 6.5 0 0 0 12.81 22H5.5A2.5 2.5 0 0 1 3 19.5v-15A2.5 2.5 0 0 1 5.5 2zm.5 12a.5.5 0 0 0-.5.5V17h-2.504a.5.5 0 0 0 0 1h2.505v2.503a.5.5 0 1 0 1 0V18h2.502a.5.5 0 1 0 0-1H18v-2.5a.5.5 0 0 0-.5-.5M15 5a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zm-.5 1.5h-7v1h7z" fill="#212121"/></svg>
                             </button>
                             <button id="howto-btn" title="How to Use Guide"
                                 class="p-2 bg-amber-50/60 hover:bg-amber-100/70 text-slate-600 hover:text-slate-700 rounded-lg transition-all duration-200 hover:shadow-md group">
@@ -375,7 +373,7 @@
                     <div class="p-5 space-y-4">
                         <div>
                             <p class="text-sm text-slate-600 mb-3">
-                                Select a text file (.txt or .csv) containing words to import. Each word should be on a separate line.
+                                Select a text file (.txt .md or .) containing words to import. Each word should be on a separate line.
                             </p>
                             <div class="border-2 border-dashed border-amber-300 rounded-lg p-4 text-center bg-amber-50/50">
                                 <svg class="w-8 h-8 mx-auto mb-2 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -434,9 +432,9 @@
                             </svg>
                         </div>
                         <h3 class="text-xl font-semibold text-slate-800 mb-2">Import Complete!</h3>
-                        <p id="import-complete-message" class="text-sm text-slate-600 mb-6">
-                            Words have been successfully imported.
-                        </p>
+                        <div id="import-complete-message" class="text-sm text-slate-600 mb-6 space-y-1">
+                            <!-- Import message parts will be populated here -->
+                        </div>
                         <button id="import-complete-ok" class="px-6 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all duration-200 hover:shadow-lg font-medium">
                             OK
                         </button>
