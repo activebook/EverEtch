@@ -37,6 +37,11 @@ declare global {
 
             onWordMeaningStreaming: (callback: Function) => void;
             onWordMetadataReady: (callback: Function) => void;
+
+            // Protocol handlers for custom URL scheme
+            onProtocolNavigateWord: (callback: Function) => void;
+            onProtocolSwitchProfile: (callback: Function) => void;
+
             removeAllListeners: (event: string) => void;
         };
     }

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, screen } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, screen, protocol } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -19,6 +19,7 @@ let dbManager: DatabaseManager;
 let profileManager: ProfileManager;
 let aiClient: AIModelClient;
 let storeManager: StoreManager;
+let isProtocolHandlerSetUp = false; // Track if protocol handler is already set up
 
 // Configure marked for proper line break handling
 marked.setOptions({
@@ -26,22 +27,130 @@ marked.setOptions({
   gfm: true,    // Enable GitHub Flavored Markdown
 });
 
+// Register custom protocol scheme BEFORE app is ready
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'everetch', privileges: { standard: true, secure: true } }
+]);
+
+// Set up custom protocol handler
+function setupProtocolHandler() {
+  protocol.handle('everetch', async (request) => {
+    try {
+      const url = request.url;
+      console.log('Protocol request received:', url);
+
+      // Parse the URL to extract action and parameters
+      const urlObj = new URL(url);
+      const urlPath = urlObj.pathname.substring(1); // Remove leading slash
+      const params = urlObj.searchParams;
+
+      // Check if window is already loaded and showing
+      const isWindowReady = mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible();
+
+      // Handle different protocol actions
+      if (urlPath === '' || urlPath === 'open') {
+        // Just open/focus the app
+        if (isWindowReady) {
+          mainWindow.focus(); // Just focus if already open
+          return new Response('', { status: 204 }); // No content needed
+        } else {
+          // App not ready, return the main page
+          const filePath = path.join(__dirname, 'renderer/index.html');
+          const fileContent = await fs.promises.readFile(filePath, 'utf8');
+          return new Response(fileContent, {
+            headers: { 'Content-Type': 'text/html' }
+          });
+        }
+      }
+
+      if (urlPath.startsWith('word/')) {
+        // Handle word navigation: everetch://word/{wordName}
+        const wordName = decodeURIComponent(urlPath.substring(5));
+        console.log('Navigating to word:', wordName);
+
+        if (isWindowReady) {
+          // Send IPC message to renderer to navigate to the word
+          mainWindow.webContents.send('protocol-navigate-word', wordName);
+          mainWindow.focus(); // Focus the window
+          return new Response('', { status: 204 }); // No content needed
+        } else {
+          // App not ready, load HTML and then navigate
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            // Set up a one-time listener for when the window is ready
+            mainWindow.webContents.once('did-finish-load', () => {
+              mainWindow!.webContents.send('protocol-navigate-word', wordName);
+            });
+          }
+          const filePath = path.join(__dirname, 'renderer/index.html');
+          const fileContent = await fs.promises.readFile(filePath, 'utf8');
+          return new Response(fileContent, {
+            headers: { 'Content-Type': 'text/html' }
+          });
+        }
+      }
+
+      if (urlPath.startsWith('profile/')) {
+        // Handle profile switching: everetch://profile/{profileName}
+        const profileName = decodeURIComponent(urlPath.substring(8));
+        console.log('Switching to profile:', profileName);
+
+        if (isWindowReady) {
+          // Send IPC message to renderer to switch profile
+          mainWindow.webContents.send('protocol-switch-profile', profileName);
+          mainWindow.focus(); // Focus the window
+          return new Response('', { status: 204 }); // No content needed
+        } else {
+          // App not ready, load HTML and then switch profile
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            // Set up a one-time listener for when the window is ready
+            mainWindow.webContents.once('did-finish-load', () => {
+              mainWindow!.webContents.send('protocol-switch-profile', profileName);
+            });
+          }
+          const filePath = path.join(__dirname, 'renderer/index.html');
+          const fileContent = await fs.promises.readFile(filePath, 'utf8');
+          return new Response(fileContent, {
+            headers: { 'Content-Type': 'text/html' }
+          });
+        }
+      }
+
+      // Default: just open/focus the app
+      if (isWindowReady) {
+        mainWindow.focus();
+        return new Response('', { status: 204 });
+      } else {
+        const filePath = path.join(__dirname, 'renderer/index.html');
+        const fileContent = await fs.promises.readFile(filePath, 'utf8');
+        return new Response(fileContent, {
+          headers: { 'Content-Type': 'text/html' }
+        });
+      }
+
+    } catch (error) {
+      console.error('Error handling protocol request:', error);
+      // On error, try to focus existing window or return error
+      if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()) {
+        mainWindow.focus();
+        return new Response('', { status: 204 });
+      } else {
+        return new Response('Error loading page', { status: 500 });
+      }
+    }
+  });
+}
+
 async function createWindow() {
 
-  // Set up proxy environment variables
-  getAndSetProxyEnvironment();
-  
-  // Initialize managers first to get profile config
-  dbManager = new DatabaseManager();
-  profileManager = new ProfileManager(dbManager);
-  aiClient = new AIModelClient();
-  storeManager = new StoreManager();
+  // Set up custom protocol handler (only once)
+  if (!isProtocolHandlerSetUp) {
+    setupProtocolHandler();
+    isProtocolHandlerSetUp = true;
+  }
 
   // Create window with minimal bounds first (invisible), then apply saved bounds
-  let windowBounds: { width: number; height: number; x?: number; y?: number } = { width: 1200, height: 800 };
-
   mainWindow = new BrowserWindow({
-    ...windowBounds,
+    width: 1200, height: 800,
     minWidth: 800,
     minHeight: 600,
     show: false, // Don't show until bounds are applied
@@ -54,10 +163,30 @@ async function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, 'renderer/index.html'));
 
+  // Apply saved window bounds
+  adjustMainWindow(() => {
+    // Callback function after window is adjusted
+    // Set up proxy environment variables
+    getAndSetProxyEnvironment();
+
+    // Initialize managers first to get profile config
+    dbManager = new DatabaseManager();
+    profileManager = new ProfileManager(dbManager);
+    aiClient = new AIModelClient();    
+  });
+
+  if (process.env.NODE_ENV === 'development') {
+    // Open DevTools(cmd + alt + i)
+    // mainWindow.webContents.openDevTools();
+  }
+}
+
+function adjustMainWindow(ready: () => void) {
   // Load and apply window bounds after the window is ready to show
   mainWindow.once('ready-to-show', () => {
     try {
       // Load window bounds from electron-store
+      storeManager = new StoreManager();
       const savedBounds = storeManager.loadWindowBounds();
 
       if (savedBounds) {
@@ -73,7 +202,7 @@ async function createWindow() {
 
         // Check if saved position is valid
         if (savedBounds.x >= 0 && savedBounds.y >= 0 &&
-            savedBounds.x < screenWidth - 100 && savedBounds.y < screenHeight - 100) {
+          savedBounds.x < screenWidth - 100 && savedBounds.y < screenHeight - 100) {
           validatedBounds.x = savedBounds.x;
           validatedBounds.y = savedBounds.y;
         }
@@ -87,12 +216,9 @@ async function createWindow() {
 
     // Show the window after bounds are applied
     mainWindow.show();
+    // Call the provided callback
+    ready();
   });
-
-  if (process.env.NODE_ENV === 'development') {
-    // Open DevTools(cmd + alt + i)
-    // mainWindow.webContents.openDevTools();
-  }
 
   // Set up window event listeners for saving bounds
   let saveTimeout: NodeJS.Timeout;
@@ -317,7 +443,7 @@ ipcMain.handle('update-profile-config', async (event, config: any) => {
 // Markdown processing
 ipcMain.handle('process-markdown', async (event, markdown: string) => {
   try {
-    const result = marked(markdown);    
+    const result = marked(markdown);
     return result;
   } catch (error) {
     console.error('Error processing markdown:', error);
