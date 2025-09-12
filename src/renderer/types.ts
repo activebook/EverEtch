@@ -57,6 +57,7 @@ export interface WordListItem {
     id: string;
     word: string;
     one_line_desc: string;
+    remark?: string;
 }
 
 export interface ProfileConfig {
