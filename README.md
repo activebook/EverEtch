@@ -4,6 +4,7 @@ A slim, AI-powered app to help you learn and remember words.
 
 ![UI Screenshot](screenshots/UI_EN.png)
 ![UI Screenshot](screenshots/UI_JP.png)
+![UI Screenshot](screenshots/UI_FR.png)
 
 ## ✨ WTF
 
