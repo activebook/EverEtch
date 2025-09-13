@@ -72,6 +72,11 @@ export class WordImportService {
 
     console.log(`Starting import of ${this.words.length} words`);
 
+    // Send initial progress (0)
+    if (this.callbacks?.onProgress) {
+      this.callbacks.onProgress(this.progress);
+    }
+
     // Start processing
     this.processNextWord();
   }
@@ -232,7 +237,7 @@ export class WordImportService {
     // Process next word
     let timeLapse = 500
     if (skipped) {
-      timeLapse = 50
+      timeLapse = 10
     }
     setTimeout(() => {
       this.processNextWord();
