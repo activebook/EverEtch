@@ -220,16 +220,40 @@
 }
 
 .markdown-details table {
-    @apply w-full border-collapse mb-4 rounded-lg overflow-hidden shadow-sm;
+    @apply w-full border-collapse mb-4 rounded-lg overflow-hidden;
+    background: rgba(255, 255, 255, 0.02);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(245, 158, 11, 0.1);
+    box-shadow: 0 4px 6px -1px rgba(245, 158, 11, 0.05), 0 2px 4px -1px rgba(245, 158, 11, 0.03);
 }
 
 .markdown-details th,
 .markdown-details td {
-    @apply border border-slate-200 px-3 py-2 text-left;
+    @apply border px-4 py-3 text-left;
+    border-color: rgba(245, 158, 11, 0.15);
+    transition: all 0.2s ease-in-out;
 }
 
 .markdown-details th {
-    @apply font-semibold text-slate-700;
+    @apply font-semibold;
+    color: #92400e; /* amber-800 */
+    background: rgba(245, 158, 11, 0.08);
+    border-bottom: 2px solid rgba(245, 158, 11, 0.2);
+}
+
+.markdown-details tbody tr {
+    transition: all 0.2s ease-in-out;
+}
+
+.markdown-details tbody tr:hover {
+    background: rgba(245, 158, 11, 0.04);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.08);
+}
+
+.markdown-details tbody tr:hover td {
+    color: #78350f; /* slightly darker on hover */
 }
 
 
