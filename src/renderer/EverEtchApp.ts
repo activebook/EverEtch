@@ -129,7 +129,7 @@ export class EverEtchApp {
         // No current profile, just load words
         console.log('No current profile found, loading words...');
         await this.loadWords();
-      }
+      }      
 
       // Set up event listeners
       this.setupEventListeners();
@@ -139,6 +139,10 @@ export class EverEtchApp {
 
       // Update sort button icon after loading
       this.updateSortButtonIcon();
+
+      // Signal to main process that app is fully ready
+      console.log('🎯 Renderer: App fully initialized, sending app-ready signal');
+      window.electronAPI.sendAppRenderReady();
 
     } catch (error) {
       console.error('Error initializing app:', error);
@@ -314,6 +318,17 @@ export class EverEtchApp {
     // Set up word metadata ready listener
     window.electronAPI.onWordMetadataReady((wordMeta: any) => {
       this.handleWordMetadataReady(wordMeta);
+    });
+
+    // Set up protocol handlers for custom URL scheme
+    window.electronAPI.onProtocolNavigateWord((wordName: string) => {
+      console.log('🎯 Renderer: Received protocol navigation request for word:', wordName);
+      this.handleProtocolNavigateWord(wordName);
+    });
+
+    window.electronAPI.onProtocolSwitchProfile((profileName: string) => {
+      console.log('🎯 Renderer: Received protocol profile switch request for:', profileName);
+      this.handleProtocolSwitchProfile(profileName);
     });
 
     // Profile selector
@@ -1866,9 +1881,96 @@ export class EverEtchApp {
     } else {
       // Up arrow for ascending (oldest first) - more elegant design
       iconContainer.innerHTML = `
-        <svg class="w-4 h-4" viewBox="0 0 6.4 6.4" xmlns="http://www.w3.org/2000/svg"><path d="M5.741 2.341a.2.2 0 0 1-.283 0L4.8 1.683V3.6a.2.2 0 0 1-.4 0V1.683l-.659.658a.2.2 0 0 1-.283-.283l1-1 .002-.002.013-.011.007-.006.008-.006.009-.005.008-.005.009-.004.009-.004.009-.003.01-.004.008-.002.011-.003.009-.001.01-.001L4.595 1h.009l.015.001.01.002.009.001.011.003.008.002.01.004.008.003.009.004.009.004.009.005.008.005.009.007.007.005.014.013.001.001 1 1a.2.2 0 0 1 0 .283M1.2 3.4H3A.2.2 0 1 0 3 3H1.2a.2.2 0 0 0 0 .4m0-1.6h1.4a.2.2 0 0 0 0-.4H1.2a.2.2 0 1 0 0 .4m3.4 2.8H1.2a.2.2 0 0 0 0 .4h3.4a.2.2 0 0 0 0-.4"/></svg>
+        <svg class="w-4 h-4" viewBox="0 0 6.4 6.4" xmlns="http://www.w3.org/2000/svg"><path d="M5.741 2.341a.2.2 0 0 1-.283 0L4.8 1.683V3.6a.2.2 0 0 1-.4 0V1.683l-.659.658a.2.2 0 0 1-.283-.283l1-1 .002-.002.013-.011.007-.006.008-.006.009-.005.008-.005.009-.004.009-.004.009-.003.01-.004.008-.002.011-.003.009-.001.10-.001L4.595 1h.009l.015.001.01.002.009.001.011.003.008.002.01.004.008.003.009.004.009.004.009.005.008.005.009.007.007.005.014.013.001.001 1 1a.2.2 0 0 1 0 .283M1.2 3.4H3A.2.2 0 1 0 3 3H1.2a.2.2 0 0 0 0 .4m0-1.6h1.4a.2.2 0 0 0 0-.4H1.2a.2.2 0 1 0 0 .4m3.4 2.8H1.2a.2.2 0 0 0 0 .4h3.4a.2.2 0 0 0 0-.4"/></svg>
       `;
       sortBtn.title = 'Oldest first → Newest first';
+    }
+  }
+
+  // Auto-generate word if it doesn't exist
+  private async autoGenerateWord(wordName: string): Promise<void> {
+    try {
+      // Check if we're already generating something
+      if (this.isGenerating) {
+        this.toastManager.showWarning('Please wait for current generation to complete');
+        return;
+      }
+
+      // Set the word in input field
+      const wordInput = document.getElementById('word-input') as HTMLInputElement;
+      wordInput.value = wordName;
+
+      // Show loading message
+      this.toastManager.showInfo(`Generating word: ${wordName}...`);
+
+      // Trigger generation using existing logic
+      await this.handleGenerate();
+
+      // The word should now be generated and selected
+      this.toastManager.showSuccess(`Word "${wordName}" generated and selected!`);
+
+    } catch (error) {
+      console.error('Error auto-generating word:', error);
+      this.toastManager.showError(`Failed to generate word: ${wordName}`);
+    }
+  }
+
+  // Protocol handlers
+  private async handleProtocolNavigateWord(wordName: string): Promise<void> {
+    try {
+      console.log('🎯 Renderer: Handling protocol navigation to word:', wordName);
+
+      // Try to find the word by name
+      const word = await this.wordService.getWordByName(wordName);
+      if (word) {
+        // Word found, select it
+        this.selectWord(word);
+        this.toastManager.showSuccess(`Navigated to word: ${wordName}`);
+      } else {
+        // Word not found, auto-generate it!
+        console.log('🎯 Renderer: Word not found, auto-generating:', wordName);
+        await this.autoGenerateWord(wordName);
+      }
+    } catch (error) {
+      console.error('Error handling protocol navigation:', error);
+      this.toastManager.showError('Failed to navigate to word');
+    }
+  }
+
+  private async handleProtocolSwitchProfile(profileName: string): Promise<void> {
+    try {
+      console.log('Handling protocol profile switch to:', profileName);
+
+      // Check if the profile exists
+      const profiles = await this.profileService.getProfiles();
+      if (profiles.includes(profileName)) {
+        // Show loading overlay
+        this.showLoadingOverlay();
+
+        try {
+          const success = await this.profileService.switchProfile(profileName);
+          if (success) {
+            // Successful switch - load words normally
+            this.resetUIForProfileSwitch();
+            await this.loadWords();
+            this.toastManager.showSuccess(`Switched to profile: ${profileName}`);
+          } else {
+            this.toastManager.showError(`Failed to switch to profile: ${profileName}`);
+          }
+        } catch (error) {
+          console.error('Error switching profile:', error);
+          this.toastManager.showError(`Failed to switch to profile: ${profileName}`);
+        } finally {
+          setTimeout(() => {
+            this.hideLoadingOverlay();
+          }, 500);
+        }
+      } else {
+        this.toastManager.showError(`Profile "${profileName}" not found`);
+      }
+    } catch (error) {
+      console.error('Error handling protocol profile switch:', error);
+      this.toastManager.showError('Failed to switch profile');
     }
   }
 }

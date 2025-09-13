@@ -25,7 +25,8 @@ declare global {
             updateProfileConfig: (config: any) => Promise<boolean>;            
             processMarkdown: (markdown: string) => Promise<string>;
 
-
+            // App Render ready
+            sendAppRenderReady: () => Promise<void>;
 
             // Profile import/export
             exportProfile: () => Promise<any>;
@@ -37,6 +38,11 @@ declare global {
 
             onWordMeaningStreaming: (callback: Function) => void;
             onWordMetadataReady: (callback: Function) => void;
+
+            // Protocol handlers for custom URL scheme
+            onProtocolNavigateWord: (callback: Function) => void;
+            onProtocolSwitchProfile: (callback: Function) => void;
+
             removeAllListeners: (event: string) => void;
         };
     }

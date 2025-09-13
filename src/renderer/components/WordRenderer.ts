@@ -242,7 +242,11 @@ export class WordRenderer {
 
         const target = e.target as HTMLElement;
         const tag = target.dataset.tag!;
-        // This will be handled by the main app
+        // Set the input field to the tag and show related words
+        const wordInput = document.getElementById('word-input') as HTMLInputElement;
+        wordInput.value = tag;
+        // Trigger input event to update UI (suggestions, button state)
+        wordInput.dispatchEvent(new Event('input', { bubbles: true }));
         this.onTagClick?.(tag);
       });
     });
@@ -262,6 +266,8 @@ export class WordRenderer {
         // Set the input field to the synonym and show related words
         const wordInput = document.getElementById('word-input') as HTMLInputElement;
         wordInput.value = synonym;
+        // Trigger input event to update UI (suggestions, button state)
+        wordInput.dispatchEvent(new Event('input', { bubbles: true }));
         this.onSynonymClick?.(synonym);
       });
     });
@@ -281,6 +287,8 @@ export class WordRenderer {
         // Set the input field to the antonym and show related words
         const wordInput = document.getElementById('word-input') as HTMLInputElement;
         wordInput.value = antonym;
+        // Trigger input event to update UI (suggestions, button state)
+        wordInput.dispatchEvent(new Event('input', { bubbles: true }));
         this.onAntonymClick?.(antonym);
       });
     });
