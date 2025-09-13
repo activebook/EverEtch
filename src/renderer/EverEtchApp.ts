@@ -1887,10 +1887,38 @@ export class EverEtchApp {
     }
   }
 
+  // Auto-generate word if it doesn't exist
+  private async autoGenerateWord(wordName: string): Promise<void> {
+    try {
+      // Check if we're already generating something
+      if (this.isGenerating) {
+        this.toastManager.showWarning('Please wait for current generation to complete');
+        return;
+      }
+
+      // Set the word in input field
+      const wordInput = document.getElementById('word-input') as HTMLInputElement;
+      wordInput.value = wordName;
+
+      // Show loading message
+      this.toastManager.showInfo(`Generating word: ${wordName}...`);
+
+      // Trigger generation using existing logic
+      await this.handleGenerate();
+
+      // The word should now be generated and selected
+      this.toastManager.showSuccess(`Word "${wordName}" generated and selected!`);
+
+    } catch (error) {
+      console.error('Error auto-generating word:', error);
+      this.toastManager.showError(`Failed to generate word: ${wordName}`);
+    }
+  }
+
   // Protocol handlers
   private async handleProtocolNavigateWord(wordName: string): Promise<void> {
     try {
-      console.log('Handling protocol navigation to word:', wordName);
+      console.log('🎯 Renderer: Handling protocol navigation to word:', wordName);
 
       // Try to find the word by name
       const word = await this.wordService.getWordByName(wordName);
@@ -1899,13 +1927,9 @@ export class EverEtchApp {
         this.selectWord(word);
         this.toastManager.showSuccess(`Navigated to word: ${wordName}`);
       } else {
-        // Word not found, set the input field and show a message
-        const wordInput = document.getElementById('word-input') as HTMLInputElement;
-        if (wordInput) {
-          wordInput.value = wordName;
-          this.updateGenerateBtnState(wordName);
-        }
-        this.toastManager.showInfo(`Word "${wordName}" not found. You can generate it now.`);
+        // Word not found, auto-generate it!
+        console.log('🎯 Renderer: Word not found, auto-generating:', wordName);
+        await this.autoGenerateWord(wordName);
       }
     } catch (error) {
       console.error('Error handling protocol navigation:', error);
