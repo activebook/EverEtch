@@ -232,7 +232,7 @@ export class WordImportService {
     // Process next word
     let timeLapse = 500
     if (skipped) {
-      timeLapse = 200
+      timeLapse = 50
     }
     setTimeout(() => {
       this.processNextWord();
