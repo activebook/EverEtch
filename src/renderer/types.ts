@@ -25,7 +25,8 @@ declare global {
             updateProfileConfig: (config: any) => Promise<boolean>;            
             processMarkdown: (markdown: string) => Promise<string>;
 
-
+            // App Render ready
+            sendAppRenderReady: () => Promise<void>;
 
             // Profile import/export
             exportProfile: () => Promise<any>;
