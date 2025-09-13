@@ -1830,6 +1830,7 @@ export class EverEtchApp {
       // Calculate statistics
       const successfulCount = progress.success || 0;
       const failedCount = progress.errors?.length || 0;
+      const skippedCount = progress.skipped || 0;
       const remainingCount = (progress.total || 0) - (progress.current || 0);
       const failedWord = progress.currentWord || 'unknown word';
 
@@ -1842,6 +1843,15 @@ export class EverEtchApp {
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
           </svg>
           <span class="font-medium">${successfulCount} words successfully imported</span>
+        </div>`;
+      }
+
+      if (skippedCount > 0) {
+        html += `<div class="flex items-center text-blue-600">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+          </svg>
+          <span class="font-medium">${skippedCount} words were skipped (already exist)</span>
         </div>`;
       }
 
