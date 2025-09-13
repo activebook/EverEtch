@@ -66,6 +66,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('protocol-switch-profile', (_event: any, profileName: string) => callback(profileName));
   },
 
+  // App ready signal
+  sendAppRenderReady: () => {
+    ipcRenderer.send('app-render-ready');
+  },
+
   removeAllListeners: (event: string) => {
     ipcRenderer.removeAllListeners(event);
   }

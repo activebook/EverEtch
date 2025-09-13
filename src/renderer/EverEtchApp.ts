@@ -129,7 +129,7 @@ export class EverEtchApp {
         // No current profile, just load words
         console.log('No current profile found, loading words...');
         await this.loadWords();
-      }
+      }      
 
       // Set up event listeners
       this.setupEventListeners();
@@ -139,6 +139,10 @@ export class EverEtchApp {
 
       // Update sort button icon after loading
       this.updateSortButtonIcon();
+
+      // Signal to main process that app is fully ready
+      console.log('🎯 Renderer: App fully initialized, sending app-ready signal');
+      window.electronAPI.sendAppRenderReady();
 
     } catch (error) {
       console.error('Error initializing app:', error);
@@ -318,10 +322,12 @@ export class EverEtchApp {
 
     // Set up protocol handlers for custom URL scheme
     window.electronAPI.onProtocolNavigateWord((wordName: string) => {
+      console.log('🎯 Renderer: Received protocol navigation request for word:', wordName);
       this.handleProtocolNavigateWord(wordName);
     });
 
     window.electronAPI.onProtocolSwitchProfile((profileName: string) => {
+      console.log('🎯 Renderer: Received protocol profile switch request for:', profileName);
       this.handleProtocolSwitchProfile(profileName);
     });
 
