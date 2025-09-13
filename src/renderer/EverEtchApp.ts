@@ -1792,8 +1792,8 @@ export class EverEtchApp {
       this.loadWords();
     }
 
-    const error = progress?.errors?.[0];
-    this.toastManager.showError(`Import failed: ${error}`);
+    // Show detailed completion modal instead of simple toast
+    this.showImportErrorModal(progress);
   }
 
   private handleImportCancel(progress?: ImportProgress): void {
@@ -1807,6 +1807,88 @@ export class EverEtchApp {
     }
 
     this.toastManager.showWarning('Import cancelled');
+  }
+
+  private showImportErrorModal(progress: ImportProgress): void {
+    const modal = document.getElementById('import-complete-modal')!;
+    const messageElement = document.getElementById('import-complete-message')!;
+    const iconContainer = modal.querySelector('.w-16.h-16') as HTMLElement;
+    const titleElement = modal.querySelector('h3') as HTMLElement;
+    const okBtn = document.getElementById('import-complete-ok') as HTMLButtonElement;
+
+    if (messageElement && iconContainer && titleElement) {
+      // Change icon to warning for partial success
+      iconContainer.innerHTML = `
+        <svg class="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+        </svg>
+      `;
+
+      // Update title for partial success
+      titleElement.textContent = 'Import Stopped - Partial Success';
+
+      // Calculate statistics
+      const successfulCount = progress.success || 0;
+      const failedCount = progress.errors?.length || 0;
+      const skippedCount = progress.skipped || 0;
+      const remainingCount = (progress.total || 0) - (progress.current || 0);
+      const failedWord = progress.currentWord || 'unknown word';
+
+      // Build detailed message
+      let html = `<div class="text-left space-y-2">`;
+
+      if (successfulCount > 0) {
+        html += `<div class="flex items-center text-green-600">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+          </svg>
+          <span class="font-medium">${successfulCount} words successfully imported</span>
+        </div>`;
+      }
+
+      if (skippedCount > 0) {
+        html += `<div class="flex items-center text-blue-600">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+          </svg>
+          <span class="font-medium">${skippedCount} words were skipped (already exist)</span>
+        </div>`;
+      }
+
+      if (failedCount > 0) {
+        const error = progress.errors?.[0] || 'Unknown error';
+        html += `<div class="flex items-center text-red-600">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+          <span class="font-medium">Failed on "${failedWord}": ${error}</span>
+        </div>`;
+      }
+
+      if (remainingCount > 0) {
+        html += `<div class="flex items-center text-amber-600">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <span class="font-medium">${remainingCount} words remaining unprocessed</span>
+        </div>`;
+      }
+
+      html += `</div>`;
+      messageElement.innerHTML = html;
+    }
+
+    if (modal) {
+      modal.classList.remove('hidden');
+    }
+
+    if (okBtn) {
+      okBtn.onclick = () => {
+        if (modal) {
+          modal.classList.add('hidden');
+        }
+      };
+    }
   }
 
   private toggleApiKeyVisibility(): void {
