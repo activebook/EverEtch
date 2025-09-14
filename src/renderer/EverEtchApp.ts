@@ -452,13 +452,13 @@ export class EverEtchApp {
     // Export button
     const exportBtn = document.getElementById('export-profile-btn') as HTMLButtonElement;
     exportBtn.addEventListener('click', () => {
-      this.handleExportProfile();
+      this.showExportChoiceModal();
     });
 
     // Import button
     const importBtn = document.getElementById('import-profile-btn') as HTMLButtonElement;
     importBtn.addEventListener('click', () => {
-      this.handleImportProfile();
+      this.showImportChoiceModal();
     });
 
     // Import words button
@@ -544,6 +544,69 @@ export class EverEtchApp {
     // Global mouse events for resizing
     document.addEventListener('mousemove', (e) => this.uiUtils.handleResize(e));
     document.addEventListener('mouseup', () => this.uiUtils.stopResize());
+
+    // Google Drive modal event handlers
+    this.setupGoogleDriveModalHandlers();
+  }
+
+  private setupGoogleDriveModalHandlers(): void {
+    // Export choice modal buttons
+    const exportLocalBtn = document.getElementById('export-local-btn') as HTMLButtonElement;
+    const exportGoogleDriveBtn = document.getElementById('export-google-drive-btn') as HTMLButtonElement;
+    const cancelExportChoice = document.getElementById('cancel-export-choice') as HTMLButtonElement;
+
+    if (exportLocalBtn) {
+      exportLocalBtn.addEventListener('click', () => {
+        this.hideExportChoiceModal();
+        this.handleExportProfile();
+      });
+    }
+
+    if (exportGoogleDriveBtn) {
+      exportGoogleDriveBtn.addEventListener('click', async () => {
+        this.hideExportChoiceModal();
+        await this.handleExportToGoogleDrive();
+      });
+    }
+
+    if (cancelExportChoice) {
+      cancelExportChoice.addEventListener('click', () => {
+        this.hideExportChoiceModal();
+      });
+    }
+
+    // Import choice modal buttons
+    const importLocalBtn = document.getElementById('import-local-btn') as HTMLButtonElement;
+    const importGoogleDriveBtn = document.getElementById('import-google-drive-btn') as HTMLButtonElement;
+    const cancelImportChoice = document.getElementById('cancel-import-choice') as HTMLButtonElement;
+
+    if (importLocalBtn) {
+      importLocalBtn.addEventListener('click', () => {
+        this.hideImportChoiceModal();
+        this.handleImportProfile();
+      });
+    }
+
+    if (importGoogleDriveBtn) {
+      importGoogleDriveBtn.addEventListener('click', async () => {
+        this.hideImportChoiceModal();
+        await this.showGoogleDriveFilePicker();
+      });
+    }
+
+    if (cancelImportChoice) {
+      cancelImportChoice.addEventListener('click', () => {
+        this.hideImportChoiceModal();
+      });
+    }
+
+    // Google Drive file picker modal
+    const cancelGoogleDrivePicker = document.getElementById('cancel-google-drive-picker') as HTMLButtonElement;
+    if (cancelGoogleDrivePicker) {
+      cancelGoogleDrivePicker.addEventListener('click', () => {
+        this.hideGoogleDriveFilePicker();
+      });
+    }
   }
 
   private async handleSearchInput(query: string): Promise<void> {
@@ -2054,5 +2117,201 @@ export class EverEtchApp {
       console.error('Error handling protocol profile switch:', error);
       this.toastManager.showError('Failed to switch profile');
     }
+  }
+
+  // Google Drive modal methods
+  private showExportChoiceModal(): void {
+    const modal = document.getElementById('export-choice-modal')!;
+    if (modal) {
+      modal.classList.remove('hidden');
+    }
+  }
+
+  private hideExportChoiceModal(): void {
+    const modal = document.getElementById('export-choice-modal')!;
+    if (modal) {
+      modal.classList.add('hidden');
+    }
+  }
+
+  private showImportChoiceModal(): void {
+    const modal = document.getElementById('import-choice-modal')!;
+    if (modal) {
+      modal.classList.remove('hidden');
+    }
+  }
+
+  private hideImportChoiceModal(): void {
+    const modal = document.getElementById('import-choice-modal')!;
+    if (modal) {
+      modal.classList.add('hidden');
+    }
+  }
+
+  private async showGoogleDriveFilePicker(): Promise<void> {
+    try {
+      // Show loading in the file picker
+      const filesList = document.getElementById('google-drive-files-list')!;
+      if (filesList) {
+        filesList.innerHTML = `
+          <div class="text-center text-slate-500 py-8">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <p>Loading files...</p>
+          </div>
+        `;
+      }
+
+      // Show the modal
+      const modal = document.getElementById('google-drive-picker-modal')!;
+      if (modal) {
+        modal.classList.remove('hidden');
+      }
+
+      // Load files from Google Drive
+      const result = await window.electronAPI.googleDriveListFiles();
+      if (result.success && result.files) {
+        this.renderGoogleDriveFiles(result.files);
+      } else {
+        this.showGoogleDriveError('Failed to load Google Drive files');
+      }
+    } catch (error) {
+      console.error('Failed to show Google Drive file picker:', error);
+      this.showGoogleDriveError('Failed to load Google Drive files');
+    }
+  }
+
+  private hideGoogleDriveFilePicker(): void {
+    const modal = document.getElementById('google-drive-picker-modal')!;
+    if (modal) {
+      modal.classList.add('hidden');
+    }
+  }
+
+  private renderGoogleDriveFiles(files: any[]): void {
+    const filesList = document.getElementById('google-drive-files-list')!;
+    if (!filesList) return;
+
+    if (files.length === 0) {
+      filesList.innerHTML = `
+        <div class="text-center text-slate-500 py-8">
+          <svg class="w-12 h-12 mx-auto mb-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+          </svg>
+          <p>No EverEtch database files found in Google Drive</p>
+          <p class="text-sm mt-2">Upload a database file first to see it here</p>
+        </div>
+      `;
+      return;
+    }
+
+    const filesHtml = files.map(file => `
+      <button class="w-full p-4 bg-white/80 hover:bg-white/90 border border-slate-200 rounded-lg transition-all duration-200 hover:shadow-md group google-drive-file-btn" data-file-id="${file.id}">
+        <div class="flex items-center">
+          <svg class="w-8 h-8 mr-3 text-blue-500" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="#4285F4"/>
+          </svg>
+          <div class="text-left flex-1">
+            <h4 class="font-medium text-slate-800 truncate">${file.name}</h4>
+            <p class="text-sm text-slate-500">Modified: ${new Date(file.modifiedTime).toLocaleDateString()}</p>
+            ${file.size ? `<p class="text-sm text-slate-500">Size: ${this.formatFileSize(parseInt(file.size))}</p>` : ''}
+          </div>
+          <svg class="w-5 h-5 text-slate-400 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+          </svg>
+        </div>
+      </button>
+    `).join('');
+
+    filesList.innerHTML = filesHtml;
+
+    // Add click handlers for file buttons
+    const fileButtons = filesList.querySelectorAll('.google-drive-file-btn');
+    fileButtons.forEach(button => {
+      button.addEventListener('click', async (e) => {
+        const target = e.currentTarget as HTMLElement;
+        const fileId = target.getAttribute('data-file-id');
+        if (fileId) {
+          await this.handleGoogleDriveFileSelect(fileId);
+        }
+      });
+    });
+  }
+
+  private showGoogleDriveError(message: string): void {
+    const filesList = document.getElementById('google-drive-files-list')!;
+    if (filesList) {
+      filesList.innerHTML = `
+        <div class="text-center text-red-500 py-8">
+          <svg class="w-12 h-12 mx-auto mb-4 text-red-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <p class="font-medium">Error</p>
+          <p class="text-sm mt-2">${message}</p>
+        </div>
+      `;
+    }
+  }
+
+  private async handleGoogleDriveFileSelect(fileId: string): Promise<void> {
+    try {
+      this.showLoadingOverlay();
+      this.hideGoogleDriveFilePicker();
+
+      const result = await window.electronAPI.googleDriveDownloadDatabase(fileId);
+
+      if (result.success) {
+        this.toastManager.showSuccess(result.message);
+
+        // Refresh profiles and switch to the new one
+        await this.profileService.loadProfiles();
+        if (result.profileName) {
+          this.profileService.setCurrentProfile(result.profileName);
+          const profileSelect = document.getElementById('profile-select') as HTMLSelectElement;
+          profileSelect.value = result.profileName;
+
+          this.resetUIForProfileSwitch();
+          await this.loadWords();
+        }
+      } else {
+        this.toastManager.showError(result.message);
+      }
+    } catch (error) {
+      console.error('Failed to download Google Drive file:', error);
+      this.toastManager.showError('Failed to download file from Google Drive');
+    } finally {
+      this.hideLoadingOverlay();
+    }
+  }
+
+  private async handleExportToGoogleDrive(): Promise<void> {
+    try {
+      this.showLoadingOverlay();
+
+      const result = await window.electronAPI.googleDriveUploadDatabase();
+
+      if (result.success) {
+        this.toastManager.showSuccess(result.message);
+      } else {
+        this.toastManager.showError(result.message);
+      }
+    } catch (error) {
+      console.error('Failed to export to Google Drive:', error);
+      this.toastManager.showError('Failed to export to Google Drive');
+    } finally {
+      this.hideLoadingOverlay();
+    }
+  }
+
+  private formatFileSize(bytes: number): string {
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let size = bytes;
+    let unitIndex = 0;
+
+    while (size >= 1024 && unitIndex < units.length - 1) {
+      size /= 1024;
+      unitIndex++;
+    }
+
+    return `${size.toFixed(1)} ${units[unitIndex]}`;
   }
 }

@@ -9,6 +9,9 @@ import { StoreManager } from './utils/StoreManager.js';
 import { DatabaseManager } from './database/DatabaseManager.js';
 import { ProfileManager } from './database/ProfileManager.js';
 import { AIModelClient, WORD_DUMMY_METAS } from './ai/AIModelClient.js';
+import { GoogleAuthService } from './main/google/GoogleAuthService.js';
+import { GoogleDriveService } from './main/google/GoogleDriveService.js';
+import { GoogleDriveExportService } from './main/services/GoogleDriveExportService.js';
 import { marked } from 'marked';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -19,6 +22,9 @@ let dbManager: DatabaseManager;
 let profileManager: ProfileManager;
 let aiClient: AIModelClient;
 let storeManager: StoreManager;
+let googleAuthService: GoogleAuthService;
+let googleDriveService: GoogleDriveService;
+let googleDriveExportService: GoogleDriveExportService;
 let queuedProtocolAction: { type: string, data: any } | null = null; // Store queued protocol actions
 
 // Configure marked for proper line break handling
@@ -48,6 +54,12 @@ async function createWindow() {
     dbManager = new DatabaseManager();
     profileManager = new ProfileManager(dbManager);
     aiClient = new AIModelClient();
+
+    // Initialize Google services
+    storeManager = new StoreManager();
+    googleAuthService = new GoogleAuthService(mainWindow, storeManager);
+    googleDriveService = new GoogleDriveService(googleAuthService);
+    googleDriveExportService = new GoogleDriveExportService(dbManager);
 
     // Create window with minimal bounds first (invisible), then apply saved bounds
     mainWindow = new BrowserWindow({
@@ -88,7 +100,6 @@ function adjustMainWindow(ready: () => void, shown: () => void) {
     // ✅ But not yet visible to user
     try {
       // Load window bounds from electron-store
-      storeManager = new StoreManager();
       const savedBounds = storeManager.loadWindowBounds();
 
       if (savedBounds) {
@@ -590,6 +601,192 @@ ipcMain.handle('import-profile', async () => {
     return {
       success: false,
       message: `Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+});
+
+// Google Drive operations
+ipcMain.handle('google-authenticate', async () => {
+  try {
+    const success = await googleAuthService.authenticate();
+    return { success, message: success ? 'Successfully authenticated with Google' : 'Authentication cancelled' };
+  } catch (error) {
+    console.error('Google authentication failed:', error);
+    return {
+      success: false,
+      message: `Authentication failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+});
+
+ipcMain.handle('google-is-authenticated', async () => {
+  try {
+    const isAuthenticated = await googleAuthService.isAuthenticated();
+    return { success: true, authenticated: isAuthenticated };
+  } catch (error) {
+    console.error('Failed to check authentication status:', error);
+    return { success: false, authenticated: false };
+  }
+});
+
+ipcMain.handle('google-logout', async () => {
+  try {
+    await googleAuthService.logout();
+    return { success: true, message: 'Successfully logged out from Google' };
+  } catch (error) {
+    console.error('Google logout failed:', error);
+    return {
+      success: false,
+      message: `Logout failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+});
+
+ipcMain.handle('google-get-user-info', async () => {
+  try {
+    const userInfo = await googleAuthService.getUserInfo();
+    return { success: true, userInfo };
+  } catch (error) {
+    console.error('Failed to get user info:', error);
+    return {
+      success: false,
+      message: `Failed to get user info: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+});
+
+ipcMain.handle('google-drive-list-files', async () => {
+  try {
+    const files = await googleDriveService.listFiles();
+    return { success: true, files };
+  } catch (error) {
+    console.error('Failed to list Google Drive files:', error);
+    return {
+      success: false,
+      message: `Failed to list files: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      files: []
+    };
+  }
+});
+
+ipcMain.handle('google-drive-upload-database', async () => {
+  try {
+    const currentProfile = profileManager.getLastOpenedProfile();
+    if (!currentProfile) {
+      throw new Error('No current profile selected');
+    }
+
+    const fileInfo = googleDriveExportService.getCurrentDatabaseFileInfo(currentProfile);
+    if (!fileInfo) {
+      throw new Error('Database file not found');
+    }
+
+    const fileBuffer = await googleDriveExportService.readDatabaseFile(fileInfo.filePath);
+    const fileName = googleDriveExportService.generateFileName(currentProfile);
+
+    const result = await googleDriveService.uploadFile(
+      fileName,
+      fileBuffer.toString('base64'),
+      'application/octet-stream'
+    );
+
+    return result;
+  } catch (error) {
+    console.error('Failed to upload database to Google Drive:', error);
+    return {
+      success: false,
+      message: `Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+});
+
+ipcMain.handle('google-drive-download-database', async (event, fileId: string) => {
+  try {
+    const downloadResult = await googleDriveService.downloadFile(fileId);
+    if (!downloadResult.success) {
+      return downloadResult;
+    }
+
+    // Get file metadata to determine profile name
+    const fileMetadata = await googleDriveService.getFileMetadata(fileId);
+    if (!fileMetadata) {
+      throw new Error('Could not get file metadata');
+    }
+
+    // Extract profile name from filename (remove EverEtch_ prefix and timestamp)
+    const profileNameMatch = fileMetadata.name.match(/^EverEtch_(.+?)_\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.db$/);
+    let profileName = 'imported_profile';
+
+    if (profileNameMatch) {
+      profileName = profileNameMatch[1];
+    }
+
+    // Generate unique profile name if needed
+    const existingProfiles = profileManager.getProfiles();
+    let finalProfileName = profileName;
+    let counter = 1;
+
+    while (existingProfiles.includes(finalProfileName)) {
+      finalProfileName = `${profileName}_${counter}`;
+      counter++;
+    }
+
+    // Save the downloaded file
+    const targetPath = getDatabasePath(finalProfileName);
+    ensureDataDirectory();
+    const fileBuffer = Buffer.from(downloadResult.content!, 'base64');
+    await googleDriveExportService.writeDatabaseFile(targetPath, fileBuffer);
+
+    // Validate the downloaded database
+    const isValid = await googleDriveExportService.validateDownloadedDatabase(targetPath);
+    if (!isValid) {
+      // Clean up invalid file
+      try {
+        fs.unlinkSync(targetPath);
+      } catch (cleanupError) {
+        console.error('Error cleaning up invalid download:', cleanupError);
+      }
+      throw new Error('Downloaded file is not a valid EverEtch database');
+    }
+
+    // Import the profile
+    const importSuccess = profileManager.importProfile(finalProfileName);
+    if (!importSuccess) {
+      // Clean up if import failed
+      try {
+        fs.unlinkSync(targetPath);
+      } catch (cleanupError) {
+        console.error('Error cleaning up failed import:', cleanupError);
+      }
+      throw new Error('Failed to import profile');
+    }
+
+    return {
+      success: true,
+      message: `Profile "${finalProfileName}" imported successfully from Google Drive`,
+      profileName: finalProfileName
+    };
+  } catch (error) {
+    console.error('Failed to download database from Google Drive:', error);
+    return {
+      success: false,
+      message: `Download failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+});
+
+ipcMain.handle('google-drive-delete-file', async (event, fileId: string) => {
+  try {
+    const success = await googleDriveService.deleteFile(fileId);
+    return {
+      success,
+      message: success ? 'File deleted successfully' : 'Failed to delete file'
+    };
+  } catch (error) {
+    console.error('Failed to delete Google Drive file:', error);
+    return {
+      success: false,
+      message: `Delete failed: ${error instanceof Error ? error.message : 'Unknown error'}`
     };
   }
 });

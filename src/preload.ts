@@ -48,6 +48,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   exportProfile: () => ipcRenderer.invoke('export-profile'),
   importProfile: () => ipcRenderer.invoke('import-profile'),
 
+  // Google Drive operations
+  googleAuthenticate: () => ipcRenderer.invoke('google-authenticate'),
+  googleIsAuthenticated: () => ipcRenderer.invoke('google-is-authenticated'),
+  googleLogout: () => ipcRenderer.invoke('google-logout'),
+  googleGetUserInfo: () => ipcRenderer.invoke('google-get-user-info'),
+  googleDriveListFiles: () => ipcRenderer.invoke('google-drive-list-files'),
+  googleDriveUploadDatabase: () => ipcRenderer.invoke('google-drive-upload-database'),
+  googleDriveDownloadDatabase: (fileId: string) => ipcRenderer.invoke('google-drive-download-database', fileId),
+  googleDriveDeleteFile: (fileId: string) => ipcRenderer.invoke('google-drive-delete-file', fileId),
+
   // Event listeners for streaming
   onWordMeaningStreaming: (callback: Function) => {
     ipcRenderer.on('word-meaning-streaming', (_event: any, content: string) => callback(content));
