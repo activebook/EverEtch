@@ -196,7 +196,7 @@
 }
 
 .markdown-details pre {
-    @apply bg-slate-50 p-4 rounded-lg mb-4 overflow-x-auto border border-slate-200;
+    @apply bg-amber-50 p-4 rounded-lg mb-4 overflow-x-auto border border-amber-200;
 }
 
 .markdown-details pre code {
