@@ -13,10 +13,25 @@ interface PanelWidths {
   right: number;
 }
 
+interface GoogleCredentials {
+  clientId: string;
+  clientSecret: string;
+  redirectUri: string;
+}
+
+interface GoogleTokens {
+  access_token: string;
+  refresh_token: string;
+  expiry_date: number;
+  token_type: string;
+}
+
 interface StoreSchema {
   windowBounds: WindowBounds | null;
   panelWidths: PanelWidths | null;
   sortOrder: 'asc' | 'desc' | null;
+  googleCredentials: GoogleCredentials | null;
+  googleTokens: GoogleTokens | null;
 }
 
 export class StoreManager {
@@ -46,12 +61,31 @@ export class StoreManager {
         sortOrder: {
           type: ['string', 'null'],
           enum: ['asc', 'desc', null]
+        },
+        googleCredentials: {
+          type: ['object', 'null'],
+          properties: {
+            clientId: { type: 'string' },
+            clientSecret: { type: 'string' },
+            redirectUri: { type: 'string' }
+          }
+        },
+        googleTokens: {
+          type: ['object', 'null'],
+          properties: {
+            access_token: { type: 'string' },
+            refresh_token: { type: 'string' },
+            expiry_date: { type: 'number' },
+            token_type: { type: 'string' }
+          }
         }
       },
       defaults: {
         windowBounds: null,
         panelWidths: null,
-        sortOrder: 'desc'
+        sortOrder: 'desc',
+        googleCredentials: null,
+        googleTokens: null
       }
     }) as Store<StoreSchema>;
   }
@@ -105,6 +139,48 @@ export class StoreManager {
     this.store.set('windowBounds', null);
     this.store.set('panelWidths', null);
     this.store.set('sortOrder', 'desc');
+  }
+
+  /**
+   * Save Google credentials
+   */
+  saveGoogleCredentials(credentials: GoogleCredentials): void {
+    this.store.set('googleCredentials', credentials);
+  }
+
+  /**
+   * Load Google credentials
+   */
+  getGoogleCredentials(): GoogleCredentials | null {
+    return this.store.get('googleCredentials');
+  }
+
+  /**
+   * Save Google tokens
+   */
+  saveGoogleTokens(tokens: GoogleTokens): void {
+    this.store.set('googleTokens', tokens);
+  }
+
+  /**
+   * Load Google tokens
+   */
+  getGoogleTokens(): GoogleTokens | null {
+    return this.store.get('googleTokens');
+  }
+
+  /**
+   * Clear Google tokens
+   */
+  clearGoogleTokens(): void {
+    this.store.set('googleTokens', null);
+  }
+
+  /**
+   * Clear Google credentials
+   */
+  clearGoogleCredentials(): void {
+    this.store.set('googleCredentials', null);
   }
 
   /**
