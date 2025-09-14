@@ -32,6 +32,16 @@ declare global {
             exportProfile: () => Promise<any>;
             importProfile: () => Promise<any>;
 
+            // Google Drive operations
+            googleAuthenticate: () => Promise<any>;
+            googleIsAuthenticated: () => Promise<any>;
+            googleLogout: () => Promise<any>;
+            googleGetUserInfo: () => Promise<any>;
+            googleDriveListFiles: () => Promise<any>;
+            googleDriveUploadDatabase: () => Promise<any>;
+            googleDriveDownloadDatabase: (fileId: string) => Promise<any>;
+            googleDriveDeleteFile: (fileId: string) => Promise<any>;
+
             // Sort order persistence
             loadSortOrder: () => Promise<'asc' | 'desc'>;
             saveSortOrder: (sortOrder: 'asc' | 'desc') => Promise<void>;
