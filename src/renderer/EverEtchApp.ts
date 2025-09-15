@@ -2150,6 +2150,17 @@ export class EverEtchApp {
 
   private async showGoogleDriveFilePicker(): Promise<void> {
     try {
+      // Check if we're authenticated first
+      const authStatus = await window.electronAPI.googleIsAuthenticated();
+      if (!authStatus.authenticated) {
+        // Trigger authentication
+        const authResult = await window.electronAPI.googleAuthenticate();
+        if (!authResult.success) {
+          this.toastManager.showError('Authentication required for Google Drive access');
+          return;
+        }
+      }
+
       // Show loading in the file picker
       const filesList = document.getElementById('google-drive-files-list')!;
       if (filesList) {
@@ -2286,6 +2297,17 @@ export class EverEtchApp {
   private async handleExportToGoogleDrive(): Promise<void> {
     try {
       this.showLoadingOverlay();
+
+      // Check if we're authenticated first
+      const authStatus = await window.electronAPI.googleIsAuthenticated();
+      if (!authStatus.authenticated) {
+        // Trigger authentication
+        const authResult = await window.electronAPI.googleAuthenticate();
+        if (!authResult.success) {
+          this.toastManager.showError('Authentication required for Google Drive access');
+          return;
+        }
+      }
 
       const result = await window.electronAPI.googleDriveUploadDatabase();
 

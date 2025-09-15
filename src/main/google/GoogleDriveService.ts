@@ -1,6 +1,8 @@
 import { google } from 'googleapis';
-import { OAuth2Client } from 'google-auth-library';
 import { drive_v3 } from 'googleapis';
+import { app } from 'electron';
+import * as fs from 'fs';
+import * as path from 'path';
 import { GoogleAuthService } from './GoogleAuthService.js';
 
 export interface DriveFile {
@@ -26,34 +28,89 @@ export interface DownloadResult {
 }
 
 export class GoogleDriveService {
-  private drive: drive_v3.Drive;
   private authService: GoogleAuthService;
+  private apiKey?: string;
 
   constructor(authService: GoogleAuthService) {
     this.authService = authService;
-    this.drive = google.drive({
-      version: 'v3',
-      auth: authService.getOAuth2Client()
-    } as any) as unknown as drive_v3.Drive;
+    // Try to get API key from environment or credentials
+    this.apiKey = process.env.GOOGLE_API_KEY || this.getApiKeyFromCredentials();
+  }
+
+  private getDriveClient(): drive_v3.Drive {
+    // Create drive client with current OAuth2Client state
+    // This ensures we always use the most up-to-date authentication
+    const authClient = this.authService.getOAuth2Client();
+
+    // Pass the authenticated client directly with proper typing
+    return google.drive({ 
+      version: 'v3', 
+      auth: authClient 
+    });
+  }
+
+  private getApiKeyFromCredentials(): string | undefined {
+    try {
+      const credentialsPath = path.join(app.getAppPath(), 'credentials.json');
+      if (!fs.existsSync(credentialsPath)) {
+        return undefined;
+      }
+
+      const credentialsContent = fs.readFileSync(credentialsPath, 'utf-8');
+      const credentialsData = JSON.parse(credentialsContent);
+
+      // Some credentials files might include an API key
+      return credentialsData.api_key;
+    } catch (error) {
+      return undefined;
+    }
   }
 
   async listFiles(query?: string, pageSize: number = 100): Promise<DriveFile[]> {
     try {
-      const response = await this.drive.files.list({
+      // Ensure we're authenticated before making API calls
+      const isAuthenticated = await this.authService.isAuthenticated();
+      if (!isAuthenticated) {
+        throw new Error('Not authenticated with Google. Please authenticate first.');
+      }
+
+      const requestParams: any = {
         q: query || "name contains 'EverEtch' and mimeType='application/octet-stream' and trashed=false",
         fields: 'files(id,name,mimeType,modifiedTime,size,parents)',
         orderBy: 'modifiedTime desc',
         pageSize: pageSize
-      });
+      };
 
-      return response.data.files?.map(file => ({
-        id: file.id!,
-        name: file.name!,
-        mimeType: file.mimeType!,
-        modifiedTime: file.modifiedTime!,
-        size: file.size,
-        parents: file.parents
-      })) || [];
+      // Add API key if available (helps with "unregistered callers" issues)
+      if (this.apiKey) {
+        requestParams.key = this.apiKey;
+      }
+
+      const response = await this.getDriveClient().files.list(requestParams);
+
+      // Filter out files that might cause permission issues
+      // The drive.file scope only allows access to files created by this app
+      const accessibleFiles: DriveFile[] = [];
+
+      for (const file of response.data.files || []) {
+        try {
+          // Try to get file metadata to check if we have access
+          await this.getFileMetadata(file.id!);
+          accessibleFiles.push({
+            id: file.id!,
+            name: file.name!,
+            mimeType: file.mimeType!,
+            modifiedTime: file.modifiedTime!,
+            size: file.size,
+            parents: file.parents
+          });
+        } catch (error) {
+          // Skip files we don't have permission to access
+          console.log(`Skipping file ${file.name} - insufficient permissions`);
+        }
+      }
+
+      return accessibleFiles;
     } catch (error) {
       console.error('Failed to list files:', error);
       throw new Error('Failed to list Google Drive files');
@@ -67,9 +124,23 @@ export class GoogleDriveService {
     folderId?: string
   ): Promise<UploadResult> {
     try {
-      // Check if file already exists
-      const existingFiles = await this.listFiles(`name='${fileName}' and trashed=false`);
-      const existingFile = existingFiles.find(f => f.name === fileName);
+      // Ensure we're authenticated before making API calls
+      const isAuthenticated = await this.authService.isAuthenticated();
+      if (!isAuthenticated) {
+        return {
+          success: false,
+          message: 'Not authenticated with Google. Please authenticate first.'
+        };
+      }
+
+      // Debug: Check OAuth2Client state
+      const oauthClient = this.authService.getOAuth2Client();
+      console.log('OAuth2Client state before API call:', {
+        hasCredentials: !!oauthClient.credentials,
+        hasAccessToken: !!oauthClient.credentials.access_token,
+        hasRefreshToken: !!oauthClient.credentials.refresh_token,
+        accessTokenLength: oauthClient.credentials.access_token?.length || 0
+      });
 
       const fileMetadata: any = {
         name: fileName,
@@ -85,28 +156,23 @@ export class GoogleDriveService {
         body: content
       };
 
-      let response;
-      if (existingFile) {
-        // Update existing file
-        response = await this.drive.files.update({
-          fileId: existingFile.id,
-          media: media,
-          fields: 'id,webViewLink'
-        });
-      } else {
-        // Create new file
-        response = await this.drive.files.create({
-          requestBody: fileMetadata,
-          media: media,
-          fields: 'id,webViewLink'
-        });
+      // Create new file (Google Drive will handle duplicates by creating new versions)
+      const createParams: any = {
+        requestBody: fileMetadata,
+        media: media,
+        fields: 'id,webViewLink'
+      };
+      if (this.apiKey) {
+        createParams.key = this.apiKey;
       }
+
+      const response = await this.getDriveClient().files.create(createParams);
 
       return {
         success: true,
         fileId: response.data.id!,
         fileUrl: response.data.webViewLink!,
-        message: existingFile ? 'File updated successfully' : 'File uploaded successfully'
+        message: 'File uploaded successfully'
       };
     } catch (error) {
       console.error('Failed to upload file:', error);
@@ -119,7 +185,16 @@ export class GoogleDriveService {
 
   async downloadFile(fileId: string): Promise<DownloadResult> {
     try {
-      const response = await this.drive.files.get({
+      // Ensure we're authenticated before making API calls
+      const isAuthenticated = await this.authService.isAuthenticated();
+      if (!isAuthenticated) {
+        return {
+          success: false,
+          message: 'Not authenticated with Google. Please authenticate first.'
+        };
+      }
+
+      const response = await this.getDriveClient().files.get({
         fileId: fileId,
         alt: 'media'
       }, {
@@ -142,13 +217,19 @@ export class GoogleDriveService {
 
   async createFolder(folderName: string, parentId?: string): Promise<string | null> {
     try {
+      // Ensure we're authenticated before making API calls
+      const isAuthenticated = await this.authService.isAuthenticated();
+      if (!isAuthenticated) {
+        return null;
+      }
+
       const fileMetadata = {
         name: folderName,
         mimeType: 'application/vnd.google-apps.folder',
         parents: parentId ? [parentId] : undefined
       };
 
-      const response = await this.drive.files.create({
+      const response = await this.getDriveClient().files.create({
         requestBody: fileMetadata,
         fields: 'id'
       });
@@ -181,7 +262,13 @@ export class GoogleDriveService {
 
   async deleteFile(fileId: string): Promise<boolean> {
     try {
-      await this.drive.files.delete({
+      // Ensure we're authenticated before making API calls
+      const isAuthenticated = await this.authService.isAuthenticated();
+      if (!isAuthenticated) {
+        return false;
+      }
+
+      await this.getDriveClient().files.delete({
         fileId: fileId
       });
       return true;
@@ -193,7 +280,13 @@ export class GoogleDriveService {
 
   async getFileMetadata(fileId: string): Promise<DriveFile | null> {
     try {
-      const response = await this.drive.files.get({
+      // Ensure we're authenticated before making API calls
+      const isAuthenticated = await this.authService.isAuthenticated();
+      if (!isAuthenticated) {
+        return null;
+      }
+
+      const response = await this.getDriveClient().files.get({
         fileId: fileId,
         fields: 'id,name,mimeType,modifiedTime,size,parents'
       });

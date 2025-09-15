@@ -1,6 +1,9 @@
 import { google } from 'googleapis';
-import { OAuth2Client } from 'google-auth-library';
-import { BrowserWindow } from 'electron';
+import { OAuth2Client } from 'googleapis-common';
+import { BrowserWindow, app } from 'electron';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as http from 'http';
 import { StoreManager } from '../../utils/StoreManager.js';
 
 export interface GoogleCredentials {
@@ -17,10 +20,11 @@ export interface TokenData {
 }
 
 export class GoogleAuthService {
-  private oauth2Client: OAuth2Client;
+  private oauth2Client: OAuth2Client; // Using 'any' type to avoid type conflicts
   private storeManager: StoreManager;
   private mainWindow: BrowserWindow;
   private authWindow: BrowserWindow | null = null;
+  private localServer: http.Server | null = null;
 
   constructor(mainWindow: BrowserWindow, storeManager: StoreManager) {
     this.mainWindow = mainWindow;
@@ -29,7 +33,7 @@ export class GoogleAuthService {
     // Initialize OAuth2 client with Google credentials
     // These should be configured by the user in settings
     const credentials = this.getCredentials();
-    this.oauth2Client = new OAuth2Client(
+    this.oauth2Client = new google.auth.OAuth2(
       credentials.clientId,
       credentials.clientSecret,
       credentials.redirectUri
@@ -40,19 +44,73 @@ export class GoogleAuthService {
   }
 
   private getCredentials(): GoogleCredentials {
-    // Get credentials from store, with defaults for development
-    const stored = this.storeManager.getGoogleCredentials();
-    return stored || {
+    // Always load credentials from credentials.json file (never cache them)
+    const fileCredentials = this.loadCredentialsFromFile();
+    if (fileCredentials) {
+      return fileCredentials;
+    }
+
+    // Final fallback to environment variables (for development)
+    return {
       clientId: process.env.GOOGLE_CLIENT_ID || '',
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
-      redirectUri: 'urn:ietf:wg:oauth:2.0:oob' // For desktop apps
+      redirectUri: 'http://localhost:3000/oauth2callback' // For desktop apps
     };
+  }
+
+  private loadCredentialsFromFile(): GoogleCredentials | null {
+    try {
+      const credentialsPath = path.join(app.getAppPath(), 'credentials.json');
+      if (!fs.existsSync(credentialsPath)) {
+        return null;
+      }
+
+      const credentialsContent = fs.readFileSync(credentialsPath, 'utf-8');
+      const credentialsData = JSON.parse(credentialsContent);
+
+      // Handle Google Cloud Console credentials format
+      if (credentialsData.installed) {
+        // For Electron desktop apps, use localhost redirect with local server
+        return {
+          clientId: credentialsData.installed.client_id,
+          clientSecret: credentialsData.installed.client_secret,
+          redirectUri: 'http://localhost:3000/oauth2callback'
+        };
+      }
+
+      // Handle direct format (client_id, client_secret, redirect_uri)
+      if (credentialsData.client_id && credentialsData.client_secret) {
+        return {
+          clientId: credentialsData.client_id,
+          clientSecret: credentialsData.client_secret,
+          redirectUri: credentialsData.redirect_uri || 'http://localhost:3000/oauth2callback'
+        };
+      }
+
+      console.warn('Invalid credentials.json format');
+      return null;
+    } catch (error) {
+      console.error('Failed to load credentials from file:', error);
+      return null;
+    }
   }
 
   private loadTokens(): void {
     const tokens = this.storeManager.getGoogleTokens();
     if (tokens) {
+      console.log('Loading stored Google tokens:', {
+        hasAccessToken: !!tokens.access_token,
+        hasRefreshToken: !!tokens.refresh_token,
+        expiryDate: new Date(tokens.expiry_date || 0).toISOString(),
+        tokenType: tokens.token_type
+      });
       this.oauth2Client.setCredentials(tokens);
+      console.log('OAuth2Client credentials set:', {
+        hasAccessToken: !!this.oauth2Client.credentials.access_token,
+        hasRefreshToken: !!this.oauth2Client.credentials.refresh_token
+      });
+    } else {
+      console.log('No stored Google tokens found');
     }
   }
 
@@ -88,6 +146,21 @@ export class GoogleAuthService {
 
   private async performOAuthFlow(authUrl: string): Promise<boolean> {
     return new Promise((resolve, reject) => {
+      // Start local HTTP server to handle OAuth callback
+      this.startLocalServer((code: string) => {
+        this.exchangeCodeForTokens(code)
+          .then(() => {
+            this.stopLocalServer();
+            this.authWindow?.close();
+            resolve(true);
+          })
+          .catch((error) => {
+            this.stopLocalServer();
+            this.authWindow?.close();
+            reject(error);
+          });
+      }, reject);
+
       // Create auth window
       this.authWindow = new BrowserWindow({
         width: 600,
@@ -105,32 +178,72 @@ export class GoogleAuthService {
       this.authWindow.loadURL(authUrl);
       this.authWindow.show();
 
-      // Handle navigation events to capture the authorization code
-      this.authWindow.webContents.on('will-navigate', async (event, url) => {
-        if (url.startsWith('urn:ietf:wg:oauth:2.0:oob')) {
-          event.preventDefault();
-          const code = this.extractCodeFromUrl(url);
-          if (code) {
-            try {
-              await this.exchangeCodeForTokens(code);
-              this.authWindow?.close();
-              resolve(true);
-            } catch (error) {
-              this.authWindow?.close();
-              reject(error);
-            }
-          }
-        }
-      });
-
       // Handle window close
       this.authWindow.on('closed', () => {
         this.authWindow = null;
+        this.stopLocalServer();
         if (!this.oauth2Client.credentials.access_token) {
           resolve(false); // User cancelled authentication
         }
       });
     });
+  }
+
+  private startLocalServer(onCodeReceived: (code: string) => void, onError: (error: any) => void): void {
+    this.localServer = http.createServer((req, res) => {
+      if (req.url?.startsWith('/oauth2callback')) {
+        const url = new URL(req.url, 'http://localhost:3000');
+        const code = url.searchParams.get('code');
+
+        if (code) {
+          // Send success response to browser
+          res.writeHead(200, { 'Content-Type': 'text/html' });
+          res.end(`
+            <html>
+              <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+                <h1 style="color: #4CAF50;">Authentication Successful!</h1>
+                <p>You can close this window and return to the application.</p>
+                <script>window.close();</script>
+              </body>
+            </html>
+          `);
+
+          onCodeReceived(code);
+        } else {
+          // Send error response
+          res.writeHead(400, { 'Content-Type': 'text/html' });
+          res.end(`
+            <html>
+              <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+                <h1 style="color: #f44336;">Authentication Failed</h1>
+                <p>No authorization code received.</p>
+              </body>
+            </html>
+          `);
+
+          onError(new Error('No authorization code received'));
+        }
+      } else {
+        res.writeHead(404);
+        res.end('Not found');
+      }
+    });
+
+    this.localServer.listen(3000, 'localhost', () => {
+      console.log('Local OAuth server listening on http://localhost:3000');
+    });
+
+    this.localServer.on('error', (error) => {
+      console.error('Local server error:', error);
+      onError(error);
+    });
+  }
+
+  private stopLocalServer(): void {
+    if (this.localServer) {
+      this.localServer.close();
+      this.localServer = null;
+    }
   }
 
   private extractCodeFromUrl(url: string): string | null {
@@ -194,7 +307,7 @@ export class GoogleAuthService {
     this.oauth2Client.setCredentials({});
   }
 
-  getOAuth2Client(): OAuth2Client {
+  getOAuth2Client(): any {
     return this.oauth2Client;
   }
 
