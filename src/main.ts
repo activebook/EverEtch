@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { SysProxy } from './utils/SysProxy.js';
-import { Utils } from './utils/utils.js';
+import { Utils } from './utils/Utils.js';
 import { StoreManager } from './utils/StoreManager.js';
 import { DatabaseManager } from './database/DatabaseManager.js';
 import { ProfileManager } from './database/ProfileManager.js';

@@ -1,5 +1,5 @@
 import sqlite3 from 'sqlite3';
-import { Utils } from '../utils/utils.js';
+import { Utils } from '../utils/Utils.js';
 import { DatabaseRecovery } from './DatabaseRecovery.js';
 
 export interface WordDocument {

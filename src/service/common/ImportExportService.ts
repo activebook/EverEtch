@@ -1,6 +1,6 @@
 import { DatabaseManager } from '../../database/DatabaseManager.js';
 import { ProfileManager } from '../../database/ProfileManager.js';
-import { Utils } from '../../utils/utils.js';
+import { Utils } from '../../utils/Utils.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
