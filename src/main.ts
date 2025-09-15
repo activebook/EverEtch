@@ -27,7 +27,7 @@ let aiClient: AIModelClient;
 let storeManager: StoreManager;
 let googleAuthService: GoogleAuthService;
 let googleDriveService: GoogleDriveService;
-let googleDriveExportService: ImportExportService;
+let importExportService: ImportExportService;
 let queuedProtocolAction: { type: string, data: any } | null = null; // Store queued protocol actions
 
 // Configure marked for proper line break handling
@@ -75,7 +75,7 @@ async function createWindow() {
     storeManager = new StoreManager();
     googleAuthService = new GoogleAuthService(mainWindow, storeManager);
     googleDriveService = new GoogleDriveService(googleAuthService);
-    googleDriveExportService = new ImportExportService(dbManager);
+    importExportService = new ImportExportService(dbManager, profileManager);
 
     mainWindow.loadFile(path.join(__dirname, 'renderer/index.html'));
 
@@ -503,22 +503,8 @@ ipcMain.handle('export-profile', async () => {
       return { success: false, message: 'Export cancelled' };
     }
 
-    // Copy the current profile's database to the selected location
-    const sourcePath = getDatabasePath(currentProfile);
-    const targetPath = result.filePath;
-
-    // Ensure source database exists
-    if (!fs.existsSync(sourcePath)) {
-      throw new Error('Current profile database not found');
-    }
-
-    // Copy the database file
-    fs.copyFileSync(sourcePath, targetPath);
-
-    return {
-      success: true,
-      message: `Profile "${currentProfile}" exported successfully to ${targetPath}`
-    };
+    // Use the import/export service to handle the export
+    return await importExportService.exportProfileToLocal(result.filePath);
 
   } catch (error) {
     console.error('Error exporting profile:', error);
@@ -546,58 +532,9 @@ ipcMain.handle('import-profile', async () => {
     }
 
     const sourcePath = result.filePaths[0];
-    const fileName = path.basename(sourcePath, '.db');
 
-    // Validate the database format
-    const isValid = await DatabaseManager.validateDatabaseFormat(sourcePath);
-    if (!isValid) {
-      return {
-        success: false,
-        message: 'Invalid database format. The selected file is not a valid EverEtch profile database.'
-      };
-    }
-
-    // Generate unique profile name if needed
-    let profileName = fileName;
-    const existingProfiles = profileManager.getProfiles();
-    let counter = 1;
-
-    while (existingProfiles.includes(profileName)) {
-      profileName = `${fileName}_${counter}`;
-      counter++;
-    }
-
-    // Copy database to profile directory
-    const targetPath = getDatabasePath(profileName);
-    ensureDataDirectory();
-    fs.copyFileSync(sourcePath, targetPath);
-
-    let success = false;
-
-    // Add new profile to profiles
-    success = profileManager.importProfile(profileName);
-    if (success) {
-      // Switch to the imported profile to ensure it's properly initialized
-      success = await profileManager.switchProfile(profileName);
-    } else {
-      console.error('Failed to imported profile, the same profile already exists');
-    }
-
-    if (!success) {
-      // Clean up the copied file if profile creation failed
-      try {
-        fs.unlinkSync(targetPath);
-      } catch (cleanupError) {
-        console.error('Error cleaning up failed import:', cleanupError);
-      }
-      return { success: false, message: 'Failed to create new profile' };
-    }
-
-    return {
-      success: true,
-      message: `Profile "${profileName}" imported successfully`,
-      profileName
-    };
+    // Use the import/export service to handle the import
+    return await importExportService.importProfileFromLocal(sourcePath);
 
   } catch (error) {
     console.error('Error importing profile:', error);
@@ -681,18 +618,11 @@ ipcMain.handle('google-drive-list-files', async () => {
 
 ipcMain.handle('google-drive-upload-database', async () => {
   try {
-    const currentProfile = profileManager.getLastOpenedProfile();
-    if (!currentProfile) {
-      throw new Error('No current profile selected');
+    // Prepare profile data for upload using the service
+    const uploadData = await importExportService.exportProfileForUpload();
+    if (!uploadData.success) {
+      return uploadData;
     }
-
-    const fileInfo = googleDriveExportService.getCurrentDatabaseFileInfo(currentProfile);
-    if (!fileInfo) {
-      throw new Error('Database file not found');
-    }
-
-    const fileBuffer = await googleDriveExportService.readDatabaseFile(fileInfo.filePath);
-    const fileName = googleDriveExportService.generateFileName(currentProfile);
 
     // Get or create the EverEtch Profiles folder
     const folderId = await googleDriveService.getFolder(EVERETCH_FOLDER_NAME);
@@ -702,8 +632,8 @@ ipcMain.handle('google-drive-upload-database', async () => {
 
     // Upload file to the EverEtch folder
     const result = await googleDriveService.uploadFile(
-      fileName,
-      fileBuffer,
+      uploadData.fileName!,
+      uploadData.fileBuffer!,
       folderId
     );
 
@@ -730,54 +660,9 @@ ipcMain.handle('google-drive-download-database', async (event, fileId: string) =
       throw new Error('Could not get file metadata');
     }
 
-    // Extract profile name from filename using the export service
-    const profileName = googleDriveExportService.parseProfileName(fileMetadata.name);
+    // Use the import/export service to handle the import from Google Drive
+    return await importExportService.importProfileFromGoogleDrive(fileMetadata.name, downloadResult.content!);
 
-    // Generate unique profile name if needed
-    const existingProfiles = profileManager.getProfiles();
-    let finalProfileName = profileName;
-    let counter = 1;
-
-    while (existingProfiles.includes(finalProfileName)) {
-      finalProfileName = `${profileName}_${counter}`;
-      counter++;
-    }
-
-    // Save the downloaded file
-    const targetPath = getDatabasePath(finalProfileName);
-    ensureDataDirectory();
-    const fileBuffer = Buffer.from(downloadResult.content!, 'base64');
-    await googleDriveExportService.writeDatabaseFile(targetPath, fileBuffer);
-
-    // Validate the downloaded database
-    const isValid = await DatabaseManager.validateDatabaseFormat(targetPath);
-    if (!isValid) {
-      // Clean up invalid file
-      try {
-        fs.unlinkSync(targetPath);
-      } catch (cleanupError) {
-        console.error('Error cleaning up invalid download:', cleanupError);
-      }
-      throw new Error('Downloaded file is not a valid EverEtch database');
-    }
-
-    // Import the profile
-    const importSuccess = profileManager.importProfile(finalProfileName);
-    if (!importSuccess) {
-      // Clean up if import failed
-      try {
-        fs.unlinkSync(targetPath);
-      } catch (cleanupError) {
-        console.error('Error cleaning up failed import:', cleanupError);
-      }
-      throw new Error('Failed to import profile');
-    }
-
-    return {
-      success: true,
-      message: `Profile "${finalProfileName}" imported successfully from Google Drive`,
-      profileName: finalProfileName
-    };
   } catch (error) {
     console.error('Failed to download database from Google Drive:', error);
     return {
