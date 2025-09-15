@@ -9,13 +9,16 @@ import { StoreManager } from './utils/StoreManager.js';
 import { DatabaseManager } from './database/DatabaseManager.js';
 import { ProfileManager } from './database/ProfileManager.js';
 import { AIModelClient, WORD_DUMMY_METAS } from './ai/AIModelClient.js';
-import { GoogleAuthService } from './main/google/GoogleAuthService.js';
-import { GoogleDriveService } from './main/google/GoogleDriveService.js';
-import { GoogleDriveExportService } from './main/services/GoogleDriveExportService.js';
+import { GoogleAuthService } from './service/google/GoogleAuthService.js';
+import { GoogleDriveService } from './service/google/GoogleDriveService.js';
+import { ImportExportService } from './service/common/ImportExportService.js';
 import { marked } from 'marked';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// Application constants
+const EVERETCH_FOLDER_NAME = 'EverEtch Profiles';
 
 let mainWindow: BrowserWindow;
 let dbManager: DatabaseManager;
@@ -24,7 +27,7 @@ let aiClient: AIModelClient;
 let storeManager: StoreManager;
 let googleAuthService: GoogleAuthService;
 let googleDriveService: GoogleDriveService;
-let googleDriveExportService: GoogleDriveExportService;
+let googleDriveExportService: ImportExportService;
 let queuedProtocolAction: { type: string, data: any } | null = null; // Store queued protocol actions
 
 // Configure marked for proper line break handling
@@ -72,7 +75,7 @@ async function createWindow() {
     storeManager = new StoreManager();
     googleAuthService = new GoogleAuthService(mainWindow, storeManager);
     googleDriveService = new GoogleDriveService(googleAuthService);
-    googleDriveExportService = new GoogleDriveExportService(dbManager);
+    googleDriveExportService = new ImportExportService(dbManager);
 
     mainWindow.loadFile(path.join(__dirname, 'renderer/index.html'));
 
@@ -657,7 +660,14 @@ ipcMain.handle('google-get-user-info', async () => {
 
 ipcMain.handle('google-drive-list-files', async () => {
   try {
-    const files = await googleDriveService.listFilesInEverEtchFolder();
+    // Get or create the EverEtch Profiles folder
+    const folderId = await googleDriveService.getFolder(EVERETCH_FOLDER_NAME);
+    if (!folderId) {
+      throw new Error('Could not access EverEtch Profiles folder');
+    }
+
+    // List files in the EverEtch folder
+    const files = await googleDriveService.listFilesInFolder(folderId);
     return { success: true, files };
   } catch (error) {
     console.error('Failed to list Google Drive files:', error);
@@ -684,10 +694,17 @@ ipcMain.handle('google-drive-upload-database', async () => {
     const fileBuffer = await googleDriveExportService.readDatabaseFile(fileInfo.filePath);
     const fileName = googleDriveExportService.generateFileName(currentProfile);
 
-    const result = await googleDriveService.uploadFileToEverEtchFolder(
+    // Get or create the EverEtch Profiles folder
+    const folderId = await googleDriveService.getFolder(EVERETCH_FOLDER_NAME);
+    if (!folderId) {
+      throw new Error('Could not access EverEtch Profiles folder');
+    }
+
+    // Upload file to the EverEtch folder
+    const result = await googleDriveService.uploadFile(
       fileName,
-      fileBuffer.toString('base64'),
-      'application/octet-stream'
+      fileBuffer,
+      folderId
     );
 
     return result;

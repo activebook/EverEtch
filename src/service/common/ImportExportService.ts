@@ -10,7 +10,7 @@ export interface DatabaseFileInfo {
   lastModified: Date;
 }
 
-export class GoogleDriveExportService {
+export class ImportExportService {
   private dbManager: DatabaseManager;
 
   constructor(dbManager: DatabaseManager) {
