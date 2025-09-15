@@ -46,6 +46,7 @@ export class EverEtchApp {
   private isImporting: boolean = false;
   private scrollObserver: IntersectionObserver | null = null;
   private sortOrder: 'asc' | 'desc' = 'desc';
+  private selectedGoogleDriveFile: any = null;
 
   constructor() {
     this.profileService = new ProfileService();
@@ -547,6 +548,14 @@ export class EverEtchApp {
 
     // Google Drive modal event handlers
     this.setupGoogleDriveModalHandlers();
+
+    // Google Drive upload success modal
+    const closeUploadModalBtn = document.getElementById('close-google-drive-upload-modal') as HTMLButtonElement;
+    if (closeUploadModalBtn) {
+      closeUploadModalBtn.addEventListener('click', () => {
+        this.hideGoogleDriveUploadModal();
+      });
+    }
   }
 
   private setupGoogleDriveModalHandlers(): void {
@@ -602,9 +611,21 @@ export class EverEtchApp {
 
     // Google Drive file picker modal
     const cancelGoogleDrivePicker = document.getElementById('cancel-google-drive-picker') as HTMLButtonElement;
+    const importGoogleDriveFile = document.getElementById('import-google-drive-file') as HTMLButtonElement;
+
     if (cancelGoogleDrivePicker) {
       cancelGoogleDrivePicker.addEventListener('click', () => {
         this.hideGoogleDriveFilePicker();
+        this.selectedGoogleDriveFile = null;
+        this.updateGoogleDriveImportUI();
+      });
+    }
+
+    if (importGoogleDriveFile) {
+      importGoogleDriveFile.addEventListener('click', async () => {
+        if (this.selectedGoogleDriveFile) {
+          await this.performGoogleDriveImport(this.selectedGoogleDriveFile.id);
+        }
       });
     }
   }
@@ -2150,6 +2171,10 @@ export class EverEtchApp {
 
   private async showGoogleDriveFilePicker(): Promise<void> {
     try {
+      // Reset selection state when opening modal
+      this.selectedGoogleDriveFile = null;
+      this.updateGoogleDriveImportUI();
+
       // Check if we're authenticated first
       const authStatus = await window.electronAPI.googleIsAuthenticated();
       if (!authStatus.authenticated) {
@@ -2198,6 +2223,13 @@ export class EverEtchApp {
     }
   }
 
+  private hideGoogleDriveUploadModal(): void {
+    const modal = document.getElementById('google-drive-upload-modal')!;
+    if (modal) {
+      modal.classList.add('hidden');
+    }
+  }
+
   private renderGoogleDriveFiles(files: any[]): void {
     const filesList = document.getElementById('google-drive-files-list')!;
     if (!filesList) return;
@@ -2215,23 +2247,26 @@ export class EverEtchApp {
       return;
     }
 
-    const filesHtml = files.map(file => `
-      <button class="w-full p-4 bg-white/80 hover:bg-white/90 border border-slate-200 rounded-lg transition-all duration-200 hover:shadow-md group google-drive-file-btn" data-file-id="${file.id}">
-        <div class="flex items-center">
-          <svg class="w-8 h-8 mr-3 text-blue-500" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="#4285F4"/>
-          </svg>
-          <div class="text-left flex-1">
-            <h4 class="font-medium text-slate-800 truncate">${file.name}</h4>
-            <p class="text-sm text-slate-500">Modified: ${new Date(file.modifiedTime).toLocaleDateString()}</p>
-            ${file.size ? `<p class="text-sm text-slate-500">Size: ${this.formatFileSize(parseInt(file.size))}</p>` : ''}
+    const filesHtml = files.map(file => {
+      const isSelected = this.selectedGoogleDriveFile && this.selectedGoogleDriveFile.id === file.id;
+      return `
+        <button class="w-full p-4 ${isSelected ? 'bg-blue-50 border-blue-300' : 'bg-white/80 hover:bg-white/90'} border ${isSelected ? 'border-blue-300' : 'border-slate-200'} rounded-lg transition-all duration-200 hover:shadow-md group google-drive-file-btn" data-file-id="${file.id}">
+          <div class="flex items-center">
+            <svg class="w-8 h-8 mr-3 text-blue-500" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="#4285F4"/>
+            </svg>
+            <div class="text-left flex-1">
+              <h4 class="font-medium ${isSelected ? 'text-blue-800' : 'text-slate-800'} truncate">${file.name}</h4>
+              <p class="text-sm text-slate-500">Modified: ${new Date(file.modifiedTime).toLocaleDateString()}</p>
+              ${file.size ? `<p class="text-sm text-slate-500">Size: ${this.formatFileSize(parseInt(file.size))}</p>` : ''}
+            </div>
+            <svg class="w-5 h-5 ${isSelected ? 'text-blue-500' : 'text-slate-400'} group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
           </div>
-          <svg class="w-5 h-5 text-slate-400 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-          </svg>
-        </div>
-      </button>
-    `).join('');
+        </button>
+      `;
+    }).join('');
 
     filesList.innerHTML = filesHtml;
 
@@ -2242,28 +2277,47 @@ export class EverEtchApp {
         const target = e.currentTarget as HTMLElement;
         const fileId = target.getAttribute('data-file-id');
         if (fileId) {
-          await this.handleGoogleDriveFileSelect(fileId);
+          // Find the file object
+          const selectedFile = files.find(f => f.id === fileId);
+          if (selectedFile) {
+            this.selectedGoogleDriveFile = selectedFile;
+            this.updateGoogleDriveImportUI();
+            // Re-render to show selection
+            this.renderGoogleDriveFiles(files);
+          }
         }
       });
     });
   }
 
-  private showGoogleDriveError(message: string): void {
-    const filesList = document.getElementById('google-drive-files-list')!;
-    if (filesList) {
-      filesList.innerHTML = `
-        <div class="text-center text-red-500 py-8">
-          <svg class="w-12 h-12 mx-auto mb-4 text-red-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-          </svg>
-          <p class="font-medium">Error</p>
-          <p class="text-sm mt-2">${message}</p>
-        </div>
-      `;
+  private updateGoogleDriveImportUI(): void {
+    const selectedFileInfo = document.getElementById('selected-file-info') as HTMLElement;
+    const selectedFileName = document.getElementById('selected-file-name') as HTMLElement;
+    const importBtn = document.getElementById('import-google-drive-file') as HTMLButtonElement;
+
+    if (this.selectedGoogleDriveFile) {
+      if (selectedFileInfo && selectedFileName) {
+        selectedFileInfo.classList.remove('hidden');
+        selectedFileName.textContent = this.selectedGoogleDriveFile.name;
+      }
+      if (importBtn) {
+        importBtn.disabled = false;
+        importBtn.classList.remove('disabled:bg-slate-400', 'disabled:cursor-not-allowed');
+        importBtn.classList.add('bg-blue-500', 'hover:bg-blue-600');
+      }
+    } else {
+      if (selectedFileInfo) {
+        selectedFileInfo.classList.add('hidden');
+      }
+      if (importBtn) {
+        importBtn.disabled = true;
+        importBtn.classList.remove('bg-blue-500', 'hover:bg-blue-600');
+        importBtn.classList.add('disabled:bg-slate-400', 'disabled:cursor-not-allowed');
+      }
     }
   }
 
-  private async handleGoogleDriveFileSelect(fileId: string): Promise<void> {
+  private async performGoogleDriveImport(fileId: string): Promise<void> {
     try {
       this.showLoadingOverlay();
       this.hideGoogleDriveFilePicker();
@@ -2291,8 +2345,27 @@ export class EverEtchApp {
       this.toastManager.showError('Failed to download file from Google Drive');
     } finally {
       this.hideLoadingOverlay();
+      // Reset selection
+      this.selectedGoogleDriveFile = null;
     }
   }
+
+  private showGoogleDriveError(message: string): void {
+    const filesList = document.getElementById('google-drive-files-list')!;
+    if (filesList) {
+      filesList.innerHTML = `
+        <div class="text-center text-red-500 py-8">
+          <svg class="w-12 h-12 mx-auto mb-4 text-red-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <p class="font-medium">Error</p>
+          <p class="text-sm mt-2">${message}</p>
+        </div>
+      `;
+    }
+  }
+
+
 
   private async handleExportToGoogleDrive(): Promise<void> {
     try {
@@ -2312,7 +2385,9 @@ export class EverEtchApp {
       const result = await window.electronAPI.googleDriveUploadDatabase();
 
       if (result.success) {
-        this.toastManager.showSuccess(result.message);
+        // Show the upload success modal with ALL uploaded files
+        // This gives users a complete view of their backup history
+        await this.showGoogleDriveUploadSuccess(result.fileId);
       } else {
         this.toastManager.showError(result.message);
       }
@@ -2322,6 +2397,95 @@ export class EverEtchApp {
     } finally {
       this.hideLoadingOverlay();
     }
+  }
+
+  private async showGoogleDriveUploadSuccess(justUploadedFileId?: string): Promise<void> {
+    const filesList = document.getElementById('google-drive-uploaded-files-list')!;
+    if (!filesList) return;
+
+    try {
+      // Show loading state
+      filesList.innerHTML = `
+        <div class="text-center text-slate-500 py-8">
+          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p>Loading your backup files...</p>
+        </div>
+      `;
+
+      // Show the modal
+      const modal = document.getElementById('google-drive-upload-modal')!;
+      if (modal) {
+        modal.classList.remove('hidden');
+      }
+
+      // Load all EverEtch files from Google Drive
+      const result = await window.electronAPI.googleDriveListFiles();
+      if (result.success && result.files) {
+        this.renderGoogleDriveUploadedFiles(result.files, justUploadedFileId);
+      } else {
+        filesList.innerHTML = `
+          <div class="text-center text-slate-500 py-4">
+            <p>Unable to load backup files</p>
+          </div>
+        `;
+      }
+    } catch (error) {
+      console.error('Failed to load uploaded files:', error);
+      filesList.innerHTML = `
+        <div class="text-center text-slate-500 py-4">
+          <p>Unable to load backup files</p>
+        </div>
+      `;
+    }
+  }
+
+  private renderGoogleDriveUploadedFiles(files: any[], justUploadedFileId?: string): void {
+    const filesList = document.getElementById('google-drive-uploaded-files-list')!;
+    if (!filesList) return;
+
+    if (files.length === 0) {
+      filesList.innerHTML = `
+        <div class="text-center text-slate-500 py-4">
+          <p>No backup files found in Google Drive</p>
+        </div>
+      `;
+      return;
+    }
+
+    // Sort files by modified time (newest first)
+    const sortedFiles = files.sort((a, b) =>
+      new Date(b.modifiedTime).getTime() - new Date(a.modifiedTime).getTime()
+    );
+
+    const filesHtml = sortedFiles.map(file => {
+      const isJustUploaded = file.id === justUploadedFileId;
+      const badgeHtml = isJustUploaded ? `
+        <span class="ml-2 px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full font-medium">
+          Just uploaded
+        </span>
+      ` : '';
+
+      return `
+        <div class="flex items-center p-3 ${isJustUploaded ? 'bg-green-50 border border-green-200' : 'bg-slate-50'} rounded-lg">
+          <svg class="w-6 h-6 mr-3 text-blue-500" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="#4285F4"/>
+          </svg>
+          <div class="text-left flex-1">
+            <div class="flex items-center">
+              <h4 class="font-medium text-slate-800 truncate">${file.name}</h4>
+              ${badgeHtml}
+            </div>
+            <p class="text-sm text-slate-500">Modified: ${new Date(file.modifiedTime).toLocaleDateString()}</p>
+            ${file.size ? `<p class="text-sm text-slate-500">Size: ${this.formatFileSize(parseInt(file.size))}</p>` : ''}
+          </div>
+          <svg class="w-5 h-5 ${isJustUploaded ? 'text-green-500' : 'text-slate-400'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+          </svg>
+        </div>
+      `;
+    }).join('');
+
+    filesList.innerHTML = filesHtml;
   }
 
   private formatFileSize(bytes: number): string {

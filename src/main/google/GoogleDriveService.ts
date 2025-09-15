@@ -18,6 +18,8 @@ export interface UploadResult {
   success: boolean;
   fileId?: string;
   fileUrl?: string;
+  fileName?: string;
+  fileSize?: string;
   message: string;
 }
 
@@ -172,6 +174,8 @@ export class GoogleDriveService {
         success: true,
         fileId: response.data.id!,
         fileUrl: response.data.webViewLink!,
+        fileName: response.data.name || fileName,
+        fileSize: response.data.size || '0',
         message: 'File uploaded successfully'
       };
     } catch (error) {
