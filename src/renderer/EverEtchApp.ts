@@ -2240,40 +2240,63 @@ export class EverEtchApp {
           <svg class="w-12 h-12 mx-auto mb-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
           </svg>
-          <p>No EverEtch database files found in Google Drive</p>
-          <p class="text-sm mt-2">Upload a database file first to see it here</p>
+          <p>No profiles found in Google Drive</p>
+          <p class="text-sm mt-2">Upload a profile first to see it here</p>
         </div>
       `;
       return;
     }
 
-    const filesHtml = files.map(file => {
+    // Clear the list first
+    filesList.innerHTML = '';
+
+    // Create file elements individually to avoid HTML injection issues
+    files.forEach(file => {
       const isSelected = this.selectedGoogleDriveFile && this.selectedGoogleDriveFile.id === file.id;
-      return `
-        <button class="w-full p-4 ${isSelected ? 'bg-blue-50 border-blue-300' : 'bg-white/80 hover:bg-white/90'} border ${isSelected ? 'border-blue-300' : 'border-slate-200'} rounded-lg transition-all duration-200 hover:shadow-md group google-drive-file-btn" data-file-id="${file.id}">
-          <div class="flex items-center">
-            <svg class="w-8 h-8 mr-3 text-blue-500" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="#4285F4"/>
-            </svg>
-            <div class="text-left flex-1">
-              <h4 class="font-medium ${isSelected ? 'text-blue-800' : 'text-slate-800'} truncate">${file.name}</h4>
-              <p class="text-sm text-slate-500">Modified: ${new Date(file.modifiedTime).toLocaleDateString()}</p>
-              ${file.size ? `<p class="text-sm text-slate-500">Size: ${this.formatFileSize(parseInt(file.size))}</p>` : ''}
-            </div>
-            <svg class="w-5 h-5 ${isSelected ? 'text-blue-500' : 'text-slate-400'} group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-            </svg>
+
+      // Create the main container
+      const fileContainer = document.createElement('div');
+      fileContainer.className = 'relative group';
+
+      // Create the file button
+      const fileButton = document.createElement('button');
+      fileButton.className = `w-full p-4 ${isSelected ? 'bg-blue-50 border-blue-300' : 'bg-white/80 hover:bg-white/90'} border ${isSelected ? 'border-blue-300' : 'border-slate-200'} rounded-lg transition-all duration-200 hover:shadow-md google-drive-file-btn`;
+      fileButton.setAttribute('data-file-id', file.id);
+
+      // Create the content structure
+      fileButton.innerHTML = `
+        <div class="flex items-center">
+          <svg class="w-8 h-8 mr-3 text-blue-500" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="#4285F4"/>
+          </svg>
+          <div class="text-left flex-1">
+            <h4 class="font-medium ${isSelected ? 'text-blue-800' : 'text-slate-800'} truncate"></h4>
+            <p class="text-sm text-slate-500">Modified: ${new Date(file.modifiedTime).toLocaleDateString()}</p>
+            ${file.size ? `<p class="text-sm text-slate-500">Size: ${this.formatFileSize(parseInt(file.size))}</p>` : ''}
           </div>
-        </button>
+        </div>
       `;
-    }).join('');
 
-    filesList.innerHTML = filesHtml;
+      // Set the file name using textContent to avoid HTML injection
+      const fileNameElement = fileButton.querySelector('h4');
+      if (fileNameElement) {
+        fileNameElement.textContent = file.name;
+      }
 
-    // Add click handlers for file buttons
-    const fileButtons = filesList.querySelectorAll('.google-drive-file-btn');
-    fileButtons.forEach(button => {
-      button.addEventListener('click', async (e) => {
+      // Create the delete button
+      const deleteButton = document.createElement('button');
+      deleteButton.className = 'absolute top-1/2 right-4 -translate-y-1/2 p-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 google-drive-delete-btn';
+      deleteButton.setAttribute('data-file-id', file.id);
+      deleteButton.setAttribute('data-file-name', file.name);
+      deleteButton.title = 'Delete file';
+      deleteButton.innerHTML = `
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+        </svg>
+      `;
+
+      // Add click handler for file button
+      fileButton.addEventListener('click', async (e) => {
         const target = e.currentTarget as HTMLElement;
         const fileId = target.getAttribute('data-file-id');
         if (fileId) {
@@ -2287,6 +2310,21 @@ export class EverEtchApp {
           }
         }
       });
+
+      // Add click handler for delete button
+      deleteButton.addEventListener('click', async (e) => {
+        e.stopPropagation(); // Prevent triggering the file selection
+        const fileId = deleteButton.getAttribute('data-file-id');
+        const fileName = deleteButton.getAttribute('data-file-name');
+        if (fileId && fileName) {
+          await this.handleGoogleDriveFileDelete(fileId, fileName, files);
+        }
+      });
+
+      // Assemble the elements
+      fileContainer.appendChild(fileButton);
+      fileContainer.appendChild(deleteButton);
+      filesList.appendChild(fileContainer);
     });
   }
 
@@ -2452,40 +2490,48 @@ export class EverEtchApp {
       return;
     }
 
+    // Clear the list first
+    filesList.innerHTML = '';
+
     // Sort files by modified time (newest first)
     const sortedFiles = files.sort((a, b) =>
       new Date(b.modifiedTime).getTime() - new Date(a.modifiedTime).getTime()
     );
 
-    const filesHtml = sortedFiles.map(file => {
+    // Create file elements individually to avoid HTML injection issues
+    sortedFiles.forEach(file => {
       const isJustUploaded = file.id === justUploadedFileId;
-      const badgeHtml = isJustUploaded ? `
-        <span class="ml-2 px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full font-medium">
-          Just uploaded
-        </span>
-      ` : '';
 
-      return `
-        <div class="flex items-center p-3 ${isJustUploaded ? 'bg-green-50 border border-green-200' : 'bg-slate-50'} rounded-lg">
-          <svg class="w-6 h-6 mr-3 text-blue-500" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="#4285F4"/>
-          </svg>
-          <div class="text-left flex-1">
-            <div class="flex items-center">
-              <h4 class="font-medium text-slate-800 truncate">${file.name}</h4>
-              ${badgeHtml}
-            </div>
-            <p class="text-sm text-slate-500">Modified: ${new Date(file.modifiedTime).toLocaleDateString()}</p>
-            ${file.size ? `<p class="text-sm text-slate-500">Size: ${this.formatFileSize(parseInt(file.size))}</p>` : ''}
+      // Create the main container
+      const fileContainer = document.createElement('div');
+      fileContainer.className = `flex items-center p-3 ${isJustUploaded ? 'bg-green-50 border border-green-200' : 'bg-slate-50'} rounded-lg`;
+
+      // Create the content structure
+      fileContainer.innerHTML = `
+        <svg class="w-6 h-6 mr-3 text-blue-500" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="#4285F4"/>
+        </svg>
+        <div class="text-left flex-1">
+          <div class="flex items-center">
+            <h4 class="font-medium text-slate-800 truncate"></h4>
+            ${isJustUploaded ? '<span class="ml-2 px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full font-medium">Just uploaded</span>' : ''}
           </div>
-          <svg class="w-5 h-5 ${isJustUploaded ? 'text-green-500' : 'text-slate-400'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-          </svg>
+          <p class="text-sm text-slate-500">Modified: ${new Date(file.modifiedTime).toLocaleDateString()}</p>
+          ${file.size ? `<p class="text-sm text-slate-500">Size: ${this.formatFileSize(parseInt(file.size))}</p>` : ''}
         </div>
+        <svg class="w-5 h-5 ${isJustUploaded ? 'text-green-500' : 'text-slate-400'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+        </svg>
       `;
-    }).join('');
 
-    filesList.innerHTML = filesHtml;
+      // Set the file name using textContent to avoid HTML injection
+      const fileNameElement = fileContainer.querySelector('h4');
+      if (fileNameElement) {
+        fileNameElement.textContent = file.name;
+      }
+
+      filesList.appendChild(fileContainer);
+    });
   }
 
   private formatFileSize(bytes: number): string {
@@ -2499,5 +2545,44 @@ export class EverEtchApp {
     }
 
     return `${size.toFixed(1)} ${units[unitIndex]}`;
+  }
+
+  private async handleGoogleDriveFileDelete(fileId: string, fileName: string, files: any[]): Promise<void> {
+    const confirmed = confirm(`Are you sure you want to delete "${fileName}" from Google Drive?\n\nThis action cannot be undone.`);
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      // Show loading overlay for delete operation
+      this.showLoadingOverlay();
+
+      const result = await window.electronAPI.googleDriveDeleteFile(fileId);
+
+      if (result.success) {
+        this.toastManager.showSuccess(`File "${fileName}" deleted successfully`);
+
+        // Remove the file from the current list and refresh the UI
+        const updatedFiles = files.filter(file => file.id !== fileId);
+        this.renderGoogleDriveFiles(updatedFiles);
+
+        // If the deleted file was selected, clear the selection
+        if (this.selectedGoogleDriveFile && this.selectedGoogleDriveFile.id === fileId) {
+          this.selectedGoogleDriveFile = null;
+          this.updateGoogleDriveImportUI();
+        }
+      } else {
+        this.toastManager.showError(result.message || 'Failed to delete file');
+      }
+    } catch (error) {
+      console.error('Failed to delete Google Drive file:', error);
+      this.toastManager.showError('Failed to delete file from Google Drive');
+    } finally {
+      // Hide loading overlay
+      setTimeout(() => {
+        this.hideLoadingOverlay();
+      }, 500);
+    }
   }
 }

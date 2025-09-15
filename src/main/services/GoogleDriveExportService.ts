@@ -86,15 +86,15 @@ export class GoogleDriveExportService {
     const seconds = String(now.getSeconds()).padStart(2, '0');
 
     const timestamp = `${year}${month}${day}-${hours}${minutes}${seconds}`;
-    return `EverEtch_${profileName}_${timestamp}.db`;
+    return `${profileName}_${timestamp}.db`;
   }
 
   /**
    * Extract profile name from EverEtch database filename
    */
   parseProfileName(fileName: string): string {
-    // Match pattern: EverEtch_{profileName}_{YYYYMMDD-hhmmss}.db
-    const profileNameMatch = fileName.match(/^EverEtch_(.+?)_\d{8}-\d{6}\.db$/);
+    // Match pattern: {profileName}_{YYYYMMDD-hhmmss}.db
+    const profileNameMatch = fileName.match(/^(.+?)_\d{8}-\d{6}\.db$/);
     return profileNameMatch ? profileNameMatch[1] : 'Default';
   }
 
