@@ -25,25 +25,30 @@ export class GoogleAuthService {
   private mainWindow: BrowserWindow;
   private authWindow: BrowserWindow | null = null;
   private localServer: http.Server | null = null;
+  private credentials: GoogleCredentials | null = null;
+  private apiKey: string | undefined;
 
   constructor(mainWindow: BrowserWindow, storeManager: StoreManager) {
     this.mainWindow = mainWindow;
     this.storeManager = storeManager;
 
+    // Load and cache all credentials once
+    this.loadCredentials();
+
     // Initialize OAuth2 client with Google credentials
     // These should be configured by the user in settings
-    const credentials = this.getCredentials();
+    const oauthCredentials = this.getOAuthCredentials();
     this.oauth2Client = new google.auth.OAuth2(
-      credentials.clientId,
-      credentials.clientSecret,
-      credentials.redirectUri
+      oauthCredentials.clientId,
+      oauthCredentials.clientSecret,
+      oauthCredentials.redirectUri
     );
 
     // Load existing tokens if available
     this.loadTokens();
   }
 
-  private getCredentials(): GoogleCredentials {
+  private getOAuthCredentials(): GoogleCredentials {
     // Always load credentials from credentials.json file (never cache them)
     const fileCredentials = this.loadCredentialsFromFile();
     if (fileCredentials) {
@@ -58,7 +63,53 @@ export class GoogleAuthService {
     };
   }
 
+  private loadCredentials(): void {
+    try {
+      const credentialsPath = path.join(app.getAppPath(), 'credentials.json');
+      if (!fs.existsSync(credentialsPath)) {
+        return;
+      }
+
+      const credentialsContent = fs.readFileSync(credentialsPath, 'utf-8');
+      const credentialsData = JSON.parse(credentialsContent);
+
+      // Extract API key if present
+      this.apiKey = credentialsData.api_key;
+
+      // Handle Google Cloud Console credentials format
+      if (credentialsData.installed) {
+        // For Electron desktop apps, use localhost redirect with local server
+        this.credentials = {
+          clientId: credentialsData.installed.client_id,
+          clientSecret: credentialsData.installed.client_secret,
+          redirectUri: 'http://localhost:3000/oauth2callback'
+        };
+        return;
+      }
+
+      // Handle direct format (client_id, client_secret, redirect_uri)
+      if (credentialsData.client_id && credentialsData.client_secret) {
+        this.credentials = {
+          clientId: credentialsData.client_id,
+          clientSecret: credentialsData.client_secret,
+          redirectUri: credentialsData.redirect_uri || 'http://localhost:3000/oauth2callback'
+        };
+        return;
+      }
+
+      console.warn('Invalid credentials.json format');
+    } catch (error) {
+      console.error('Failed to load credentials from file:', error);
+    }
+  }
+
   private loadCredentialsFromFile(): GoogleCredentials | null {
+    // Return cached credentials if available
+    if (this.credentials) {
+      return this.credentials;
+    }
+
+    // Fallback: try to load from file (for backward compatibility)
     try {
       const credentialsPath = path.join(app.getAppPath(), 'credentials.json');
       if (!fs.existsSync(credentialsPath)) {
@@ -98,19 +149,19 @@ export class GoogleAuthService {
   private loadTokens(): void {
     const tokens = this.storeManager.getGoogleTokens();
     if (tokens) {
-      console.log('Loading stored Google tokens:', {
+      console.debug('Loading stored Google tokens:', {
         hasAccessToken: !!tokens.access_token,
         hasRefreshToken: !!tokens.refresh_token,
         expiryDate: new Date(tokens.expiry_date || 0).toISOString(),
         tokenType: tokens.token_type
       });
       this.oauth2Client.setCredentials(tokens);
-      console.log('OAuth2Client credentials set:', {
+      console.debug('OAuth2Client credentials set:', {
         hasAccessToken: !!this.oauth2Client.credentials.access_token,
         hasRefreshToken: !!this.oauth2Client.credentials.refresh_token
       });
     } else {
-      console.log('No stored Google tokens found');
+      console.debug('No stored Google tokens found');
     }
   }
 
@@ -230,7 +281,7 @@ export class GoogleAuthService {
     });
 
     this.localServer.listen(3000, 'localhost', () => {
-      console.log('Local OAuth server listening on http://localhost:3000');
+      console.debug('Local OAuth server listening on http://localhost:3000');
     });
 
     this.localServer.on('error', (error) => {
@@ -243,15 +294,6 @@ export class GoogleAuthService {
     if (this.localServer) {
       this.localServer.close();
       this.localServer = null;
-    }
-  }
-
-  private extractCodeFromUrl(url: string): string | null {
-    try {
-      const urlObj = new URL(url);
-      return urlObj.searchParams.get('code');
-    } catch {
-      return null;
     }
   }
 
@@ -309,6 +351,14 @@ export class GoogleAuthService {
 
   getOAuth2Client(): any {
     return this.oauth2Client;
+  }
+
+  getCredentials(): GoogleCredentials | null {
+    return this.credentials;
+  }
+
+  getApiKey(): string | undefined {
+    return this.apiKey;
   }
 
   async getUserInfo(): Promise<any> {

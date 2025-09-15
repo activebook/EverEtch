@@ -713,13 +713,8 @@ ipcMain.handle('google-drive-download-database', async (event, fileId: string) =
       throw new Error('Could not get file metadata');
     }
 
-    // Extract profile name from filename (remove EverEtch_ prefix and timestamp)
-    const profileNameMatch = fileMetadata.name.match(/^EverEtch_(.+?)_\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.db$/);
-    let profileName = 'imported_profile';
-
-    if (profileNameMatch) {
-      profileName = profileNameMatch[1];
-    }
+    // Extract profile name from filename using the export service
+    const profileName = googleDriveExportService.parseProfileName(fileMetadata.name);
 
     // Generate unique profile name if needed
     const existingProfiles = profileManager.getProfiles();
@@ -738,7 +733,7 @@ ipcMain.handle('google-drive-download-database', async (event, fileId: string) =
     await googleDriveExportService.writeDatabaseFile(targetPath, fileBuffer);
 
     // Validate the downloaded database
-    const isValid = await googleDriveExportService.validateDownloadedDatabase(targetPath);
+    const isValid = await DatabaseManager.validateDatabaseFormat(targetPath);
     if (!isValid) {
       // Clean up invalid file
       try {
