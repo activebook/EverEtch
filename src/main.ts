@@ -55,12 +55,6 @@ async function createWindow() {
     profileManager = new ProfileManager(dbManager);
     aiClient = new AIModelClient();
 
-    // Initialize Google services
-    storeManager = new StoreManager();
-    googleAuthService = new GoogleAuthService(mainWindow, storeManager);
-    googleDriveService = new GoogleDriveService(googleAuthService);
-    googleDriveExportService = new GoogleDriveExportService(dbManager);
-
     // Create window with minimal bounds first (invisible), then apply saved bounds
     mainWindow = new BrowserWindow({
       width: 1200, height: 800,
@@ -73,6 +67,12 @@ async function createWindow() {
         preload: path.join(__dirname, 'preload.js')
       }
     });
+
+    // Initialize Google services AFTER mainWindow is created
+    storeManager = new StoreManager();
+    googleAuthService = new GoogleAuthService(mainWindow, storeManager);
+    googleDriveService = new GoogleDriveService(googleAuthService);
+    googleDriveExportService = new GoogleDriveExportService(dbManager);
 
     mainWindow.loadFile(path.join(__dirname, 'renderer/index.html'));
 
