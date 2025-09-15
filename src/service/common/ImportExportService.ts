@@ -1,6 +1,6 @@
 import { DatabaseManager } from '../../database/DatabaseManager.js';
 import { ProfileManager } from '../../database/ProfileManager.js';
-import { getDatabasePath, ensureDataDirectory } from '../../utils/utils.js';
+import { Utils } from '../../utils/utils.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -44,7 +44,7 @@ export class ImportExportService {
    */
   getCurrentDatabaseFileInfo(profileName: string): DatabaseFileInfo | null {
     try {
-      const filePath = getDatabasePath(profileName);
+      const filePath = Utils.getDatabasePath(profileName);
 
       if (!fs.existsSync(filePath)) {
         return null;
@@ -147,7 +147,7 @@ export class ImportExportService {
       }
 
       // Get source database path
-      const sourcePath = getDatabasePath(currentProfile);
+      const sourcePath = Utils.getDatabasePath(currentProfile);
 
       // Ensure source database exists
       if (!fs.existsSync(sourcePath)) {
@@ -199,8 +199,8 @@ export class ImportExportService {
       }
 
       // Copy database to profile directory
-      const targetPath = getDatabasePath(profileName);
-      ensureDataDirectory();
+      const targetPath = Utils.getDatabasePath(profileName);
+      Utils.ensureDataDirectory();
       fs.copyFileSync(sourcePath, targetPath);
 
       let success = false;
@@ -292,8 +292,8 @@ export class ImportExportService {
       }
 
       // Save the downloaded file
-      const targetPath = getDatabasePath(finalProfileName);
-      ensureDataDirectory();
+      const targetPath = Utils.getDatabasePath(finalProfileName);
+      Utils.ensureDataDirectory();
       const fileBuffer = Buffer.from(fileContent, 'base64');
       await this.writeDatabaseFile(targetPath, fileBuffer);
 

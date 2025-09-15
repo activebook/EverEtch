@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import { DatabaseManager, ProfileConfig } from './DatabaseManager.js';
-import { getProfilesPath, getDatabasePath, ensureDataDirectory, generateId, formatDate } from '../utils/utils.js';
+import { Utils } from '../utils/utils.js';
 
 
 
@@ -12,8 +12,8 @@ export class ProfileManager {
 
   constructor(dbManager: DatabaseManager) {
     this.dbManager = dbManager;
-    this.profilesPath = getProfilesPath();
-    ensureDataDirectory();
+    this.profilesPath = Utils.getProfilesPath();
+    Utils.ensureDataDirectory();
   }
 
   async loadProfiles(): Promise<string[]> {
@@ -152,7 +152,7 @@ export class ProfileManager {
     }
 
     // Delete database file
-    const dbPath = getDatabasePath(profileName);
+    const dbPath = Utils.getDatabasePath(profileName);
     try {
       if (fs.existsSync(dbPath)) {
         fs.unlinkSync(dbPath);
@@ -206,8 +206,8 @@ export class ProfileManager {
       }
 
       // 2. Rename the database file
-      const oldDbPath = getDatabasePath(trimmedOldName);
-      const newDbPath = getDatabasePath(trimmedNewName);
+      const oldDbPath = Utils.getDatabasePath(trimmedOldName);
+      const newDbPath = Utils.getDatabasePath(trimmedNewName);
 
       // Keypart: Rename the database file
       if (fs.existsSync(oldDbPath)) {

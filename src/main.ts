@@ -3,8 +3,8 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import { getAndSetProxyEnvironment } from './utils/sys_proxy.js';
-import { getDatabasePath, ensureDataDirectory, logToFile, setDebugMode, clearDebugLog, getUserDataPath } from './utils/utils.js';
+import { SysProxy } from './utils/SysProxy.js';
+import { Utils } from './utils/utils.js';
 import { StoreManager } from './utils/StoreManager.js';
 import { DatabaseManager } from './database/DatabaseManager.js';
 import { ProfileManager } from './database/ProfileManager.js';
@@ -46,9 +46,9 @@ try {
 }
 
 // Test logging functionality
-setDebugMode(false);
-clearDebugLog();
-logToFile('EverEtch app starting up');
+Utils.setDebugMode(false);
+Utils.clearDebugLog();
+Utils.logToFile('EverEtch app starting up');
 
 
 async function createWindow() {
@@ -83,8 +83,8 @@ async function createWindow() {
     adjustMainWindow(() => {
       // Callback function after window is ready
       // Set up proxy environment variables
-      getAndSetProxyEnvironment();
-    }, () => {});
+      SysProxy.apply();
+    }, () => { });
 
     if (process.env.NODE_ENV === 'development') {
       // Open DevTools(cmd + alt + i)
@@ -182,7 +182,7 @@ function adjustMainWindow(ready: () => void, shown: () => void) {
 
 // Handle protocol URL processing
 function handleProtocolUrl(url: string) {
-  logToFile(`🎯 Processing protocol URL: ${url}`);
+  Utils.logToFile(`🎯 Processing protocol URL: ${url}`);
 
   try {
     // Remove the protocol prefix to get the path
@@ -192,15 +192,15 @@ function handleProtocolUrl(url: string) {
     // Check if window is already loaded and showing
     const isWindowReady = mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible();
 
-    logToFile(`🎯 Window ready? ${isWindowReady}`);
-    logToFile(`🎯 URL parts: ${JSON.stringify(urlParts)}`);
+    Utils.logToFile(`🎯 Window ready? ${isWindowReady}`);
+    Utils.logToFile(`🎯 URL parts: ${JSON.stringify(urlParts)}`);
 
     // Handle different protocol actions
     if (urlParts.length === 1 && (urlParts[0] === '' || urlParts[0] === 'open')) {
-      logToFile('🎯 Handling: Open app');
+      Utils.logToFile('🎯 Handling: Open app');
       if (isWindowReady) {
         mainWindow.focus();
-        logToFile('✅ App focused');
+        Utils.logToFile('✅ App focused');
       }
       return;
     }
@@ -208,15 +208,15 @@ function handleProtocolUrl(url: string) {
     if (urlParts.length >= 2 && urlParts[0] === 'word') {
       // Join all parts after 'word' and decode
       const wordName = decodeURIComponent(urlParts.slice(1).join('/'));
-      logToFile(`🎯 Handling: Navigate to word "${wordName}"`);
+      Utils.logToFile(`🎯 Handling: Navigate to word "${wordName}"`);
 
       if (isWindowReady) {
-        logToFile('🎯 Sending IPC message to renderer');
+        Utils.logToFile('🎯 Sending IPC message to renderer');
         mainWindow.webContents.send('protocol-navigate-word', wordName);
         mainWindow.focus();
-        logToFile('✅ IPC message sent and window focused');
+        Utils.logToFile('✅ IPC message sent and window focused');
       } else {
-        logToFile('⚠️ Window not ready, queuing navigation');
+        Utils.logToFile('⚠️ Window not ready, queuing navigation');
         // Queue the action for when window is ready
         queuedProtocolAction = { type: 'word', data: wordName };
       }
@@ -226,24 +226,24 @@ function handleProtocolUrl(url: string) {
     if (urlParts.length >= 2 && urlParts[0] === 'profile') {
       // Join all parts after 'profile' and decode
       const profileName = decodeURIComponent(urlParts.slice(1).join('/'));
-      logToFile(`🎯 Handling: Switch to profile "${profileName}"`);
+      Utils.logToFile(`🎯 Handling: Switch to profile "${profileName}"`);
 
       if (isWindowReady) {
-        logToFile('🎯 Sending IPC message to renderer');
+        Utils.logToFile('🎯 Sending IPC message to renderer');
         mainWindow.webContents.send('protocol-switch-profile', profileName);
         mainWindow.focus();
-        logToFile('✅ IPC message sent and window focused');
+        Utils.logToFile('✅ IPC message sent and window focused');
       } else {
-        logToFile('⚠️ Window not ready, queuing profile switch');
+        Utils.logToFile('⚠️ Window not ready, queuing profile switch');
         queuedProtocolAction = { type: 'profile', data: profileName };
       }
       return;
     }
 
-    logToFile(`⚠️ Unknown protocol action: ${urlWithoutProtocol}`);
+    Utils.logToFile(`⚠️ Unknown protocol action: ${urlWithoutProtocol}`);
 
   } catch (error) {
-    logToFile(`❌ Error processing protocol URL: ${error}`);
+    Utils.logToFile(`❌ Error processing protocol URL: ${error}`);
   }
 }
 
@@ -251,16 +251,16 @@ function handleProtocolUrl(url: string) {
 function processQueuedProtocolAction() {
   if (!queuedProtocolAction || !mainWindow) return;
 
-  logToFile(`🎯 Processing queued action: ${queuedProtocolAction.type} - ${queuedProtocolAction.data}`);
+  Utils.logToFile(`🎯 Processing queued action: ${queuedProtocolAction.type} - ${queuedProtocolAction.data}`);
 
   if (queuedProtocolAction.type === 'word') {
     mainWindow.webContents.send('protocol-navigate-word', queuedProtocolAction.data);
     mainWindow.focus();
-    logToFile('✅ Queued word navigation sent');
+    Utils.logToFile('✅ Queued word navigation sent');
   } else if (queuedProtocolAction.type === 'profile') {
     mainWindow.webContents.send('protocol-switch-profile', queuedProtocolAction.data);
     mainWindow.focus();
-    logToFile('✅ Queued profile switch sent');
+    Utils.logToFile('✅ Queued profile switch sent');
   }
 
   queuedProtocolAction = null; // Clear the queue
@@ -268,13 +268,13 @@ function processQueuedProtocolAction() {
 
 // Listen for app-ready signal from renderer
 ipcMain.on('app-render-ready', () => {
-  logToFile('🎯 Received app-ready signal from renderer');
+  Utils.logToFile('🎯 Received app-ready signal from renderer');
   processQueuedProtocolAction();
 });
 
 // Handle open-url event for macOS protocol links
 app.on('open-url', (event, url) => {
-  logToFile(`🎯 App open-url event received: ${url}`);
+  Utils.logToFile(`🎯 App open-url event received: ${url}`);
   event.preventDefault();
 
   // Parse the URL and handle it
