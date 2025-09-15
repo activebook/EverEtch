@@ -97,17 +97,7 @@ export class EverEtchApp {
     loadingOverlay.classList.add('hidden');
   }
 
-  private setupWordRendererCallbacks(): void {
-    // Delegate to word manager
-    this.wordRenderer.onTagClick = (tag: string) => this.associatedWordsManager.loadAssociatedWords(tag);
-    this.wordRenderer.onSynonymClick = (synonym: string) => this.associatedWordsManager.loadAssociatedWords(synonym);
-    this.wordRenderer.onAntonymClick = (antonym: string) => this.associatedWordsManager.loadAssociatedWords(antonym);
-    this.wordRenderer.onAddWord = (word: WordDocument) => this.wordManager.handleAddWord(word);
-    this.wordRenderer.onRefreshWord = (word: WordDocument) => this.wordManager.handleRefreshWord(word);
-    this.wordRenderer.onDeleteWord = (word: WordDocument) => this.wordManager.handleDeleteWord(word);
-    this.wordRenderer.onWriteRemark = (word: WordDocument) => this.wordManager.handleWriteRemark(word);
-    this.wordRenderer.onWordSelect = (word: WordDocument | WordListItem) => this.wordManager.selectWord(word);
-  }
+
 
   private async initializeApp(): Promise<void> {
     try {
@@ -156,9 +146,6 @@ export class EverEtchApp {
         console.log('No current profile found, loading words...');
         await this.loadWords();
       }      
-
-      // Set up word renderer callbacks
-      this.setupWordRendererCallbacks();
 
       // Set up event listeners
       this.setupEventListeners();

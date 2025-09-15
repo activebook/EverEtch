@@ -15,10 +15,6 @@ export class EventManager {
   private wordImportService: WordImportService;
   private toastManager: ToastManager;
 
-  // Import state
-  private selectedImportFile: File | null = null;
-  private isImporting: boolean = false;
-
   constructor(
     wordManager: WordManager,
     modalManager: ModalManager,
@@ -298,18 +294,7 @@ export class EventManager {
 
   // Event handler implementations
   private async handleSearchInput(query: string): Promise<void> {
-    try {
-      const suggestions = await window.electronAPI.searchWords(query);
-      // Render suggestions - this will be handled by the word renderer
-      console.log('Suggestions:', suggestions);
-
-      const hasExactMatch = suggestions.some((word: any) =>
-        word.word.toLowerCase() === query.toLowerCase()
-      );
-      this.updateGenerateBtnState(query, hasExactMatch);
-    } catch (error) {
-      console.error('Error searching words:', error);
-    }
+    await this.wordManager.handleSearchInput(query);
   }
 
   private updateGenerateBtnState(query: string, hasExactMatch?: boolean): void {
@@ -338,30 +323,7 @@ export class EventManager {
   }
 
   private async handleSearchExistingWord(): Promise<void> {
-    const wordInput = document.getElementById('word-input') as HTMLInputElement;
-    const query = wordInput.value.trim().toLowerCase();
-
-    if (!query) {
-      this.toastManager.showError('Please enter a word');
-      return;
-    }
-
-    try {
-      const suggestions = await window.electronAPI.searchWords(query);
-      const exactMatch = suggestions.find((word: any) =>
-        word.word.toLowerCase() === query
-      );
-
-      if (exactMatch) {
-        // Select the word - this will be handled by the word manager
-        this.uiUtils.clearSuggestions();
-      } else {
-        this.toastManager.showError('Word not found. Try generating it instead.');
-      }
-    } catch (error) {
-      console.error('Error searching for existing word:', error);
-      this.toastManager.showError('Failed to find existing word');
-    }
+    await this.wordManager.handleSearchExistingWord();
   }
 
   private async handleProfileSwitch(newProfile: string, profileSelect?: HTMLSelectElement): Promise<void> {
@@ -456,16 +418,16 @@ export class EventManager {
   }
 
   private handleWordMeaningStreaming(content: string): void {
-    // This will be handled by the word manager
-    console.log('Word meaning streaming:', content);
+    this.wordManager.handleWordMeaningStreaming(content);
   }
 
   private handleWordMetadataReady(wordMeta: any): void {
-    // This will be handled by the word manager
-    console.log('Word metadata ready:', wordMeta);
+    this.wordManager.handleWordMetadataReady(wordMeta);
   }
 
-  // Import functionality
+  // Import functionality - simplified to use WordImportService state
+  private selectedImportFile: File | null = null;
+
   private selectImportFile(): void {
     const input = document.createElement('input');
     input.type = 'file';
@@ -497,7 +459,7 @@ export class EventManager {
   }
 
   private async startWordImport(): Promise<void> {
-    if (!this.selectedImportFile || this.isImporting) {
+    if (!this.selectedImportFile) {
       return;
     }
 
@@ -520,7 +482,6 @@ export class EventManager {
         },
       };
 
-      this.isImporting = true;
       await this.wordImportService.startImport(content, callbacks);
     } catch (error) {
       console.error('Error starting import:', error);
@@ -529,8 +490,6 @@ export class EventManager {
   }
 
   private cancelWordImport(): void {
-    if (!this.isImporting) return;
-
     this.wordImportService.cancelImport();
   }
 
@@ -575,7 +534,6 @@ export class EventManager {
   }
 
   private handleImportComplete(progress: ImportProgress): void {
-    this.isImporting = false;
     this.hideImportProgressOverlay();
 
     // Show completion modal
@@ -615,7 +573,6 @@ export class EventManager {
   }
 
   private handleImportError(progress: ImportProgress): void {
-    this.isImporting = false;
     this.hideImportProgressOverlay();
 
     // If we have progress info and at least one word was successfully imported, reload the word list
@@ -629,7 +586,6 @@ export class EventManager {
   }
 
   private handleImportCancel(progress?: ImportProgress): void {
-    this.isImporting = false;
     this.hideImportProgressOverlay();
 
     // If we have progress info and at least one word was successfully imported, reload the word list
