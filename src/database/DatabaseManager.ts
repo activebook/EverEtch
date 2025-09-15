@@ -623,13 +623,24 @@ export class DatabaseManager {
   close(): Promise<void> {
     return new Promise((resolve) => {
       if (this.db) {
-        this.db.close((err) => {
+        // Check if database is already closed or in a bad state
+        try {
+          this.db.close((err) => {
+            this.db = null;
+            if (err) {
+              // Only log non-misuse errors, as SQLITE_MISUSE often means already closed
+              if (!err.message.includes('SQLITE_MISUSE')) {
+                console.error('Error closing database:', err);
+              }
+            }
+            resolve();
+          });
+        } catch (error) {
+          // Database might already be closed
           this.db = null;
-          if (err) {
-            console.error('Error closing database:', err);
-          }
+          console.debug('Database close attempted on already closed connection');
           resolve();
-        });
+        }
       } else {
         resolve();
       }
