@@ -548,14 +548,6 @@ export class EverEtchApp {
 
     // Google Drive modal event handlers
     this.setupGoogleDriveModalHandlers();
-
-    // Google Drive upload success modal
-    const closeUploadModalBtn = document.getElementById('close-google-drive-upload-modal') as HTMLButtonElement;
-    if (closeUploadModalBtn) {
-      closeUploadModalBtn.addEventListener('click', () => {
-        this.hideGoogleDriveUploadModal();
-      });
-    }
   }
 
   private setupGoogleDriveModalHandlers(): void {
@@ -563,6 +555,14 @@ export class EverEtchApp {
     const exportLocalBtn = document.getElementById('export-local-btn') as HTMLButtonElement;
     const exportGoogleDriveBtn = document.getElementById('export-google-drive-btn') as HTMLButtonElement;
     const cancelExportChoice = document.getElementById('cancel-export-choice') as HTMLButtonElement;
+     // Google Drive upload success modal
+    const closeUploadModalBtn = document.getElementById('close-google-drive-upload-modal') as HTMLButtonElement;
+    
+    if (closeUploadModalBtn) {
+      closeUploadModalBtn.addEventListener('click', () => {
+        this.hideGoogleDriveUploadModal();
+      });
+    }
 
     if (exportLocalBtn) {
       exportLocalBtn.addEventListener('click', () => {
