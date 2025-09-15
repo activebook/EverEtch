@@ -41,12 +41,12 @@ export class GoogleDriveManager {
       // Show loading in the file picker
       const filesList = document.getElementById('google-drive-files-list')!;
       if (filesList) {
-        filesList.innerHTML = `
-          <div class="text-center text-slate-500 py-8">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-            <p>Loading files...</p>
-          </div>
-        `;
+      filesList.innerHTML = `
+        <div class="text-center text-slate-500 py-8">
+          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500 mx-auto mb-4"></div>
+          <p>Loading files...</p>
+        </div>
+      `;
       }
 
       // Show the modal
@@ -98,19 +98,19 @@ export class GoogleDriveManager {
 
       // Create the file button
       const fileButton = document.createElement('button');
-      fileButton.className = `w-full p-4 ${isSelected ? 'bg-blue-50 border-blue-300' : 'bg-white/80 hover:bg-white/90'} border ${isSelected ? 'border-blue-300' : 'border-slate-200'} rounded-lg transition-all duration-200 hover:shadow-md google-drive-file-btn`;
+      fileButton.className = `w-full p-3 ${isSelected ? 'bg-amber-50 border-amber-300' : 'bg-white/80 hover:bg-white/90'} border ${isSelected ? 'border-amber-300' : 'border-slate-200'} rounded-lg transition-all duration-200 hover:shadow-md google-drive-file-btn`;
       fileButton.setAttribute('data-file-id', file.id);
 
       // Create the content structure
       fileButton.innerHTML = `
         <div class="flex items-center">
-          <svg class="w-8 h-8 mr-3 text-blue-500" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="#4285F4"/>
+          <svg class="w-6 h-6 mr-2 text-amber-600" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="#F59E0B"/>
           </svg>
           <div class="text-left flex-1">
-            <h4 class="font-medium ${isSelected ? 'text-blue-800' : 'text-slate-800'} truncate"></h4>
-            <p class="text-sm text-slate-500">Modified: ${new Date(file.modifiedTime).toLocaleDateString()}</p>
-            ${file.size ? `<p class="text-sm text-slate-500">Size: ${this.formatFileSize(parseInt(file.size))}</p>` : ''}
+            <h4 class="font-medium text-sm ${isSelected ? 'text-amber-800' : 'text-slate-800'} truncate"></h4>
+            <p class="text-xs text-slate-500">Modified: ${new Date(file.modifiedTime).toLocaleDateString()}</p>
+            ${file.size ? `<p class="text-xs text-slate-500">Size: ${this.formatFileSize(parseInt(file.size))}</p>` : ''}
           </div>
         </div>
       `;
@@ -178,8 +178,8 @@ export class GoogleDriveManager {
       }
       if (importBtn) {
         importBtn.disabled = false;
-        importBtn.classList.remove('disabled:bg-slate-400', 'disabled:cursor-not-allowed');
-        importBtn.classList.add('bg-blue-500', 'hover:bg-blue-600');
+        importBtn.classList.remove('disabled:cursor-not-allowed');
+        //importBtn.classList.add('bg-amber-500', 'hover:bg-amber-600');
       }
     } else {
       if (selectedFileInfo) {
@@ -187,8 +187,8 @@ export class GoogleDriveManager {
       }
       if (importBtn) {
         importBtn.disabled = true;
-        importBtn.classList.remove('bg-blue-500', 'hover:bg-blue-600');
-        importBtn.classList.add('disabled:bg-slate-400', 'disabled:cursor-not-allowed');
+        //importBtn.classList.remove('bg-blue-500', 'hover:bg-blue-600');
+        importBtn.classList.add('disabled:cursor-not-allowed');
       }
     }
   }
@@ -262,6 +262,9 @@ export class GoogleDriveManager {
       if (result.success) {
         this.toastManager.showSuccess(result.message);
 
+        // Show the upload success modal with the uploaded file
+        await this.showGoogleDriveUploadSuccess(result.fileId);
+
         // Refresh profiles and switch to the new one
         await this.profileService.loadProfiles();
         if (result.profileName) {
@@ -292,7 +295,7 @@ export class GoogleDriveManager {
       // Show loading state
       filesList.innerHTML = `
         <div class="text-center text-slate-500 py-8">
-          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500 mx-auto mb-4"></div>
           <p>Loading your backup files...</p>
         </div>
       `;
@@ -351,22 +354,22 @@ export class GoogleDriveManager {
 
       // Create the main container
       const fileContainer = document.createElement('div');
-      fileContainer.className = `flex items-center p-3 ${isJustUploaded ? 'bg-green-50 border border-green-200' : 'bg-slate-50'} rounded-lg`;
+      fileContainer.className = `flex items-center p-2 ${isJustUploaded ? 'bg-green-50 border border-green-200' : 'bg-slate-50'} rounded-lg`;
 
       // Create the content structure
       fileContainer.innerHTML = `
-        <svg class="w-6 h-6 mr-3 text-blue-500" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="#4285F4"/>
+        <svg class="w-5 h-5 mr-2 text-amber-600" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="#F59E0B"/>
         </svg>
         <div class="text-left flex-1">
           <div class="flex items-center">
-            <h4 class="font-medium text-slate-800 truncate"></h4>
-            ${isJustUploaded ? '<span class="ml-2 px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full font-medium">Just uploaded</span>' : ''}
+            <h4 class="font-medium text-sm text-slate-800 truncate"></h4>
+            ${isJustUploaded ? '<span class="ml-2 px-1.5 py-0.5 text-xs bg-green-100 text-green-700 rounded-full font-medium">Just uploaded</span>' : ''}
           </div>
-          <p class="text-sm text-slate-500">Modified: ${new Date(file.modifiedTime).toLocaleDateString()}</p>
-          ${file.size ? `<p class="text-sm text-slate-500">Size: ${this.formatFileSize(parseInt(file.size))}</p>` : ''}
+          <p class="text-xs text-slate-500">Modified: ${new Date(file.modifiedTime).toLocaleDateString()}</p>
+          ${file.size ? `<p class="text-xs text-slate-500">Size: ${this.formatFileSize(parseInt(file.size))}</p>` : ''}
         </div>
-        <svg class="w-5 h-5 ${isJustUploaded ? 'text-green-500' : 'text-slate-400'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-4 h-4 ${isJustUploaded ? 'text-green-500' : 'text-slate-400'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
         </svg>
       `;

@@ -283,6 +283,15 @@ export class EventManager {
       this.handleWordMetadataReady(wordMeta);
     });
 
+    // Set up protocol navigation event listeners
+    window.electronAPI.onProtocolNavigateWord(async (wordName: string) => {
+      await this.handleProtocolNavigateWord(wordName);
+    });
+
+    window.electronAPI.onProtocolSwitchProfile(async (profileName: string) => {
+      await this.handleProtocolSwitchProfile(profileName);
+    });
+
     // Set up custom profile switch event listener for modal-triggered profile changes
     document.addEventListener('profile-switched', (event: any) => {
       const profileName = event.detail?.profileName;
@@ -423,6 +432,74 @@ export class EventManager {
 
   private handleWordMetadataReady(wordMeta: any): void {
     this.wordManager.handleWordMetadataReady(wordMeta);
+  }
+
+  private async handleProtocolNavigateWord(wordName: string): Promise<void> {
+    // This should be handled by the ProtocolManager, but for now we'll handle it directly
+    try {
+      console.log('🎯 EventManager: Handling protocol navigation to word:', wordName);
+
+      // Try to find the word by name
+      const word = await window.electronAPI.getWordByName(wordName);
+      if (word) {
+        // Word found, select it using WordManager
+        await this.wordManager.selectWord(word);
+        this.toastManager.showSuccess(`Navigated to word: ${wordName}`);
+      } else {
+        // Word not found, auto-generate it
+        console.log('🎯 EventManager: Word not found, auto-generating:', wordName);
+        await this.handleProtocolAutoGenerateWord(wordName);
+      }
+    } catch (error) {
+      console.error('Error handling protocol navigation:', error);
+      this.toastManager.showError('Failed to navigate to word');
+    }
+  }
+
+  private async handleProtocolSwitchProfile(profileName: string): Promise<void> {
+    try {
+      console.log('EventManager: Handling protocol profile switch to:', profileName);
+
+      // Check if the profile exists
+      const profiles = await window.electronAPI.getProfiles();
+      if (profiles.includes(profileName)) {
+        // Profile exists, switch to it
+        await this.handleProfileSwitch(profileName);
+        this.toastManager.showSuccess(`Switched to profile: ${profileName}`);
+      } else {
+        this.toastManager.showError(`Profile "${profileName}" not found`);
+      }
+    } catch (error) {
+      console.error('Error handling protocol profile switch:', error);
+      this.toastManager.showError('Failed to switch profile');
+    }
+  }
+
+  private async handleProtocolAutoGenerateWord(wordName: string): Promise<void> {
+    try {
+      // Check if we're already generating something
+      if (this.wordManager.getIsGenerating()) {
+        this.toastManager.showWarning('Please wait for current generation to complete');
+        return;
+      }
+
+      // Set the word in input field
+      const wordInput = document.getElementById('word-input') as HTMLInputElement;
+      wordInput.value = wordName;
+
+      // Show loading message
+      this.toastManager.showInfo(`Generating word: ${wordName}...`);
+
+      // Trigger generation using WordManager
+      await this.wordManager.handleGenerate();
+
+      // The word should now be generated and selected
+      this.toastManager.showSuccess(`Word "${wordName}" generated and selected!`);
+
+    } catch (error) {
+      console.error('Error auto-generating word:', error);
+      this.toastManager.showError(`Failed to generate word: ${wordName}`);
+    }
   }
 
   // Import functionality - simplified to use WordImportService state

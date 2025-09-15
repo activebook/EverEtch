@@ -201,5 +201,14 @@ export class AssociatedWordsManager {
       currentTag: '',
       scrollObserver: null
     };
+
+    // Clear associated words list UI
+    const associatedList = document.getElementById('associated-list');
+    if (associatedList) {
+      associatedList.innerHTML = '';
+    }
+
+    // Update associated count
+    this.uiUtils.updateAssociatedCount(0);
   }
 }
