@@ -73,7 +73,7 @@ export class EverEtchApp {
     // Create other managers
     this.modalManager = new ModalManager(this.toastManager, this.profileService);
     this.googleDriveManager = new GoogleDriveManager(this.toastManager, this.profileService);
-    this.protocolManager = new ProtocolManager(this.toastManager);
+    this.protocolManager = new ProtocolManager(this.toastManager, this.wordManager);
 
     // Create event manager (depends on all other managers)
     this.eventManager = new EventManager(

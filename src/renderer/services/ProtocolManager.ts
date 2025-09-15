@@ -1,10 +1,13 @@
 import { ToastManager } from '../components/ToastManager.js';
+import { WordManager } from './WordManager.js';
 
 export class ProtocolManager {
   private toastManager: ToastManager;
+  private wordManager: WordManager;
 
-  constructor(toastManager: ToastManager) {
+  constructor(toastManager: ToastManager, wordManager: WordManager) {
     this.toastManager = toastManager;
+    this.wordManager = wordManager;
     this.setupProtocolHandlers();
   }
 
@@ -64,7 +67,10 @@ export class ProtocolManager {
   private async autoGenerateWord(wordName: string): Promise<void> {
     try {
       // Check if we're already generating something
-      // This check will be handled by the main app
+      if (this.wordManager.getIsGenerating()) {
+        this.toastManager.showWarning('Please wait for current generation to complete');
+        return;
+      }
 
       // Set the word in input field
       const wordInput = document.getElementById('word-input') as HTMLInputElement;
@@ -73,8 +79,8 @@ export class ProtocolManager {
       // Show loading message
       this.toastManager.showInfo(`Generating word: ${wordName}...`);
 
-      // Trigger generation using existing logic
-      // This will be handled by the main app's word generation logic
+      // Trigger generation using WordManager
+      await this.wordManager.handleGenerate();
 
       // The word should now be generated and selected
       this.toastManager.showSuccess(`Word "${wordName}" generated and selected!`);

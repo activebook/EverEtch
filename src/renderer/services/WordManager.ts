@@ -942,4 +942,48 @@ export class WordManager {
     // Re-render word details
     this.wordRenderer.renderWordDetails(this.currentWord);
   }
+
+  // Cleanup method for state synchronization
+  cleanup(): void {
+    // Reset all state
+    this.words = [];
+    this.wordsPagination = {
+      offset: 0,
+      pageSize: WORDS_PAGE_SIZE,
+      isLoading: false,
+      hasMore: true,
+      total: 0
+    };
+    this.currentWord = null;
+    this.currentGenerationId = '';
+    this.streamingContent = '';
+    this.isGenerating = false;
+    this.isSearchMode = false;
+
+    // Clean up scroll observer
+    if (this.scrollObserver) {
+      this.scrollObserver.disconnect();
+      this.scrollObserver = null;
+    }
+
+    // Clear UI elements
+    const wordList = document.getElementById('word-list');
+    if (wordList) {
+      wordList.innerHTML = '';
+    }
+
+    // Reset sort order to default
+    this.sortOrder = 'desc';
+  }
+
+  // Reset pagination state
+  resetPagination(): void {
+    this.wordsPagination = {
+      offset: 0,
+      pageSize: WORDS_PAGE_SIZE,
+      isLoading: false,
+      hasMore: true,
+      total: 0
+    };
+  }
 }
