@@ -87,15 +87,9 @@ export class EverEtchApp {
     );
   }
 
-  private showLoadingOverlay(): void {
-    const loadingOverlay = document.getElementById('loading-overlay')!;
-    loadingOverlay.classList.remove('hidden');
-  }
 
-  private hideLoadingOverlay(): void {
-    const loadingOverlay = document.getElementById('loading-overlay')!;
-    loadingOverlay.classList.add('hidden');
-  }
+
+
 
 
 
@@ -115,7 +109,7 @@ export class EverEtchApp {
         console.log('Switching to last opened profile:', currentProfile);
 
         // Show loading overlay
-        this.showLoadingOverlay();
+        this.uiUtils.showLoadingOverlay();
 
         try {
           // Switch to the last opened profile
@@ -138,7 +132,7 @@ export class EverEtchApp {
         } finally {
           setTimeout(() => {
             // Hide loading overlay
-            this.hideLoadingOverlay();
+            this.uiUtils.hideLoadingOverlay();
           }, 500);
         }
       } else {
@@ -175,98 +169,4 @@ export class EverEtchApp {
     // Delegate event setup to EventManager
     this.eventManager.setupEventListeners();
   }
-
-
-
-  private async handleGenerate(): Promise<void> {
-    await this.wordManager.handleGenerate();
-  }
-
-
-
-  private async loadAssociatedWords(tag: string): Promise<void> {
-    await this.associatedWordsManager.loadAssociatedWords(tag);
-  }
-
-  private async selectWord(word: WordDocument | WordListItem): Promise<void> {
-    await this.wordManager.selectWord(word);
-  }
-
-
-
-
-
-
-
-  private async handleSearchExistingWord(): Promise<void> {
-    await this.wordManager.handleSearchExistingWord();
-  }
-
-  // Profile modal methods
-  private showAddProfileModal(): void {
-    this.modalManager.showAddProfileModal();
-  }
-
-  private hideAddProfileModal(): void {
-    this.modalManager.hideAddProfileModal();
-  }
-
-  private async handleCreateProfile(): Promise<void> {
-    await this.modalManager.handleCreateProfile();
-  }
-
-  private async handleDeleteProfile(): Promise<void> {
-    await this.modalManager.handleDeleteProfile();
-  }
-
-  private async handleExportProfile(): Promise<void> {
-    await this.modalManager.handleExportProfile();
-  }
-
-  private async handleImportProfile(): Promise<void> {
-    await this.modalManager.handleImportProfile();
-  }
-
-  // Settings modal methods - delegate to ModalManager
-  private async showSettingsModal(): Promise<void> {
-    await this.modalManager.showSettingsModal();
-  }
-
-  private hideSettingsModal(): void {
-    this.modalManager.hideSettingsModal();
-  }
-
-  private async saveSettings(): Promise<void> {
-    await this.modalManager.saveSettings();
-  }
-
-  // Howto modal methods - delegate to ModalManager
-  private async showHowtoModal(): Promise<void> {
-    await this.modalManager.showHowtoModal();
-  }
-
-  private hideHowtoModal(): void {
-    this.modalManager.hideHowtoModal();
-  }
-
-  private toggleApiKeyVisibility(): void {
-    this.modalManager.toggleApiKeyVisibility();
-  }
-
-  private async handleSortToggle(): Promise<void> {
-    await this.wordManager.handleSortToggle();
-  }
-
-
-
-  // Protocol handlers
-  private async handleProtocolNavigateWord(wordName: string): Promise<void> {
-    await this.protocolManager.handleProtocolNavigateWord(wordName);
-  }
-
-  private async handleProtocolSwitchProfile(profileName: string): Promise<void> {
-    await this.protocolManager.handleProtocolSwitchProfile(profileName);
-  }
-
-
 }

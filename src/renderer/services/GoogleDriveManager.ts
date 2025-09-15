@@ -1,14 +1,17 @@
 import { ToastManager } from '../components/ToastManager.js';
 import { ProfileService } from './ProfileService.js';
+import { UIUtils } from '../utils/UIUtils.js';
 
 export class GoogleDriveManager {
   private toastManager: ToastManager;
   private profileService: ProfileService;
+  private uiUtils: UIUtils;
   private selectedGoogleDriveFile: any = null;
 
   constructor(toastManager: ToastManager, profileService: ProfileService) {
     this.toastManager = toastManager;
     this.profileService = profileService;
+    this.uiUtils = new UIUtils(); // Create instance for loading overlay methods
   }
 
   // Getters
@@ -195,7 +198,7 @@ export class GoogleDriveManager {
 
   async performGoogleDriveImport(fileId: string): Promise<void> {
     try {
-      this.showLoadingOverlay();
+      this.uiUtils.showLoadingOverlay();
       this.hideGoogleDriveFilePicker();
 
       const result = await window.electronAPI.googleDriveDownloadDatabase(fileId);
@@ -221,7 +224,7 @@ export class GoogleDriveManager {
       console.error('Failed to download Google Drive file:', error);
       this.toastManager.showError('Failed to download file from Google Drive');
     } finally {
-      this.hideLoadingOverlay();
+      this.uiUtils.hideLoadingOverlay();
       // Reset selection
       this.selectedGoogleDriveFile = null;
     }
@@ -244,7 +247,7 @@ export class GoogleDriveManager {
 
   async handleExportToGoogleDrive(): Promise<void> {
     try {
-      this.showLoadingOverlay();
+      this.uiUtils.showLoadingOverlay();
 
       // Check if we're authenticated first
       const authStatus = await window.electronAPI.googleIsAuthenticated();
@@ -283,7 +286,7 @@ export class GoogleDriveManager {
       console.error('Failed to export to Google Drive:', error);
       this.toastManager.showError('Failed to export to Google Drive');
     } finally {
-      this.hideLoadingOverlay();
+      this.uiUtils.hideLoadingOverlay();
     }
   }
 
@@ -406,7 +409,7 @@ export class GoogleDriveManager {
 
     try {
       // Show loading overlay for delete operation
-      this.showLoadingOverlay();
+      this.uiUtils.showLoadingOverlay();
 
       const result = await window.electronAPI.googleDriveDeleteFile(fileId);
 
@@ -430,23 +433,11 @@ export class GoogleDriveManager {
       this.toastManager.showError('Failed to delete file from Google Drive');
     } finally {
       // Hide loading overlay
-      this.hideLoadingOverlay();
+      this.uiUtils.hideLoadingOverlay();
     }
   }
 
-  private showLoadingOverlay(): void {
-    const overlay = document.getElementById('loading-overlay')!;
-    if (overlay) {
-      overlay.classList.remove('hidden');
-    }
-  }
 
-  private hideLoadingOverlay(): void {
-    const overlay = document.getElementById('loading-overlay')!;
-    if (overlay) {
-      overlay.classList.add('hidden');
-    }
-  }
 
   private hideGoogleDriveFilePicker(): void {
     const modal = document.getElementById('google-drive-picker-modal')!;
