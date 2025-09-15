@@ -1,8 +1,5 @@
 import { google } from 'googleapis';
 import { drive_v3 } from 'googleapis';
-import { app } from 'electron';
-import * as fs from 'fs';
-import * as path from 'path';
 import { GoogleAuthService } from './GoogleAuthService.js';
 
 export interface DriveFile {
@@ -31,12 +28,9 @@ export interface DownloadResult {
 
 export class GoogleDriveService {
   private authService: GoogleAuthService;
-  private apiKey?: string;
 
   constructor(authService: GoogleAuthService) {
     this.authService = authService;
-    // Try to get API key from environment or credentials
-    this.apiKey = process.env.GOOGLE_API_KEY || this.getApiKeyFromCredentials();
   }
 
   private getDriveClient(): drive_v3.Drive {
@@ -51,22 +45,7 @@ export class GoogleDriveService {
     });
   }
 
-  private getApiKeyFromCredentials(): string | undefined {
-    try {
-      const credentialsPath = path.join(app.getAppPath(), 'credentials.json');
-      if (!fs.existsSync(credentialsPath)) {
-        return undefined;
-      }
 
-      const credentialsContent = fs.readFileSync(credentialsPath, 'utf-8');
-      const credentialsData = JSON.parse(credentialsContent);
-
-      // Some credentials files might include an API key
-      return credentialsData.api_key;
-    } catch (error) {
-      return undefined;
-    }
-  }
 
   async listFiles(query?: string, pageSize: number = 100): Promise<DriveFile[]> {
     try {
@@ -84,35 +63,22 @@ export class GoogleDriveService {
       };
 
       // Add API key if available (helps with "unregistered callers" issues)
-      if (this.apiKey) {
-        requestParams.key = this.apiKey;
+      const apiKey = this.authService.getApiKey();
+      if (apiKey) {
+        requestParams.key = apiKey;
       }
 
       const response = await this.getDriveClient().files.list(requestParams);
 
-      // Filter out files that might cause permission issues
-      // The drive.file scope only allows access to files created by this app
-      const accessibleFiles: DriveFile[] = [];
-
-      for (const file of response.data.files || []) {
-        try {
-          // Try to get file metadata to check if we have access
-          await this.getFileMetadata(file.id!);
-          accessibleFiles.push({
-            id: file.id!,
-            name: file.name!,
-            mimeType: file.mimeType!,
-            modifiedTime: file.modifiedTime!,
-            size: file.size,
-            parents: file.parents
-          });
-        } catch (error) {
-          // Skip files we don't have permission to access
-          console.log(`Skipping file ${file.name} - insufficient permissions`);
-        }
-      }
-
-      return accessibleFiles;
+      // Return all files - let calling code handle any permission errors
+      return response.data.files?.map(file => ({
+        id: file.id!,
+        name: file.name!,
+        mimeType: file.mimeType!,
+        modifiedTime: file.modifiedTime!,
+        size: file.size,
+        parents: file.parents
+      })) || [];
     } catch (error) {
       console.error('Failed to list files:', error);
       throw new Error('Failed to list Google Drive files');
@@ -135,15 +101,6 @@ export class GoogleDriveService {
         };
       }
 
-      // Debug: Check OAuth2Client state
-      const oauthClient = this.authService.getOAuth2Client();
-      console.log('OAuth2Client state before API call:', {
-        hasCredentials: !!oauthClient.credentials,
-        hasAccessToken: !!oauthClient.credentials.access_token,
-        hasRefreshToken: !!oauthClient.credentials.refresh_token,
-        accessTokenLength: oauthClient.credentials.access_token?.length || 0
-      });
-
       const fileMetadata: any = {
         name: fileName,
         mimeType: mimeType
@@ -164,8 +121,9 @@ export class GoogleDriveService {
         media: media,
         fields: 'id,webViewLink'
       };
-      if (this.apiKey) {
-        createParams.key = this.apiKey;
+      const apiKey = this.authService.getApiKey();
+      if (apiKey) {
+        createParams.key = apiKey;
       }
 
       const response = await this.getDriveClient().files.create(createParams);
