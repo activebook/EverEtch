@@ -337,7 +337,7 @@ export class EventManager {
 
   private async handleProfileSwitch(newProfile: string, profileSelect?: HTMLSelectElement): Promise<void> {
     // Show loading overlay
-    this.showLoadingOverlay();
+    this.uiUtils.showLoadingOverlay();
 
     // Get profile select element if not provided
     const selectElement = profileSelect || document.getElementById('profile-select') as HTMLSelectElement;
@@ -371,7 +371,7 @@ export class EventManager {
       this.toastManager.showError('Failed to load profile data. You can delete this profile in Settings.');
     } finally {
       setTimeout(() => {
-        this.hideLoadingOverlay();
+        this.uiUtils.hideLoadingOverlay();
         if (selectElement) {
           selectElement.disabled = false;
         }
@@ -799,18 +799,5 @@ export class EventManager {
     await this.uiUtils.loadPanelWidths();
   }
 
-  // Add missing methods
-  private showLoadingOverlay(): void {
-    const overlay = document.getElementById('loading-overlay')!;
-    if (overlay) {
-      overlay.classList.remove('hidden');
-    }
-  }
 
-  private hideLoadingOverlay(): void {
-    const overlay = document.getElementById('loading-overlay')!;
-    if (overlay) {
-      overlay.classList.add('hidden');
-    }
-  }
 }

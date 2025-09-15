@@ -307,4 +307,19 @@ export class UIUtils {
       console.error('Error saving panel widths to store:', error);
     }
   }
+
+  // Loading overlay methods
+  showLoadingOverlay(): void {
+    const loadingOverlay = document.getElementById('loading-overlay')!;
+    if (loadingOverlay) {
+      loadingOverlay.classList.remove('hidden');
+    }
+  }
+
+  hideLoadingOverlay(): void {
+    const loadingOverlay = document.getElementById('loading-overlay')!;
+    if (loadingOverlay) {
+      loadingOverlay.classList.add('hidden');
+    }
+  }
 }
