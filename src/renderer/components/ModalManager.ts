@@ -50,6 +50,15 @@ export class ModalManager {
       const success = await this.profileService.createProfile(profileName);
       if (success) {
         this.toastManager.showSuccess(`Profile "${profileName}" created successfully`);
+
+        // Switch to the newly created profile
+        this.profileService.setCurrentProfile(profileName);
+
+        // Trigger the profile switch UI update
+        const profileSwitchEvent = new CustomEvent('profile-switched', {
+          detail: { profileName: profileName }
+        });
+        document.dispatchEvent(profileSwitchEvent);
       } else {
         this.toastManager.showError('Failed to create profile');
       }
@@ -392,7 +401,7 @@ export class ModalManager {
     if (exportLocalBtn) {
       exportLocalBtn.addEventListener('click', () => {
         this.hideExportChoiceModal();
-        // Export functionality will be handled by the main app
+        this.handleExportProfile();
       });
     }
     if (cancelExportChoice) {
@@ -406,7 +415,7 @@ export class ModalManager {
     if (importLocalBtn) {
       importLocalBtn.addEventListener('click', () => {
         this.hideImportChoiceModal();
-        // Import functionality will be handled by the main app
+        this.handleImportProfile();
       });
     }
     if (cancelImportChoice) {

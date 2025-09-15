@@ -207,11 +207,12 @@ export class GoogleDriveManager {
         await this.profileService.loadProfiles();
         if (result.profileName) {
           this.profileService.setCurrentProfile(result.profileName);
-          const profileSelect = document.getElementById('profile-select') as HTMLSelectElement;
-          profileSelect.value = result.profileName;
 
-          // Trigger profile switch callback (will be handled by main app)
-          // This will reload words and reset UI
+          // Trigger the profile switch UI update
+          const profileSwitchEvent = new CustomEvent('profile-switched', {
+            detail: { profileName: result.profileName }
+          });
+          document.dispatchEvent(profileSwitchEvent);
         }
       } else {
         this.toastManager.showError(result.message);
@@ -259,9 +260,19 @@ export class GoogleDriveManager {
       const result = await window.electronAPI.googleDriveUploadDatabase();
 
       if (result.success) {
-        // Show the upload success modal with ALL uploaded files
-        // This gives users a complete view of their backup history
-        await this.showGoogleDriveUploadSuccess(result.fileId);
+        this.toastManager.showSuccess(result.message);
+
+        // Refresh profiles and switch to the new one
+        await this.profileService.loadProfiles();
+        if (result.profileName) {
+          this.profileService.setCurrentProfile(result.profileName);
+
+          // Trigger the profile switch UI update
+          const profileSwitchEvent = new CustomEvent('profile-switched', {
+            detail: { profileName: result.profileName }
+          });
+          document.dispatchEvent(profileSwitchEvent);
+        }
       } else {
         this.toastManager.showError(result.message);
       }

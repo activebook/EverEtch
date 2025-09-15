@@ -896,9 +896,50 @@ export class WordManager {
     } else {
       // Up arrow for ascending (oldest first) - more elegant design
       iconContainer.innerHTML = `
-        <svg class="w-4 h-4" viewBox="0 0 6.4 6.4" xmlns="http://www.w3.org/2000/svg"><path d="M5.741 2.341a.2.2 0 0 1-.283 0L4.8 1.683V3.6a.2.2 0 0 1-.4 0V1.683l-.659.658a.2.2 0 0 1-.283-.283l1-1 .002-.002.013-.011.007-.006.008-.006.009-.005.008-.005.009-.004.009-.004.009-.003.01-.004.008-.002.011-.003.009-.001.10-.001L4.595 1h.009l-.015.001-.01-.002-.009-.001-.011-.003-.008-.002-.01-.004-.008-.003-.009-.004-.009-.004-.009-.005-.008-.005-.009-.007-.007-.005-.014-.013-.001-.001 1 1a.2.2 0 0 1 0 .283M1.2 3.4H3A.2.2 0 1 0 3 3H1.2a.2.2 0 0 0 0 .4m0-1.6h1.4a.2.2 0 0 0 0-.4H1.2a.2.2 0 1 0 0 .4m3.4 2.8H1.2a.2.2 0 0 0 0 .4h3.4a.2.2 0 0 0 0-.4"/></svg>
+        <svg class="w-4 h-4" viewBox="0 0 6.4 6.4" xmlns="http://www.w3.org/2000/svg"><path d="M5.741 2.341a.2.2 0 0 1-.283 0L4.8 1.683V3.6a.2.2 0 0 1-.4 0V1.683l-.659.658a.2.2 0 0 1-.283-.283l1-1 .002-.002.013-.011.007-.006.008-.006.009-.005.008-.005.009-.004.009-.004.009-.003.01-.004.008-.002.011-.003.009-.001.10-.001L4.595 1h.009l.015.001.01.002.009.001.011.003.008.002.01.004.008.003.009.004.009.004.009.005.008.005.009.007.007.005.014.013.001.001 1 1a.2.2 0 0 1 0 .283M1.2 3.4H3A.2.2 0 1 0 3 3H1.2a.2.2 0 0 0 0 .4m0-1.6h1.4a.2.2 0 0 0 0-.4H1.2a.2.2 0 1 0 0 .4m3.4 2.8H1.2a.2.2 0 0 0 0 .4h3.4a.2.2 0 0 0 0-.4"/></svg>
       `;
       sortBtn.title = 'Oldest first → Newest first';
     }
+  }
+
+  // Streaming event handlers
+  handleWordMeaningStreaming(content: string): void {
+    this.streamingContent += content;
+    if (this.currentWord && this.currentWord.id === 'temp') {
+      const streamingWord = { ...this.currentWord, details: this.streamingContent };
+      this.wordRenderer.renderStreamingWordDetails(streamingWord);
+
+      const wordDetails = document.getElementById('word-details');
+      if (wordDetails && wordDetails.parentElement) {
+        wordDetails.parentElement.scrollTop = wordDetails.parentElement.scrollHeight;
+      }
+    }
+  }
+
+  handleWordMetadataReady(wordMeta: any): void {
+    // Simple check: if we have metadata and a current word, update it
+    if (!wordMeta || !this.currentWord || this.currentWord.id !== 'temp') {
+      return;
+    }
+
+    // Update word metadata
+    if (wordMeta.summary) {
+      this.currentWord.one_line_desc = wordMeta.summary;
+    }
+    if (wordMeta.tags) {
+      this.currentWord.tags = wordMeta.tags;
+    }
+    if (wordMeta.tag_colors) {
+      this.currentWord.tag_colors = wordMeta.tag_colors;
+    }
+    if (wordMeta.synonyms) {
+      this.currentWord.synonyms = wordMeta.synonyms;
+    }
+    if (wordMeta.antonyms) {
+      this.currentWord.antonyms = wordMeta.antonyms;
+    }
+
+    // Re-render word details
+    this.wordRenderer.renderWordDetails(this.currentWord);
   }
 }
