@@ -28,6 +28,7 @@ export interface DownloadResult {
 
 export class GoogleDriveService {
   private authService: GoogleAuthService;
+  private everEtchFolderId: string | null = null;
 
   constructor(authService: GoogleAuthService) {
     this.authService = authService;
@@ -265,6 +266,129 @@ export class GoogleDriveService {
     } catch (error) {
       console.error('Failed to get file metadata:', error);
       return null;
+    }
+  }
+
+  /**
+   * Get or create the "EverEtch Profiles" folder
+   */
+  async getOrCreateEverEtchFolder(): Promise<string | null> {
+    try {
+      // Return cached folder ID if available
+      if (this.everEtchFolderId) {
+        return this.everEtchFolderId;
+      }
+
+      // Ensure we're authenticated
+      const isAuthenticated = await this.authService.isAuthenticated();
+      if (!isAuthenticated) {
+        throw new Error('Not authenticated with Google. Please authenticate first.');
+      }
+
+      // Check if folder already exists
+      const existingFolders = await this.listFiles(
+        `name='EverEtch Profiles' and mimeType='application/vnd.google-apps.folder' and trashed=false`
+      );
+
+      if (existingFolders.length > 0) {
+        this.everEtchFolderId = existingFolders[0].id;
+        return this.everEtchFolderId;
+      }
+
+      // Create new folder
+      const folderId = await this.createFolder('EverEtch Profiles');
+      if (folderId) {
+        this.everEtchFolderId = folderId;
+      }
+      return folderId;
+    } catch (error) {
+      console.error('Failed to get or create EverEtch folder:', error);
+      return null;
+    }
+  }
+
+  /**
+   * List files in the EverEtch Profiles folder
+   */
+  async listFilesInEverEtchFolder(pageSize: number = 100): Promise<DriveFile[]> {
+    try {
+      const folderId = await this.getOrCreateEverEtchFolder();
+      if (!folderId) {
+        throw new Error('Could not access EverEtch Profiles folder');
+      }
+
+      return await this.listFilesInFolder(folderId, pageSize);
+    } catch (error) {
+      console.error('Failed to list files in EverEtch folder:', error);
+      throw new Error('Failed to list Google Drive files');
+    }
+  }
+
+  /**
+   * List files in a specific folder
+   */
+  async listFilesInFolder(folderId: string, pageSize: number = 100): Promise<DriveFile[]> {
+    try {
+      // Ensure we're authenticated before making API calls
+      const isAuthenticated = await this.authService.isAuthenticated();
+      if (!isAuthenticated) {
+        throw new Error('Not authenticated with Google. Please authenticate first.');
+      }
+
+      const requestParams: any = {
+        q: `'${folderId}' in parents and mimeType='application/octet-stream' and trashed=false`,
+        fields: 'files(id,name,mimeType,modifiedTime,size,parents)',
+        orderBy: 'modifiedTime desc',
+        pageSize: pageSize
+      };
+
+      // Add API key if available (helps with "unregistered callers" issues)
+      const apiKey = this.authService.getApiKey();
+      if (apiKey) {
+        requestParams.key = apiKey;
+      }
+
+      const response = await this.getDriveClient().files.list(requestParams);
+
+      // Return all files - let calling code handle any permission errors
+      return response.data.files?.map(file => ({
+        id: file.id!,
+        name: file.name!,
+        mimeType: file.mimeType!,
+        modifiedTime: file.modifiedTime!,
+        size: file.size,
+        parents: file.parents
+      })) || [];
+    } catch (error) {
+      console.error('Failed to list files in folder:', error);
+      throw new Error('Failed to list Google Drive files');
+    }
+  }
+
+  /**
+   * Upload file to the EverEtch Profiles folder
+   */
+  async uploadFileToEverEtchFolder(
+    fileName: string,
+    content: string,
+    mimeType: string = 'application/octet-stream'
+  ): Promise<UploadResult> {
+    try {
+      const folderId = await this.getOrCreateEverEtchFolder();
+      if (!folderId) {
+        return {
+          success: false,
+          message: 'Could not access EverEtch Profiles folder'
+        };
+      }
+
+      return await this.uploadFile(fileName, content, mimeType, folderId);
+    } catch (error) {
+      console.error('Failed to upload file to EverEtch folder:', error);
+      return {
+        success: false,
+        message: `Failed to upload file: ${error instanceof Error ? error.message : 'Unknown error'}`
+      };
     }
   }
 }

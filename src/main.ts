@@ -657,7 +657,7 @@ ipcMain.handle('google-get-user-info', async () => {
 
 ipcMain.handle('google-drive-list-files', async () => {
   try {
-    const files = await googleDriveService.listFiles();
+    const files = await googleDriveService.listFilesInEverEtchFolder();
     return { success: true, files };
   } catch (error) {
     console.error('Failed to list Google Drive files:', error);
@@ -684,7 +684,7 @@ ipcMain.handle('google-drive-upload-database', async () => {
     const fileBuffer = await googleDriveExportService.readDatabaseFile(fileInfo.filePath);
     const fileName = googleDriveExportService.generateFileName(currentProfile);
 
-    const result = await googleDriveService.uploadFile(
+    const result = await googleDriveService.uploadFileToEverEtchFolder(
       fileName,
       fileBuffer.toString('base64'),
       'application/octet-stream'
