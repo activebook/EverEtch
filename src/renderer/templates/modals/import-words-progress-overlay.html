@@ -1,0 +1,25 @@
+<!-- Import Words Progress Overlay -->
+<div id="import-words-progress-overlay"
+    class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden flex z-[9998] items-center justify-center">
+    <div
+        class="bg-amber-50/95 backdrop-blur-md rounded-2xl shadow-2xl max-w-md w-full mx-4 border border-amber-200/60">
+        <div class="p-6">
+            <div class="text-center mb-6">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-4 border-amber-500 mx-auto mb-4"></div>
+                <h3 class="text-lg font-semibold text-slate-800 mb-2">Importing Words...</h3>
+                <p id="import-progress-text" class="text-sm text-slate-600">Processing words...</p>
+            </div>
+
+            <div class="w-full bg-amber-200 rounded-full h-3 mb-6">
+                <div id="import-progress-bar" class="bg-amber-500 h-3 rounded-full transition-all duration-300"></div>
+            </div>
+
+            <div class="flex justify-center">
+                <button id="cancel-import-btn"
+                    class="px-6 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all duration-200 hover:shadow-lg font-medium">
+                    Cancel Import
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
