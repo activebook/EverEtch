@@ -199,6 +199,11 @@
     @apply bg-amber-50 p-4 rounded-lg mb-4 overflow-x-auto border border-amber-200;
 }
 
+/* Import progress bar */
+#import-progress-bar {
+    width: 0%;
+}
+
 .markdown-details pre code {
     @apply bg-transparent border-none p-0;
 }

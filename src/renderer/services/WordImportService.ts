@@ -20,7 +20,7 @@ export interface ImportCallbacks {
   onProgress: (progress: ImportProgress) => void;
   onComplete: (progress: ImportProgress) => void;
   onError: (progress: ImportProgress) => void;
-  onCancel: (progress?: ImportProgress) => void;
+  onCancel: (progress: ImportProgress) => void;
 }
 
 export class WordImportService {
