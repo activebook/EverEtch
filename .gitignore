@@ -4,6 +4,7 @@
 
 # Credentials
 credentials.json
+credentials.enc
 encrypt.ts
 
 # Dependencies
