@@ -1,46 +1,36 @@
 import { WordManager } from './WordManager.js';
 import { ModalManager } from '../components/ModalManager.js';
-import { GoogleDriveManager } from './GoogleDriveManager.js';
 import { ProfileService } from './ProfileService.js';
 import { UIUtils } from '../utils/UIUtils.js';
-import { WordImportService, ImportProgress, ImportCallbacks } from './WordImportService.js';
 import { ToastManager } from '../components/ToastManager.js';
 
 export class EventManager {
   private wordManager: WordManager;
-  private modalManager: ModalManager;
-  private googleDriveManager: GoogleDriveManager;
+  private modalManager: ModalManager;  
   private profileService: ProfileService;
-  private uiUtils: UIUtils;
-  private wordImportService: WordImportService;
+  private uiUtils: UIUtils;  
   private toastManager: ToastManager;
 
   constructor(
     wordManager: WordManager,
-    modalManager: ModalManager,
-    googleDriveManager: GoogleDriveManager,
+    modalManager: ModalManager,    
     profileService: ProfileService,
-    uiUtils: UIUtils,
-    wordImportService: WordImportService,
+    uiUtils: UIUtils,    
     toastManager: ToastManager
   ) {
     this.wordManager = wordManager;
-    this.modalManager = modalManager;
-    this.googleDriveManager = googleDriveManager;
+    this.modalManager = modalManager;    
     this.profileService = profileService;
-    this.uiUtils = uiUtils;
-    this.wordImportService = wordImportService;
+    this.uiUtils = uiUtils;    
     this.toastManager = toastManager;
 
     // Event listeners will be set up by EverEtchApp after initialization
   }
 
   public setupEventListeners(): void {
+    // These events don't need lazy loading
     this.setupWordInputEvents();
     this.setupProfileEvents();
-    this.setupModalEvents();
-    this.setupImportEvents();
-    this.setupGoogleDriveEvents();
     this.setupUIEvents();
     this.setupStreamingEvents();
   }
@@ -147,18 +137,30 @@ export class EventManager {
         this.modalManager.showImportChoiceModal();
       });
     }
+
+    // Set up custom profile switch event listener for modal-triggered profile changes
+    document.addEventListener('profile-switched', (event: any) => {
+      const profileName = event.detail?.profileName;
+      if (profileName) {
+        this.handleProfileSwitch(profileName);
+      }
+    });
   }
 
-  private setupModalEvents(): void {
-    // Delegate modal event setup to ModalManager
-    this.modalManager.setupModalEventHandlers();
-
-    // Additional modal events that need coordination between managers
+  private setupUIEvents(): void {
     // Settings button
     const settingsBtn = document.getElementById('settings-btn') as HTMLButtonElement;
     if (settingsBtn) {
       settingsBtn.addEventListener('click', () => {
         this.modalManager.showSettingsModal();
+      });
+    }
+
+    // Import words button
+    const importWordsBtn = document.getElementById('import-words-btn') as HTMLButtonElement;
+    if (importWordsBtn) {
+      importWordsBtn.addEventListener('click', () => {
+        this.modalManager.showImportWordsModal();
       });
     }
 
@@ -169,87 +171,7 @@ export class EventManager {
         this.modalManager.showHowtoModal();
       });
     }
-
-    // Sort button
-    const sortBtn = document.getElementById('sort-btn') as HTMLButtonElement;
-    if (sortBtn) {
-      sortBtn.addEventListener('click', () => {
-        this.handleSortToggle();
-      });
-    }
-  }
-
-  private setupImportEvents(): void {
-    // Import words button
-    const importWordsBtn = document.getElementById('import-words-btn') as HTMLButtonElement;
-    if (importWordsBtn) {
-      importWordsBtn.addEventListener('click', () => {
-        this.modalManager.showImportWordsModal();
-      });
-    }
-
-    // Import words modal buttons
-    const selectFileBtn = document.getElementById('select-import-file') as HTMLButtonElement;
-    const startImportBtn = document.getElementById('start-import-btn') as HTMLButtonElement;
-    const cancelImportBtn = document.getElementById('cancel-import-btn') as HTMLButtonElement;
-
-    if (selectFileBtn) {
-      selectFileBtn.addEventListener('click', () => {
-        this.selectImportFile();
-      });
-    }
-
-    if (startImportBtn) {
-      startImportBtn.addEventListener('click', () => {
-        this.startWordImport();
-      });
-    }
-
-    if (cancelImportBtn) {
-      cancelImportBtn.addEventListener('click', () => {
-        this.cancelWordImport();
-      });
-    }
-
-    // Import words modal close button
-    const closeImportModalBtn = document.getElementById('close-import-modal') as HTMLButtonElement;
-    if (closeImportModalBtn) {
-      closeImportModalBtn.addEventListener('click', () => {
-        this.modalManager.hideImportWordsModal();
-      });
-    }
-  }
-
-  private setupGoogleDriveEvents(): void {
-    // Google Drive modal event handlers
-    const exportGoogleDriveBtn = document.getElementById('export-google-drive-btn') as HTMLButtonElement;
-    const importGoogleDriveBtn = document.getElementById('import-google-drive-btn') as HTMLButtonElement;
-    const importGoogleDriveFile = document.getElementById('import-google-drive-file') as HTMLButtonElement;
-
-    if (exportGoogleDriveBtn) {
-      exportGoogleDriveBtn.addEventListener('click', async () => {
-        this.modalManager.hideExportChoiceModal();
-        await this.googleDriveManager.handleExportToGoogleDrive();
-      });
-    }
-
-    if (importGoogleDriveBtn) {
-      importGoogleDriveBtn.addEventListener('click', async () => {
-        this.modalManager.hideImportChoiceModal();
-        await this.googleDriveManager.showGoogleDriveFilePicker();
-      });
-    }
-
-    if (importGoogleDriveFile) {
-      importGoogleDriveFile.addEventListener('click', async () => {
-        if (this.googleDriveManager.getSelectedFile()) {
-          await this.googleDriveManager.performGoogleDriveImport(this.googleDriveManager.getSelectedFile().id);
-        }
-      });
-    }
-  }
-
-  private setupUIEvents(): void {
+ 
     // More button and inline actions
     const moreBtn = document.getElementById('more-btn') as HTMLButtonElement;
     const inlineActions = document.getElementById('inline-actions') as HTMLElement;
@@ -258,6 +180,14 @@ export class EventManager {
       moreBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         this.uiUtils.toggleInlineActions();
+      });
+    }
+
+    // Sort button
+    const sortBtn = document.getElementById('sort-btn') as HTMLButtonElement;
+    if (sortBtn) {
+      sortBtn.addEventListener('click', () => {
+        this.handleSortToggle();
       });
     }
 
@@ -290,14 +220,6 @@ export class EventManager {
 
     window.electronAPI.onProtocolSwitchProfile(async (profileName: string) => {
       await this.handleProtocolSwitchProfile(profileName);
-    });
-
-    // Set up custom profile switch event listener for modal-triggered profile changes
-    document.addEventListener('profile-switched', (event: any) => {
-      const profileName = event.detail?.profileName;
-      if (profileName) {
-        this.handleProfileSwitch(profileName);
-      }
     });
   }
 
@@ -502,260 +424,6 @@ export class EventManager {
     }
   }
 
-  // Import functionality - simplified to use WordImportService state
-  private selectedImportFile: File | null = null;
-
-  private selectImportFile(): void {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.txt,.md,.csv';
-    input.onchange = (e) => {
-      const target = e.target as HTMLInputElement;
-      const file = target.files?.[0];
-      if (file) {
-        this.selectedImportFile = file;
-        this.updateImportUI();
-      }
-    };
-    input.click();
-  }
-
-  private updateImportUI(): void {
-    const fileNameElement = document.getElementById('import-file-name') as HTMLElement;
-    const startBtn = document.getElementById('start-import-btn') as HTMLButtonElement;
-
-    if (fileNameElement && startBtn) {
-      if (this.selectedImportFile) {
-        fileNameElement.textContent = this.selectedImportFile.name;
-        startBtn.disabled = false;
-      } else {
-        fileNameElement.textContent = 'No file selected';
-        startBtn.disabled = true;
-      }
-    }
-  }
-
-  private async startWordImport(): Promise<void> {
-    if (!this.selectedImportFile) {
-      return;
-    }
-
-    try {
-      const content = await this.readFileContent(this.selectedImportFile);
-      this.showImportProgressOverlay();
-
-      const callbacks: ImportCallbacks = {
-        onProgress: (progress: ImportProgress) => {
-          this.updateImportProgress(progress);
-        },
-        onComplete: (progress: ImportProgress) => {
-          this.handleImportComplete(progress);
-        },
-        onError: (progress: ImportProgress) => {
-          this.handleImportError(progress);
-        },
-        onCancel: (progress?: ImportProgress) => {
-          this.handleImportCancel(progress);
-        },
-      };
-
-      await this.wordImportService.startImport(content, callbacks);
-    } catch (error) {
-      console.error('Error starting import:', error);
-      this.toastManager.showError('Failed to start import');
-    }
-  }
-
-  private cancelWordImport(): void {
-    this.wordImportService.cancelImport();
-  }
-
-  private async readFileContent(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const content = e.target?.result as string;
-        resolve(content);
-      };
-      reader.onerror = () => reject(new Error('Failed to read file'));
-      reader.readAsText(file);
-    });
-  }
-
-  private showImportProgressOverlay(): void {
-    const overlay = document.getElementById('import-progress-overlay')!;
-    if (overlay) {
-      overlay.classList.remove('hidden');
-    }
-  }
-
-  private hideImportProgressOverlay(): void {
-    const overlay = document.getElementById('import-progress-overlay')!;
-    if (overlay) {
-      overlay.classList.add('hidden');
-    }
-  }
-
-  private updateImportProgress(progress: ImportProgress): void {
-    const progressText = document.getElementById('import-progress-text')!;
-    const progressBar = document.getElementById('import-progress-bar') as HTMLDivElement;
-
-    if (progressText) {
-      progressText.textContent = `${progress.current}/${progress.total} - ${progress.currentWord || 'Processing...'}`;
-    }
-
-    if (progressBar) {
-      const percentage = progress.total > 0 ? (progress.current / progress.total) * 100 : 0;
-      progressBar.style.width = `${percentage}%`;
-    }
-  }
-
-  private handleImportComplete(progress: ImportProgress): void {
-    this.hideImportProgressOverlay();
-
-    // Show completion modal
-    const modal = document.getElementById('import-complete-modal')!;
-    const messageElement = document.getElementById('import-complete-message')!;
-    const okBtn = document.getElementById('import-complete-ok') as HTMLButtonElement;
-
-    if (messageElement) {
-      const successCount = progress.total - progress.errors.length - progress.skipped;
-      let html = `<span>Import completed!</span><br><span>${successCount}/${progress.total} words imported successfully.</span>`;
-
-      if (progress.skipped > 0) {
-        html += `<br><span>${progress.skipped} words were skipped (already exist).</span>`;
-      }
-
-      if (progress.errors.length > 0) {
-        html += `<br><span>${progress.errors.length} words had errors.</span>`;
-      }
-
-      messageElement.innerHTML = html;
-    }
-
-    if (modal) {
-      modal.classList.remove('hidden');
-    }
-
-    // Refresh word list
-    this.wordManager.loadWords();
-
-    if (okBtn) {
-      okBtn.onclick = () => {
-        if (modal) {
-          modal.classList.add('hidden');
-        }
-      };
-    }
-  }
-
-  private handleImportError(progress: ImportProgress): void {
-    this.hideImportProgressOverlay();
-
-    // If we have progress info and at least one word was successfully imported, reload the word list
-    if (progress && progress.success > 0) {
-      console.log(`Import failed but ${progress.success} words were successfully imported. Reloading word list...`);
-      this.wordManager.loadWords();
-    }
-
-    // Show detailed completion modal instead of simple toast
-    this.showImportErrorModal(progress);
-  }
-
-  private handleImportCancel(progress?: ImportProgress): void {
-    this.hideImportProgressOverlay();
-
-    // If we have progress info and at least one word was successfully imported, reload the word list
-    if (progress && progress.success > 0) {
-      console.log(`Import cancelled but ${progress.success} words were successfully imported. Reloading word list...`);
-      this.wordManager.loadWords();
-    }
-
-    this.toastManager.showWarning('Import cancelled');
-  }
-
-  private showImportErrorModal(progress: ImportProgress): void {
-    const modal = document.getElementById('import-complete-modal')!;
-    const messageElement = document.getElementById('import-complete-message')!;
-    const iconContainer = modal.querySelector('.w-16.h-16') as HTMLElement;
-    const titleElement = modal.querySelector('h3') as HTMLElement;
-    const okBtn = document.getElementById('import-complete-ok') as HTMLButtonElement;
-
-    if (messageElement && iconContainer && titleElement) {
-      // Change icon to warning for partial success
-      iconContainer.innerHTML = `
-        <svg class="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-        </svg>
-      `;
-
-      // Update title for partial success
-      titleElement.textContent = 'Import Stopped - Partial Success';
-
-      // Calculate statistics
-      const successfulCount = progress.success || 0;
-      const failedCount = progress.errors?.length || 0;
-      const skippedCount = progress.skipped || 0;
-      const remainingCount = (progress.total || 0) - (progress.current || 0);
-      const failedWord = progress.currentWord || 'unknown word';
-
-      // Build detailed message
-      let html = `<div class="text-left space-y-2">`;
-
-      if (successfulCount > 0) {
-        html += `<div class="flex items-center text-green-600">
-          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-          </svg>
-          <span class="font-medium">${successfulCount} words successfully imported</span>
-        </div>`;
-      }
-
-      if (skippedCount > 0) {
-        html += `<div class="flex items-center text-blue-600">
-          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-          </svg>
-          <span class="font-medium">${skippedCount} words were skipped (already exist)</span>
-        </div>`;
-      }
-
-      if (failedCount > 0) {
-        const error = progress.errors?.[0] || 'Unknown error';
-        html += `<div class="flex items-center text-red-600">
-          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-          <span class="font-medium">Failed on "${failedWord}": ${error}</span>
-        </div>`;
-      }
-
-      if (remainingCount > 0) {
-        html += `<div class="flex items-center text-amber-600">
-          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-          </svg>
-          <span class="font-medium">${remainingCount} words remaining unprocessed</span>
-        </div>`;
-      }
-
-      html += `</div>`;
-      messageElement.innerHTML = html;
-    }
-
-    if (modal) {
-      modal.classList.remove('hidden');
-    }
-
-    if (okBtn) {
-      okBtn.onclick = () => {
-        if (modal) {
-          modal.classList.add('hidden');
-        }
-      };
-    }
-  }
-
   private async resetUIForProfileSwitch(): Promise<void> {
     // Reset word manager state
     this.wordManager.setCurrentWord(null);
@@ -798,6 +466,4 @@ export class EventManager {
     // Reload panel widths
     await this.uiUtils.loadPanelWidths();
   }
-
-
 }

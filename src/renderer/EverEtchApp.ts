@@ -1,4 +1,3 @@
-import { WordDocument, WordListItem } from './types.js';
 import { ProfileService } from './services/ProfileService.js';
 import { WordService } from './services/WordService.js';
 import { WordImportService, ImportProgress, ImportCallbacks } from './services/WordImportService.js';
@@ -11,7 +10,6 @@ import { ModalManager } from './components/ModalManager.js';
 import { GoogleDriveManager } from './services/GoogleDriveManager.js';
 import { ProtocolManager } from './services/ProtocolManager.js';
 import { EventManager } from './services/EventManager.js';
-import { generateGenerationId } from './utils/Common.js';
 
 // Constants for pagination
 const WORDS_PAGE_SIZE = 10; // For release builds, set to 10, debug 5
@@ -71,27 +69,27 @@ export class EverEtchApp {
     );
 
     // Create other managers
-    this.modalManager = new ModalManager(this.toastManager, this.profileService);
     this.googleDriveManager = new GoogleDriveManager(this.toastManager, this.profileService);
     this.protocolManager = new ProtocolManager(this.toastManager, this.wordManager);
+
+    // Create modal manager
+    this.modalManager = new ModalManager(
+      this.wordManager,
+      this.toastManager,
+      this.profileService,
+      this.googleDriveManager,
+      this.wordImportService,
+      this.uiUtils);
 
     // Create event manager (depends on all other managers)
     this.eventManager = new EventManager(
       this.wordManager,
       this.modalManager,
-      this.googleDriveManager,
       this.profileService,
-      this.uiUtils,
-      this.wordImportService,
+      this.uiUtils,      
       this.toastManager
     );
   }
-
-
-
-
-
-
 
   private async initializeApp(): Promise<void> {
     try {
@@ -117,18 +115,16 @@ export class EverEtchApp {
           if (success) {
             console.log('Successfully switched to profile:', currentProfile);
             // Load words for the switched profile (with correct sort order)
-            await this.loadWords();
+            await this.wordManager.loadWords();
           } else {
             console.error('Failed to switch to profile:', currentProfile);
             this.toastManager.showError('Failed to load last opened profile');
             // Still try to load words with whatever profile is current
-            await this.loadWords();
+            await this.wordManager.loadWords();
           }
         } catch (error) {
           console.error('Error switching to profile:', error);
           this.toastManager.showError('Failed to load last opened profile');
-          // Still try to load words
-          await this.loadWords();
         } finally {
           setTimeout(() => {
             // Hide loading overlay
@@ -138,16 +134,13 @@ export class EverEtchApp {
       } else {
         // No current profile, just load words
         console.log('No current profile found, loading words...');
-        await this.loadWords();
-      }      
+      }
 
       // Set up event listeners
-      this.setupEventListeners();
+      this.eventManager.setupEventListeners();
 
       // Load saved panel widths
       await this.uiUtils.loadPanelWidths();
-
-
 
       // Signal to main process that app is fully ready
       console.log('🎯 Renderer: App fully initialized, sending app-ready signal');
@@ -157,16 +150,5 @@ export class EverEtchApp {
       console.error('Error initializing app:', error);
       this.toastManager.showError('Failed to initialize application');
     }
-  }
-
-  private async loadWords(): Promise<void> {
-    await this.wordManager.loadWords();
-  }
-
-
-
-  private setupEventListeners(): void {
-    // Delegate event setup to EventManager
-    this.eventManager.setupEventListeners();
   }
 }

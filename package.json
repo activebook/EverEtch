@@ -7,11 +7,12 @@
   "scripts": {
     "start": "electron .",
     "dev": "npm run build && electron .",
-    "build": "tsc && npm run build-css && npm run copy-html && npm run inject-version",
+    "build": "tsc && npm run build-css && npm run copy-html && npm run copy-templates && npm run inject-version",
     "watch": "tsc --watch",
     "build-css": "postcss ./src/renderer/styles.css -o ./lib/renderer/styles.css",
     "dev-css": "postcss ./src/renderer/styles.css -o ./lib/renderer/styles.css --watch",
     "copy-html": "mkdir -p lib/renderer && cp src/renderer/index.html lib/renderer/ && sed -i '' 's|../../lib/renderer/|./|g' lib/renderer/index.html",
+    "copy-templates": "mkdir -p lib/renderer && cp -r src/renderer/templates lib/renderer/",
     "inject-version": "node inject-version.js",
     "dist": "npm run build && electron-builder",
     "dist:win": "npm run build && electron-builder --win",

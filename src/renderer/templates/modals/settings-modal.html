@@ -1,0 +1,103 @@
+<!-- Modern Settings Modal -->
+<div id="settings-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden z-50">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div
+            class="bg-amber-50/95 backdrop-blur-md rounded-2xl shadow-2xl max-w-md w-full border border-amber-200/60">
+            <div
+                class="p-4 border-b border-amber-200/60 bg-gradient-to-r from-amber-25/40 to-amber-50/60 rounded-t-2xl">
+                <h3 class="text-lg font-semibold text-slate-800 flex items-center">
+                    <svg class="w-5 h-5 mr-2 text-amber-600" fill="none" stroke="currentColor"
+                        viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
+                        </path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    Profile Settings
+                </h3>
+            </div>
+            <div class="p-4 space-y-3">
+                <div>
+                    <label for="profile-name" class="block text-sm font-medium text-slate-700 mb-1.5">Profile
+                        Name</label>
+                    <input type="text" id="profile-name"
+                        class="w-full px-2.5 py-1.5 border border-amber-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-amber-50/80 backdrop-blur-sm text-slate-700 placeholder-slate-400"
+                        placeholder="Enter profile name...">
+                </div>
+                <div>
+                    <label for="system-prompt" class="block text-sm font-medium text-slate-700 mb-1.5">System
+                        Prompt</label>
+                    <textarea id="system-prompt" rows="8"
+                        class="w-full px-2.5 py-1.5 border border-amber-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-amber-50/80 backdrop-blur-sm text-slate-700 placeholder-slate-400 resize-none text-sm"
+                        placeholder="Enter system prompt..."></textarea>
+                </div>
+                <div>
+                    <label for="model-provider" class="block text-sm font-medium text-slate-700 mb-1.5">Model
+                        Provider</label>
+                    <select id="model-provider" title="Select AI model provider"
+                        class="w-full px-2.5 py-1.5 border border-amber-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-amber-50/80 backdrop-blur-sm text-slate-700 text-sm">
+                        <option value="openai">OpenAI</option>
+                        <option value="google">Google</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="model-name" class="block text-sm font-medium text-slate-700 mb-1.5">Model
+                        Name</label>
+                    <input type="text" id="model-name"
+                        class="w-full px-2.5 py-1.5 border border-amber-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-amber-50/80 backdrop-blur-sm text-slate-700 placeholder-slate-400 text-sm"
+                        placeholder="e.g., gpt-4, claude-3-sonnet">
+                </div>
+                <div>
+                    <label for="api-endpoint" class="block text-sm font-medium text-slate-700 mb-1.5">API
+                        Endpoint</label>
+                    <input type="text" id="api-endpoint"
+                        class="w-full px-2.5 py-1.5 border border-amber-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-amber-50/80 backdrop-blur-sm text-slate-700 placeholder-slate-400 text-sm"
+                        placeholder="https://api.openai.com/v1/chat/completions">
+                </div>
+                <div>
+                    <label for="api-key" class="block text-sm font-medium text-slate-700 mb-1.5">API Key</label>
+                    <div class="relative">
+                        <input type="password" id="api-key"
+                            class="w-full pr-10 px-2.5 py-1.5 border border-amber-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-amber-50/80 backdrop-blur-sm text-slate-700 placeholder-slate-400 text-sm"
+                            placeholder="Enter your API key">
+                        <button type="button" id="toggle-api-key-visibility" title="Toggle API key visibility"
+                            class="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 text-amber-600 hover:text-amber-700 transition-colors duration-200">
+                            <svg id="eye-icon" class="w-4 h-4" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z">
+                                </path>
+                            </svg>
+                            <svg id="eye-off-icon" class="w-4 h-4 hidden" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21">
+                                </path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div
+                class="p-4 border-t border-amber-200/60 flex justify-between items-center bg-amber-50/50 rounded-b-2xl">
+                <button id="delete-profile-btn"
+                    class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all duration-200 hover:shadow-lg font-medium text-sm">
+                    Delete Profile
+                </button>
+                <div class="flex space-x-3">
+                    <button id="cancel-settings"
+                        class="px-4 py-2 bg-slate-500 hover:bg-slate-600 text-white rounded-lg transition-all duration-200 hover:shadow-lg font-medium text-sm">
+                        Cancel
+                    </button>
+                    <button id="save-settings"
+                        class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all duration-200 hover:shadow-lg font-medium text-sm">
+                        Save
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

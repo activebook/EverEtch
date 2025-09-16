@@ -58,6 +58,17 @@ declare global {
     }
 }
 
+// In a .d.ts file or at the top of your file
+declare global {
+  interface HTMLButtonElement {
+    _listenerAdded?: boolean;
+  }
+  interface HTMLElement {
+    _listenerAdded?: boolean;
+  }
+}
+
+
 export { }; // This makes the file a module
 
 export interface WordDocument {
