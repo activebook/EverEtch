@@ -13,12 +13,6 @@ interface PanelWidths {
   right: number;
 }
 
-interface GoogleCredentials {
-  clientId: string;
-  clientSecret: string;
-  redirectUri: string;
-}
-
 interface GoogleTokens {
   access_token: string;
   refresh_token: string;
@@ -30,7 +24,6 @@ interface StoreSchema {
   windowBounds: WindowBounds | null;
   panelWidths: PanelWidths | null;
   sortOrder: 'asc' | 'desc' | null;
-  googleCredentials: GoogleCredentials | null;
   googleTokens: GoogleTokens | null;
 }
 
@@ -39,7 +32,7 @@ export class StoreManager {
 
   constructor() {
     this.store = new Store<StoreSchema>({
-      name: 'ui-settings',
+      name: 'app-settings',
       schema: {
         windowBounds: {
           type: ['object', 'null'],
@@ -62,14 +55,6 @@ export class StoreManager {
           type: ['string', 'null'],
           enum: ['asc', 'desc', null]
         },
-        googleCredentials: {
-          type: ['object', 'null'],
-          properties: {
-            clientId: { type: 'string' },
-            clientSecret: { type: 'string' },
-            redirectUri: { type: 'string' }
-          }
-        },
         googleTokens: {
           type: ['object', 'null'],
           properties: {
@@ -84,7 +69,6 @@ export class StoreManager {
         windowBounds: null,
         panelWidths: null,
         sortOrder: 'desc',
-        googleCredentials: null,
         googleTokens: null
       }
     }) as Store<StoreSchema>;
@@ -142,20 +126,6 @@ export class StoreManager {
   }
 
   /**
-   * Save Google credentials
-   */
-  saveGoogleCredentials(credentials: GoogleCredentials): void {
-    this.store.set('googleCredentials', credentials);
-  }
-
-  /**
-   * Load Google credentials
-   */
-  getGoogleCredentials(): GoogleCredentials | null {
-    return this.store.get('googleCredentials');
-  }
-
-  /**
    * Save Google tokens
    */
   saveGoogleTokens(tokens: GoogleTokens): void {
@@ -174,13 +144,6 @@ export class StoreManager {
    */
   clearGoogleTokens(): void {
     this.store.set('googleTokens', null);
-  }
-
-  /**
-   * Clear Google credentials
-   */
-  clearGoogleCredentials(): void {
-    this.store.set('googleCredentials', null);
   }
 
   /**

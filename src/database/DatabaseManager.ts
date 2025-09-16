@@ -1,5 +1,5 @@
 import sqlite3 from 'sqlite3';
-import { getDatabasePath, ensureDataDirectory, generateId, formatDate } from '../utils/utils.js';
+import { Utils } from '../utils/Utils.js';
 import { DatabaseRecovery } from './DatabaseRecovery.js';
 
 export interface WordDocument {
@@ -52,8 +52,8 @@ export class DatabaseManager {
 
   initialize(profileName: string): Promise<void> {
     return new Promise((resolve, reject) => {
-      ensureDataDirectory();
-      this.dbPath = getDatabasePath(profileName);
+      Utils.ensureDataDirectory();
+      this.dbPath = Utils.getDatabasePath(profileName);
       this.db = new sqlite3.Database(this.dbPath, (err) => {
         if (err) {
           reject(err);
@@ -276,7 +276,7 @@ export class DatabaseManager {
           const updatedWord: WordDocument = {
             ...existingWord,
             ...wordData,
-            updated_at: formatDate()
+            updated_at: Utils.formatDate()
           };
 
           this.db.run(
@@ -292,8 +292,8 @@ export class DatabaseManager {
           );
         } else {
           // Create new word
-          const id = generateId('word');
-          const now = formatDate();
+          const id = Utils.generateId('word');
+          const now = Utils.formatDate();
 
           const wordDoc: WordDocument = {
             id,
@@ -623,13 +623,24 @@ export class DatabaseManager {
   close(): Promise<void> {
     return new Promise((resolve) => {
       if (this.db) {
-        this.db.close((err) => {
+        // Check if database is already closed or in a bad state
+        try {
+          this.db.close((err) => {
+            this.db = null;
+            if (err) {
+              // Only log non-misuse errors, as SQLITE_MISUSE often means already closed
+              if (!err.message.includes('SQLITE_MISUSE')) {
+                console.error('Error closing database:', err);
+              }
+            }
+            resolve();
+          });
+        } catch (error) {
+          // Database might already be closed
           this.db = null;
-          if (err) {
-            console.error('Error closing database:', err);
-          }
+          console.debug('Database close attempted on already closed connection');
           resolve();
-        });
+        }
       } else {
         resolve();
       }
@@ -650,7 +661,7 @@ export class DatabaseManager {
           }
 
           // Now open the new database
-          this.dbPath = getDatabasePath(profileName);
+          this.dbPath = Utils.getDatabasePath(profileName);
           this.db = new sqlite3.Database(this.dbPath, (err) => {
             if (err) {
               reject(err);
@@ -661,7 +672,7 @@ export class DatabaseManager {
         });
       } else {
         // No existing connection, just open the database
-        this.dbPath = getDatabasePath(profileName);
+        this.dbPath = Utils.getDatabasePath(profileName);
         this.db = new sqlite3.Database(this.dbPath, (err) => {
           if (err) {
             reject(err);

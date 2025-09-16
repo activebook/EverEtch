@@ -3,19 +3,22 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import { getAndSetProxyEnvironment } from './utils/sys_proxy.js';
-import { getDatabasePath, ensureDataDirectory, logToFile, setDebugMode, clearDebugLog, getUserDataPath } from './utils/utils.js';
+import { SysProxy } from './utils/SysProxy.js';
+import { Utils } from './utils/Utils.js';
 import { StoreManager } from './utils/StoreManager.js';
 import { DatabaseManager } from './database/DatabaseManager.js';
 import { ProfileManager } from './database/ProfileManager.js';
 import { AIModelClient, WORD_DUMMY_METAS } from './ai/AIModelClient.js';
-import { GoogleAuthService } from './main/google/GoogleAuthService.js';
-import { GoogleDriveService } from './main/google/GoogleDriveService.js';
-import { GoogleDriveExportService } from './main/services/GoogleDriveExportService.js';
+import { GoogleAuthService } from './service/google/GoogleAuthService.js';
+import { GoogleDriveService } from './service/google/GoogleDriveService.js';
+import { ImportExportService } from './service/common/ImportExportService.js';
 import { marked } from 'marked';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// Application constants
+const EVERETCH_FOLDER_NAME = 'EverEtch Profiles';
 
 let mainWindow: BrowserWindow;
 let dbManager: DatabaseManager;
@@ -24,7 +27,7 @@ let aiClient: AIModelClient;
 let storeManager: StoreManager;
 let googleAuthService: GoogleAuthService;
 let googleDriveService: GoogleDriveService;
-let googleDriveExportService: GoogleDriveExportService;
+let importExportService: ImportExportService;
 let queuedProtocolAction: { type: string, data: any } | null = null; // Store queued protocol actions
 
 // Configure marked for proper line break handling
@@ -43,9 +46,9 @@ try {
 }
 
 // Test logging functionality
-setDebugMode(false);
-clearDebugLog();
-logToFile('EverEtch app starting up');
+Utils.setDebugMode(false);
+Utils.clearDebugLog();
+Utils.logToFile('EverEtch app starting up');
 
 
 async function createWindow() {
@@ -54,12 +57,6 @@ async function createWindow() {
     dbManager = new DatabaseManager();
     profileManager = new ProfileManager(dbManager);
     aiClient = new AIModelClient();
-
-    // Initialize Google services
-    storeManager = new StoreManager();
-    googleAuthService = new GoogleAuthService(mainWindow, storeManager);
-    googleDriveService = new GoogleDriveService(googleAuthService);
-    googleDriveExportService = new GoogleDriveExportService(dbManager);
 
     // Create window with minimal bounds first (invisible), then apply saved bounds
     mainWindow = new BrowserWindow({
@@ -74,14 +71,20 @@ async function createWindow() {
       }
     });
 
+    // Initialize Google services AFTER mainWindow is created
+    storeManager = new StoreManager();
+    googleAuthService = new GoogleAuthService(mainWindow, storeManager);
+    googleDriveService = new GoogleDriveService(googleAuthService);
+    importExportService = new ImportExportService(dbManager, profileManager);
+
     mainWindow.loadFile(path.join(__dirname, 'renderer/index.html'));
 
     // Apply saved window bounds
     adjustMainWindow(() => {
       // Callback function after window is ready
       // Set up proxy environment variables
-      getAndSetProxyEnvironment();
-    }, () => {});
+      SysProxy.apply();
+    }, () => { });
 
     if (process.env.NODE_ENV === 'development') {
       // Open DevTools(cmd + alt + i)
@@ -179,7 +182,7 @@ function adjustMainWindow(ready: () => void, shown: () => void) {
 
 // Handle protocol URL processing
 function handleProtocolUrl(url: string) {
-  logToFile(`🎯 Processing protocol URL: ${url}`);
+  Utils.logToFile(`🎯 Processing protocol URL: ${url}`);
 
   try {
     // Remove the protocol prefix to get the path
@@ -189,15 +192,15 @@ function handleProtocolUrl(url: string) {
     // Check if window is already loaded and showing
     const isWindowReady = mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible();
 
-    logToFile(`🎯 Window ready? ${isWindowReady}`);
-    logToFile(`🎯 URL parts: ${JSON.stringify(urlParts)}`);
+    Utils.logToFile(`🎯 Window ready? ${isWindowReady}`);
+    Utils.logToFile(`🎯 URL parts: ${JSON.stringify(urlParts)}`);
 
     // Handle different protocol actions
     if (urlParts.length === 1 && (urlParts[0] === '' || urlParts[0] === 'open')) {
-      logToFile('🎯 Handling: Open app');
+      Utils.logToFile('🎯 Handling: Open app');
       if (isWindowReady) {
         mainWindow.focus();
-        logToFile('✅ App focused');
+        Utils.logToFile('✅ App focused');
       }
       return;
     }
@@ -205,15 +208,15 @@ function handleProtocolUrl(url: string) {
     if (urlParts.length >= 2 && urlParts[0] === 'word') {
       // Join all parts after 'word' and decode
       const wordName = decodeURIComponent(urlParts.slice(1).join('/'));
-      logToFile(`🎯 Handling: Navigate to word "${wordName}"`);
+      Utils.logToFile(`🎯 Handling: Navigate to word "${wordName}"`);
 
       if (isWindowReady) {
-        logToFile('🎯 Sending IPC message to renderer');
+        Utils.logToFile('🎯 Sending IPC message to renderer');
         mainWindow.webContents.send('protocol-navigate-word', wordName);
         mainWindow.focus();
-        logToFile('✅ IPC message sent and window focused');
+        Utils.logToFile('✅ IPC message sent and window focused');
       } else {
-        logToFile('⚠️ Window not ready, queuing navigation');
+        Utils.logToFile('⚠️ Window not ready, queuing navigation');
         // Queue the action for when window is ready
         queuedProtocolAction = { type: 'word', data: wordName };
       }
@@ -223,24 +226,24 @@ function handleProtocolUrl(url: string) {
     if (urlParts.length >= 2 && urlParts[0] === 'profile') {
       // Join all parts after 'profile' and decode
       const profileName = decodeURIComponent(urlParts.slice(1).join('/'));
-      logToFile(`🎯 Handling: Switch to profile "${profileName}"`);
+      Utils.logToFile(`🎯 Handling: Switch to profile "${profileName}"`);
 
       if (isWindowReady) {
-        logToFile('🎯 Sending IPC message to renderer');
+        Utils.logToFile('🎯 Sending IPC message to renderer');
         mainWindow.webContents.send('protocol-switch-profile', profileName);
         mainWindow.focus();
-        logToFile('✅ IPC message sent and window focused');
+        Utils.logToFile('✅ IPC message sent and window focused');
       } else {
-        logToFile('⚠️ Window not ready, queuing profile switch');
+        Utils.logToFile('⚠️ Window not ready, queuing profile switch');
         queuedProtocolAction = { type: 'profile', data: profileName };
       }
       return;
     }
 
-    logToFile(`⚠️ Unknown protocol action: ${urlWithoutProtocol}`);
+    Utils.logToFile(`⚠️ Unknown protocol action: ${urlWithoutProtocol}`);
 
   } catch (error) {
-    logToFile(`❌ Error processing protocol URL: ${error}`);
+    Utils.logToFile(`❌ Error processing protocol URL: ${error}`);
   }
 }
 
@@ -248,16 +251,16 @@ function handleProtocolUrl(url: string) {
 function processQueuedProtocolAction() {
   if (!queuedProtocolAction || !mainWindow) return;
 
-  logToFile(`🎯 Processing queued action: ${queuedProtocolAction.type} - ${queuedProtocolAction.data}`);
+  Utils.logToFile(`🎯 Processing queued action: ${queuedProtocolAction.type} - ${queuedProtocolAction.data}`);
 
   if (queuedProtocolAction.type === 'word') {
     mainWindow.webContents.send('protocol-navigate-word', queuedProtocolAction.data);
     mainWindow.focus();
-    logToFile('✅ Queued word navigation sent');
+    Utils.logToFile('✅ Queued word navigation sent');
   } else if (queuedProtocolAction.type === 'profile') {
     mainWindow.webContents.send('protocol-switch-profile', queuedProtocolAction.data);
     mainWindow.focus();
-    logToFile('✅ Queued profile switch sent');
+    Utils.logToFile('✅ Queued profile switch sent');
   }
 
   queuedProtocolAction = null; // Clear the queue
@@ -265,13 +268,13 @@ function processQueuedProtocolAction() {
 
 // Listen for app-ready signal from renderer
 ipcMain.on('app-render-ready', () => {
-  logToFile('🎯 Received app-ready signal from renderer');
+  Utils.logToFile('🎯 Received app-ready signal from renderer');
   processQueuedProtocolAction();
 });
 
 // Handle open-url event for macOS protocol links
 app.on('open-url', (event, url) => {
-  logToFile(`🎯 App open-url event received: ${url}`);
+  Utils.logToFile(`🎯 App open-url event received: ${url}`);
   event.preventDefault();
 
   // Parse the URL and handle it
@@ -500,22 +503,8 @@ ipcMain.handle('export-profile', async () => {
       return { success: false, message: 'Export cancelled' };
     }
 
-    // Copy the current profile's database to the selected location
-    const sourcePath = getDatabasePath(currentProfile);
-    const targetPath = result.filePath;
-
-    // Ensure source database exists
-    if (!fs.existsSync(sourcePath)) {
-      throw new Error('Current profile database not found');
-    }
-
-    // Copy the database file
-    fs.copyFileSync(sourcePath, targetPath);
-
-    return {
-      success: true,
-      message: `Profile "${currentProfile}" exported successfully to ${targetPath}`
-    };
+    // Use the import/export service to handle the export
+    return await importExportService.exportProfileToLocal(result.filePath);
 
   } catch (error) {
     console.error('Error exporting profile:', error);
@@ -543,58 +532,9 @@ ipcMain.handle('import-profile', async () => {
     }
 
     const sourcePath = result.filePaths[0];
-    const fileName = path.basename(sourcePath, '.db');
 
-    // Validate the database format
-    const isValid = await DatabaseManager.validateDatabaseFormat(sourcePath);
-    if (!isValid) {
-      return {
-        success: false,
-        message: 'Invalid database format. The selected file is not a valid EverEtch profile database.'
-      };
-    }
-
-    // Generate unique profile name if needed
-    let profileName = fileName;
-    const existingProfiles = profileManager.getProfiles();
-    let counter = 1;
-
-    while (existingProfiles.includes(profileName)) {
-      profileName = `${fileName}_${counter}`;
-      counter++;
-    }
-
-    // Copy database to profile directory
-    const targetPath = getDatabasePath(profileName);
-    ensureDataDirectory();
-    fs.copyFileSync(sourcePath, targetPath);
-
-    let success = false;
-
-    // Add new profile to profiles
-    success = profileManager.importProfile(profileName);
-    if (success) {
-      // Switch to the imported profile to ensure it's properly initialized
-      success = await profileManager.switchProfile(profileName);
-    } else {
-      console.error('Failed to imported profile, the same profile already exists');
-    }
-
-    if (!success) {
-      // Clean up the copied file if profile creation failed
-      try {
-        fs.unlinkSync(targetPath);
-      } catch (cleanupError) {
-        console.error('Error cleaning up failed import:', cleanupError);
-      }
-      return { success: false, message: 'Failed to create new profile' };
-    }
-
-    return {
-      success: true,
-      message: `Profile "${profileName}" imported successfully`,
-      profileName
-    };
+    // Use the import/export service to handle the import
+    return await importExportService.importProfileFromLocal(sourcePath);
 
   } catch (error) {
     console.error('Error importing profile:', error);
@@ -657,7 +597,14 @@ ipcMain.handle('google-get-user-info', async () => {
 
 ipcMain.handle('google-drive-list-files', async () => {
   try {
-    const files = await googleDriveService.listFiles();
+    // Get or create the EverEtch Profiles folder
+    const folderId = await googleDriveService.getFolder(EVERETCH_FOLDER_NAME);
+    if (!folderId) {
+      throw new Error('Could not access EverEtch Profiles folder');
+    }
+
+    // List files in the EverEtch folder
+    const files = await googleDriveService.listFilesInFolder(folderId);
     return { success: true, files };
   } catch (error) {
     console.error('Failed to list Google Drive files:', error);
@@ -671,23 +618,23 @@ ipcMain.handle('google-drive-list-files', async () => {
 
 ipcMain.handle('google-drive-upload-database', async () => {
   try {
-    const currentProfile = profileManager.getLastOpenedProfile();
-    if (!currentProfile) {
-      throw new Error('No current profile selected');
+    // Prepare profile data for upload using the service
+    const uploadData = await importExportService.exportProfileForUpload();
+    if (!uploadData.success) {
+      return uploadData;
     }
 
-    const fileInfo = googleDriveExportService.getCurrentDatabaseFileInfo(currentProfile);
-    if (!fileInfo) {
-      throw new Error('Database file not found');
+    // Get or create the EverEtch Profiles folder
+    const folderId = await googleDriveService.getFolder(EVERETCH_FOLDER_NAME);
+    if (!folderId) {
+      throw new Error('Could not access EverEtch Profiles folder');
     }
 
-    const fileBuffer = await googleDriveExportService.readDatabaseFile(fileInfo.filePath);
-    const fileName = googleDriveExportService.generateFileName(currentProfile);
-
+    // Upload file to the EverEtch folder
     const result = await googleDriveService.uploadFile(
-      fileName,
-      fileBuffer.toString('base64'),
-      'application/octet-stream'
+      uploadData.fileName!,
+      uploadData.fileBuffer!,
+      folderId
     );
 
     return result;
@@ -713,59 +660,9 @@ ipcMain.handle('google-drive-download-database', async (event, fileId: string) =
       throw new Error('Could not get file metadata');
     }
 
-    // Extract profile name from filename (remove EverEtch_ prefix and timestamp)
-    const profileNameMatch = fileMetadata.name.match(/^EverEtch_(.+?)_\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.db$/);
-    let profileName = 'imported_profile';
+    // Use the import/export service to handle the import from Google Drive
+    return await importExportService.importProfileFromGoogleDrive(fileMetadata.name, downloadResult.content!);
 
-    if (profileNameMatch) {
-      profileName = profileNameMatch[1];
-    }
-
-    // Generate unique profile name if needed
-    const existingProfiles = profileManager.getProfiles();
-    let finalProfileName = profileName;
-    let counter = 1;
-
-    while (existingProfiles.includes(finalProfileName)) {
-      finalProfileName = `${profileName}_${counter}`;
-      counter++;
-    }
-
-    // Save the downloaded file
-    const targetPath = getDatabasePath(finalProfileName);
-    ensureDataDirectory();
-    const fileBuffer = Buffer.from(downloadResult.content!, 'base64');
-    await googleDriveExportService.writeDatabaseFile(targetPath, fileBuffer);
-
-    // Validate the downloaded database
-    const isValid = await googleDriveExportService.validateDownloadedDatabase(targetPath);
-    if (!isValid) {
-      // Clean up invalid file
-      try {
-        fs.unlinkSync(targetPath);
-      } catch (cleanupError) {
-        console.error('Error cleaning up invalid download:', cleanupError);
-      }
-      throw new Error('Downloaded file is not a valid EverEtch database');
-    }
-
-    // Import the profile
-    const importSuccess = profileManager.importProfile(finalProfileName);
-    if (!importSuccess) {
-      // Clean up if import failed
-      try {
-        fs.unlinkSync(targetPath);
-      } catch (cleanupError) {
-        console.error('Error cleaning up failed import:', cleanupError);
-      }
-      throw new Error('Failed to import profile');
-    }
-
-    return {
-      success: true,
-      message: `Profile "${finalProfileName}" imported successfully from Google Drive`,
-      profileName: finalProfileName
-    };
   } catch (error) {
     console.error('Failed to download database from Google Drive:', error);
     return {
