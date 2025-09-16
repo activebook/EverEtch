@@ -1,6 +1,7 @@
 import { google } from 'googleapis';
 import { OAuth2Client } from 'googleapis-common';
 import { BrowserWindow, app } from 'electron';
+import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as http from 'http';
@@ -64,43 +65,105 @@ export class GoogleAuthService {
   }
 
   private loadCredentials(): void {
+    // Use obfuscated credentials for offline functionality
     try {
-      const credentialsPath = path.join(app.getAppPath(), 'credentials.json');
-      if (!fs.existsSync(credentialsPath)) {
-        return;
-      }
-
-      const credentialsContent = fs.readFileSync(credentialsPath, 'utf-8');
-      const credentialsData = JSON.parse(credentialsContent);
-
-      // Extract API key if present
-      this.apiKey = credentialsData.api_key;
-
-      // Handle Google Cloud Console credentials format
-      if (credentialsData.installed) {
-        // For Electron desktop apps, use localhost redirect with local server
-        this.credentials = {
-          clientId: credentialsData.installed.client_id,
-          clientSecret: credentialsData.installed.client_secret,
-          redirectUri: 'http://localhost:3000/oauth2callback'
-        };
-        return;
-      }
-
-      // Handle direct format (client_id, client_secret, redirect_uri)
-      if (credentialsData.client_id && credentialsData.client_secret) {
-        this.credentials = {
-          clientId: credentialsData.client_id,
-          clientSecret: credentialsData.client_secret,
-          redirectUri: credentialsData.redirect_uri || 'http://localhost:3000/oauth2callback'
-        };
-        return;
-      }
-
-      console.warn('Invalid credentials.json format');
+      const obfuscatedCreds = this.getObfuscatedCredentials();
+      this.credentials = obfuscatedCreds.credentials;
+      this.apiKey = obfuscatedCreds.apiKey;
     } catch (error) {
-      console.error('Failed to load credentials from file:', error);
+      console.error('Failed to load obfuscated credentials:', error);
     }
+  }
+
+  private getObfuscatedCredentials(): { credentials: GoogleCredentials; apiKey?: string } {
+    try {
+      // Path to encrypted credentials file (in app directory)
+      const encryptedPath = path.join(app.getAppPath(), 'credentials.enc');
+
+      if (!fs.existsSync(encryptedPath)) {
+        throw new Error('Encrypted credentials file not found');
+      }
+
+      // Read encrypted file
+      const encryptedData = fs.readFileSync(encryptedPath);
+
+      // Decrypt using the same key used for encryption
+      const decryptedJson = this.decryptCredentials(encryptedData);
+      const credentialsData = JSON.parse(decryptedJson);
+
+      // Extract credentials in the same format as before
+      let clientId: string;
+      let clientSecret: string;
+      let apiKey: string | undefined;
+
+      if (credentialsData.installed) {
+        clientId = credentialsData.installed.client_id;
+        clientSecret = credentialsData.installed.client_secret;
+        apiKey = credentialsData.api_key;
+      } else if (credentialsData.client_id && credentialsData.client_secret) {
+        clientId = credentialsData.client_id;
+        clientSecret = credentialsData.client_secret;
+        apiKey = credentialsData.api_key;
+      } else {
+        throw new Error('Invalid credentials format in encrypted file');
+      }
+
+      return {
+        credentials: {
+          clientId,
+          clientSecret,
+          redirectUri: 'http://localhost:3000/oauth2callback'
+        },
+        apiKey
+      };
+    } catch (error) {
+      console.error('Failed to decrypt credentials:', error);
+      throw new Error('Failed to load encrypted credentials');
+    }
+  }
+
+  private deriveDecryptionKey(): Buffer {
+    // Generate the same derived key as encrypt.ts for decryption
+    const baseKey = this.getObfuscatedBaseKey();
+    const appVersion = app.getVersion();
+
+    // Platform-independent seed: everetch-{version}-secure (matching encrypt.ts)
+    const seed = `activebook-${baseKey}-${appVersion}-secure`;
+
+    // Return the derived key as a raw Buffer (SHA256 hash) matching encrypt.ts
+    return crypto.createHash('sha256').update(seed).digest();
+  }
+
+  private decryptCredentials(encryptedData: Buffer): string {
+    // Derive the decryption key (must match the key from encrypt.ts)
+    const decryptionKey = this.deriveDecryptionKey();
+
+    try {
+      // 1. Extract the IV from the first 16 bytes
+      const iv = encryptedData.subarray(0, 16);
+
+      // 2. Extract the actual encrypted content (the rest of the buffer)
+      const encryptedContent = encryptedData.subarray(16);
+
+      // 3. Create the decipher
+      const decipher = crypto.createDecipheriv('aes-256-cbc', decryptionKey, iv);
+
+      // 4. Decrypt the content
+      const decrypted = Buffer.concat([decipher.update(encryptedContent), decipher.final()]);
+
+      // 5. Return the result as a string
+      return decrypted.toString('utf8');
+
+    } catch (error) {
+      // This error often means the key is wrong or the data is corrupt.
+      console.error('Decryption failed. This may be due to a version mismatch or incorrect key.', error);
+      throw new Error(`Decryption failed: ${(error as Error).message}`);
+    }
+  }
+
+  private getObfuscatedBaseKey(): string {
+    // Return the app name for platform-independent seed generation
+    return 'everetch';
   }
 
   private loadCredentialsFromFile(): GoogleCredentials | null {
@@ -197,20 +260,7 @@ export class GoogleAuthService {
 
   private async performOAuthFlow(authUrl: string): Promise<boolean> {
     return new Promise((resolve, reject) => {
-      // Start local HTTP server to handle OAuth callback
-      this.startLocalServer((code: string) => {
-        this.exchangeCodeForTokens(code)
-          .then(() => {
-            this.stopLocalServer();
-            this.authWindow?.close();
-            resolve(true);
-          })
-          .catch((error) => {
-            this.stopLocalServer();
-            this.authWindow?.close();
-            reject(error);
-          });
-      }, reject);
+      let authCompleted = false; // ← Flag to prevent false rejection
 
       // Create auth window
       this.authWindow = new BrowserWindow({
@@ -226,14 +276,59 @@ export class GoogleAuthService {
         title: 'Google Authentication'
       });
 
+      // Start local HTTP server to handle OAuth callback
+      this.startLocalServer((code: string) => {
+        authCompleted = true; // ← Mark as completed to prevent false rejection
+
+        this.exchangeCodeForTokens(code)
+          .then(async () => {
+            // Add a small delay to ensure OAuth2 client processes tokens
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Verify that authentication is working
+            const isAuthenticated = await this.isAuthenticated();
+            if (isAuthenticated) {
+              this.stopLocalServer();
+              this.authWindow?.close();
+              resolve(true);
+            } else {
+              this.stopLocalServer();
+              this.authWindow?.close();
+              reject(new Error('Authentication verification failed'));
+            }
+          })
+          .catch((error) => {
+            this.stopLocalServer();
+            this.authWindow?.close();
+            reject(error);
+          });
+      }, (error) => {
+        // ← Close window immediately on server error
+        console.error('Server error during OAuth:', error);
+        this.authWindow?.close();
+        this.authWindow = null;
+        this.stopLocalServer();
+        reject(error);
+      });
+
       this.authWindow.loadURL(authUrl);
       this.authWindow.show();
+
+      // ← FIXED: Only reject on real failures, not success redirects
+      this.authWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+        // Don't reject if auth already completed successfully
+        if (!authCompleted) {
+          console.error('Auth window failed to load:', errorDescription);
+          this.authWindow?.close();
+          reject(new Error(`Authentication window failed: ${errorDescription}`));
+        }
+      });
 
       // Handle window close
       this.authWindow.on('closed', () => {
         this.authWindow = null;
         this.stopLocalServer();
-        if (!this.oauth2Client.credentials.access_token) {
+        if (!authCompleted && !this.oauth2Client.credentials.access_token) {
           resolve(false); // User cancelled authentication
         }
       });

@@ -68,6 +68,31 @@ Your word collections are saved locally on your computer:
 Your data stays private and secure on your device.
 **No fxxking storage fees!**
 
+## ☁️ Google Drive Sync
+
+Backup and sync your word collections across devices:
+
+### Cloud Backup
+- **Upload Profiles**: Save your word collections to Google Drive
+- **Automatic Timestamps**: Files are named with upload date/time
+- **Cross-Device Sync**: Access your words on any computer
+
+### Easy Import/Export
+- **One-Click Upload**: Export Profile → Upload to Google Drive
+- **Simple Download**: Import Profile → Import from Google Drive
+- **File Management**: View, delete, and organize your backups
+
+![UI Screenshot](screenshots/UI_DRIVE_IMPORT.png)
+![UI Screenshot](screenshots/UI_DRIVE_EXPORT.png)
+
+### Getting Started
+1. Click the menu (⋯) in the app header
+2. Choose "Export Profile" → "Upload to Google Drive"
+3. Authenticate with Google (one-time setup)
+4. Your profile uploads automatically
+
+**Free cloud storage with your Google account!**
+
 ## 🛠️ For Developers
 
 ### Requirements

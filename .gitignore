@@ -4,6 +4,7 @@
 
 # Credentials
 credentials.json
+encrypt.ts
 
 # Dependencies
 node_modules/
