@@ -57,6 +57,7 @@ export class GoogleDriveService {
 
   /**
    * Add API key to request parameters if available
+   * (Deprecated: Use OAuth2 authentication instead, don't need to add API key)
    */
   private addApiKey(params: any): void {
     const apiKey = this.authService.getApiKey();
@@ -115,7 +116,7 @@ export class GoogleDriveService {
         pageSize
       };
 
-      this.addApiKey(requestParams);
+      //this.addApiKey(requestParams);
 
       const response = await this.getDriveClient().files.list(requestParams);
       return response.data.files?.map(file => this.mapDriveFile(file)) || [];
@@ -157,7 +158,7 @@ export class GoogleDriveService {
           fields: 'id,webViewLink'
         };
 
-        this.addApiKey(createParams);
+        //this.addApiKey(createParams);
         const response = await this.getDriveClient().files.create(createParams);
 
         return {
@@ -282,7 +283,7 @@ export class GoogleDriveService {
         pageSize
       };
 
-      this.addApiKey(requestParams);
+      //this.addApiKey(requestParams);
       const response = await this.getDriveClient().files.list(requestParams);
       return response.data.files?.map(file => this.mapDriveFile(file)) || [];
     }, 'Failed to list files in folder');

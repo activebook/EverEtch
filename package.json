@@ -1,19 +1,20 @@
 {
   "name": "everetch",
-  "version": "1.4.2",
+  "version": "1.4.4",
   "type": "module",
   "description": "A slim word memo application",
   "main": "lib/main.js",
   "scripts": {
     "start": "electron .",
     "dev": "npm run build && electron .",
-    "build": "tsc && npm run build-css && npm run copy-html && npm run copy-templates && npm run inject-version",
+    "build": "tsc && npm run build-css && npm run copy-html && npm run copy-templates && npm run inject-version && npm run encrypt-credentials",
     "watch": "tsc --watch",
     "build-css": "postcss ./src/renderer/styles.css -o ./lib/renderer/styles.css",
     "dev-css": "postcss ./src/renderer/styles.css -o ./lib/renderer/styles.css --watch",
     "copy-html": "mkdir -p lib/renderer && cp src/renderer/index.html lib/renderer/ && sed -i '' 's|../../lib/renderer/|./|g' lib/renderer/index.html",
     "copy-templates": "mkdir -p lib/renderer && cp -r src/renderer/templates lib/renderer/",
-    "inject-version": "node inject-version.js",
+    "inject-version": "node inject-version.ts",
+    "encrypt-credentials": "node encrypt.ts",
     "dist": "npm run build && electron-builder",
     "dist:win": "npm run build && electron-builder --win",
     "dist:mac": "npm run build && electron-builder --mac",
@@ -69,6 +70,10 @@
       {
         "from": "assets",
         "to": "assets"
+      },
+      {
+        "from": "credentials.enc",
+        "to": "credentials.enc"
       }
     ],
     "mac": {

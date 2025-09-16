@@ -29,25 +29,30 @@ export class GoogleDriveManager {
     try {
       // Reset selection state when opening modal
       this.selectedGoogleDriveFile = null;
-      
+
       // Check if we're authenticated first
       const authStatus = await window.electronAPI.googleIsAuthenticated();
       if (!authStatus.authenticated) {
         // Trigger authentication
         const authResult = await window.electronAPI.googleAuthenticate();
         if (!authResult.success) {
-          this.toastManager.showError('Authentication required for Google Drive access');
-          return undefined;
+          this.toastManager.showError('Authentication failed. Please try again.');
+          return { success: false, message: 'Authentication failed', files: [] };
         }
       }
 
       // Load files from Google Drive
       const result = await window.electronAPI.googleDriveListFiles();
+      if (!result) {
+        this.toastManager.showError('Failed to load Google Drive files');
+        return { success: false, message: 'Failed to load files', files: [] };
+      }
       return result;
     } catch (error) {
-      console.error('Failed to show Google Drive file picker:', error);      
+      console.error('Failed to show Google Drive file picker:', error);
+      this.toastManager.showError('Failed to access Google Drive. Please try again.');
+      return { success: false, message: 'Failed to access Google Drive', files: [] };
     }
-    return undefined;
   }
 
   async handleGoogleDriveImport(): Promise<void> {

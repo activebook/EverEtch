@@ -407,11 +407,17 @@ export class ModalManager {
     this.googleDriveManager.setSelectedFile(null);
     this.updateGoogleDriveImportUI();
 
-    const result = await this.googleDriveManager.handleGoogleDriveFilePicker();
-    if (result.success && result.files) {
-      this.renderGoogleDriveFiles(result.files);
-    } else {
-      this.showGoogleDriveError('Failed to load Google Drive files');
+    try {
+      const result = await this.googleDriveManager.handleGoogleDriveFilePicker();
+      if (result.success && result.files) {
+        this.renderGoogleDriveFiles(result.files);
+      } else {
+        const errorMessage = result?.message || 'Failed to load Google Drive files';
+        this.showGoogleDriveError(errorMessage);
+      }
+    } catch (error) {
+      console.error('Error in showGoogleDriveFilePickerList:', error);
+      this.showGoogleDriveError('Failed to load Google Drive files. Please try again.');
     }
   }
 

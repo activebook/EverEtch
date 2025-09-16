@@ -106,15 +106,34 @@ You are a helpful assistant that explains word meanings clearly for language lea
 
 ## 💾 Backup & Sync
 
-### Export Profile
+### Local Backup
+
+#### Export Profile
 1. Click **⋯** → Export Profile
 2. Choose save location
 3. File: `[profile-name].db`
 
-### Import Profile
+#### Import Profile
 1. Click **⋯** → Import Profile
 2. Select `.db` file
 3. New profile created automatically
+
+### ☁️ Google Drive Sync
+
+#### Upload to Google Drive
+1. Click **⋯** → Export Profile → **Upload to Google Drive**
+2. Authenticate with Google (first time only)
+3. Profile uploads with automatic timestamp
+
+#### Download from Google Drive
+1. Click **⋯** → Import Profile → **Import from Google Drive**
+2. Select profile from your Google Drive files
+3. Click **Import** to download and switch profiles
+
+#### Managing Files
+- View all uploaded files in Google Drive picker
+- Delete unwanted files with the 🗑️ button
+- Files show upload date and size information
 
 ---
 
@@ -154,4 +173,4 @@ You are a helpful assistant that explains word meanings clearly for language lea
 
 **Remember**: Small, consistent sessions beat cramming!
 
-*EverEtch v1.3.6*
+*EverEtch v1.4.4*
