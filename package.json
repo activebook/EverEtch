@@ -1,6 +1,6 @@
 {
   "name": "everetch",
-  "version": "1.4.5",
+  "version": "1.4.6",
   "type": "module",
   "description": "A slim word memo application",
   "main": "lib/main.js",
@@ -64,16 +64,13 @@
       "assets/**/*",
       "lib/**/*",
       "node_modules/**/*",
-      "package.json"
+      "package.json",
+      "credentials.enc"
     ],
     "extraResources": [
       {
         "from": "assets",
         "to": "assets"
-      },
-      {
-        "from": "credentials.enc",
-        "to": "credentials.enc"
       }
     ],
     "mac": {
