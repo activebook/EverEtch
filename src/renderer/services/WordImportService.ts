@@ -235,12 +235,13 @@ export class WordImportService {
     this.callbacks?.onProgress(this.progress);
 
     // Process next word
-    let timeLapse = 500
-    if (skipped) {
-      timeLapse = 10
-    }
-    setTimeout(() => {
-      this.processNextWord();
-    }, timeLapse); // Small delay between words
+    // No delay - process next word right away
+    this.processNextWord();  // ✅ Works instantly, no throttling
+
+    // Deprecated: Throttled when in background
+    /*
+    const timeLapse = 100
+    setTimeout(() => this.processNextWord(), timeLapse);  // Still throttled
+    */
   }
 }
