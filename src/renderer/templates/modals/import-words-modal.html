@@ -18,8 +18,7 @@
             <div class="p-5 space-y-4">
                 <div>
                     <p class="text-sm text-slate-600 mb-3">
-                        Select a text file (.txt .md or .) containing words to import. Each word should be on a
-                        separate line.
+                        Select a text file (.txt .md or .) containing words to import. Each word should be on a separate line.
                     </p>
                     <div
                         class="border-2 border-dashed border-amber-300 rounded-lg p-4 text-center bg-amber-50/50">
@@ -35,6 +34,12 @@
                             Choose File
                         </button>
                     </div>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <input type="checkbox" id="update-existing-words" class="w-4 h-4 text-amber-600 bg-slate-100 border-slate-300 rounded focus:ring-amber-500 focus:ring-2">
+                    <label for="update-existing-words" class="text-sm font-medium text-slate-700 cursor-pointer">
+                        <span class="font-semibold text-amber-700">Update</span> <span class="text-xs text-slate-500">* Update existing word meaning and tags</span>
+                    </label>
                 </div>
             </div>
             <div
