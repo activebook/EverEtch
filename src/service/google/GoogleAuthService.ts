@@ -82,26 +82,26 @@ export class GoogleAuthService {
   }
 
   private getObfuscatedCredentials(): { credentials: GoogleCredentials; apiKey?: string } {
+    // Find the encrypted credentials file
+    const encryptedPath = this.findCredentialFile('credentials.enc');
+
+    if (!encryptedPath) {
+      Utils.logToFile('Encrypted credentials file not found in any location', 'ERROR');
+      throw new Error('Failed to find encrypted credentials file');
+    }
+
     try {
-      // Path to encrypted credentials file (in app directory)
-      const appPath = app.getAppPath();
-      // In packaged apps, encrypted file is in ASAR, so use direct app path
-      const encryptedPath = path.join(appPath, 'credentials.enc');
-
-      Utils.logToFile(`Looking for credentials enc at: ${encryptedPath}`, 'DEBUG');
-      Utils.logToFile(`App path: ${appPath}`, 'DEBUG');
-
-      if (!fs.existsSync(encryptedPath)) {
-        Utils.logToFile(`credentials.enc not found at: ${encryptedPath}`, 'ERROR');
-        throw new Error('Encrypted credentials file not found');
-      }
+      Utils.logToFile(`Found encrypted credentials at: ${encryptedPath}`, 'INFO');
 
       // Read encrypted file
       const encryptedData = fs.readFileSync(encryptedPath);
+      Utils.logToFile(`Read encrypted data: ${encryptedData.length} bytes`, 'DEBUG');
 
       // Decrypt using the same key used for encryption
       const decryptedJson = this.decryptCredentials(encryptedData);
       const credentialsData = JSON.parse(decryptedJson);
+
+      Utils.logToFile('Successfully decrypted credentials', 'INFO');
 
       // Extract credentials in the same format as before
       let clientId: string;
@@ -117,6 +117,7 @@ export class GoogleAuthService {
         clientSecret = credentialsData.client_secret;
         apiKey = credentialsData.api_key;
       } else {
+        Utils.logToFile('Invalid credentials format in encrypted file', 'ERROR');
         throw new Error('Invalid credentials format in encrypted file');
       }
 
@@ -128,10 +129,43 @@ export class GoogleAuthService {
         },
         apiKey
       };
+
     } catch (error) {
-      console.error('Failed to decrypt credentials:', error);
+      Utils.logToFile(`Failed to load encrypted credentials: ${error}`, 'ERROR');
       throw new Error('Failed to load encrypted credentials');
     }
+  }
+
+  private findCredentialFile(filename: string): string | null {
+    const appPath = app.getAppPath();
+    const possiblePaths: string[] = [];
+
+    // 1. ASAR location (files array) - most common for current setup
+    possiblePaths.push(path.join(appPath, filename));
+
+    // 2. Resources directory (extraResources) - fallback for older setups
+    if (appPath.includes('.asar')) {
+      const resourcesPath = path.dirname(appPath);
+      possiblePaths.push(path.join(resourcesPath, filename));
+    }
+
+    // 3. Direct app directory (development fallback)
+    if (!appPath.includes('.asar')) {
+      possiblePaths.push(path.join(appPath, filename));
+    }
+
+    Utils.logToFile(`Searching for ${filename} in: ${possiblePaths.join(', ')}`, 'DEBUG');
+
+    // Try each path
+    for (const filePath of possiblePaths) {
+      if (fs.existsSync(filePath)) {
+        Utils.logToFile(`Found ${filename} at: ${filePath}`, 'INFO');
+        return filePath;
+      }
+    }
+
+    Utils.logToFile(`${filename} not found in any location`, 'DEBUG');
+    return null;
   }
 
   private deriveDecryptionKey(): Buffer {
@@ -184,32 +218,22 @@ export class GoogleAuthService {
       return this.credentials;
     }
 
-    // Fallback: try to load from file (for backward compatibility)
+    // Fallback: try to load from plain text file (for backward compatibility)
     try {
-      // In packaged Electron apps, app.getAppPath() points to app.asar
-      const appPath = app.getAppPath();
-      const credentialsPath = path.join(appPath, 'credentials.json');
+      const credentialsPath = this.findCredentialFile('credentials.json');
 
-      // But extraResources files are in the Resources directory alongside app.asar
-      const resourcesPath = appPath.includes('.asar') ? path.dirname(appPath) : appPath;
-      //const credentialsPath = path.join(resourcesPath, 'credentials.json');
-
-      Utils.logToFile(`Looking for credentials at: ${credentialsPath}`, 'DEBUG');
-      Utils.logToFile(`App path: ${appPath}`, 'DEBUG');
-      Utils.logToFile(`Resources path: ${resourcesPath}`, 'DEBUG');
-
-      if (!fs.existsSync(credentialsPath)) {
-        Utils.logToFile(`credentials.json not found at: ${credentialsPath}`, 'ERROR');
+      if (!credentialsPath) {
+        Utils.logToFile('Plain text credentials.json not found in any location', 'DEBUG');
         return null;
       }
 
       const credentialsContent = fs.readFileSync(credentialsPath, 'utf-8');
-      Utils.logToFile(`Read credentials content length: ${credentialsContent.length}`, 'DEBUG');
+      Utils.logToFile(`Read plain text credentials: ${credentialsContent.length} bytes`, 'DEBUG');
       const credentialsData = JSON.parse(credentialsContent);
 
       // Handle Google Cloud Console credentials format
       if (credentialsData.installed) {
-        // For Electron desktop apps, use localhost redirect with local server
+        Utils.logToFile('Loaded credentials from plain text file (installed format)', 'INFO');
         return {
           clientId: credentialsData.installed.client_id,
           clientSecret: credentialsData.installed.client_secret,
@@ -219,6 +243,7 @@ export class GoogleAuthService {
 
       // Handle direct format (client_id, client_secret, redirect_uri)
       if (credentialsData.client_id && credentialsData.client_secret) {
+        Utils.logToFile('Loaded credentials from plain text file (direct format)', 'INFO');
         return {
           clientId: credentialsData.client_id,
           clientSecret: credentialsData.client_secret,
@@ -226,10 +251,10 @@ export class GoogleAuthService {
         };
       }
 
-      Utils.logToFile('Invalid credentials.json format', 'ERROR');
+      Utils.logToFile('Invalid plain text credentials.json format', 'ERROR');
       return null;
     } catch (error) {
-      Utils.logToFile(`Failed to load credentials from file: ${error}`, 'ERROR');
+      Utils.logToFile(`Failed to load plain text credentials: ${error}`, 'ERROR');
       return null;
     }
   }
