@@ -396,11 +396,12 @@ export class WordManager {
   }
 
   public async handleRefreshWord(word: WordDocument): Promise<void> {
-    if (!this.currentWord || this.currentWord.id === 'temp') {
+    if (!this.currentWord) {
       this.toastManager.showError('No word selected');
       return;
     }
 
+    const isTemporaryWord = this.currentWord.id === 'temp';
     const originalWordId = this.currentWord.id;
     const originalCreatedAt = this.currentWord.created_at;
 
@@ -410,44 +411,50 @@ export class WordManager {
 
       await this.handleGenerate();
 
-      if (this.currentWord && this.currentWord.id === 'temp') {
-        const updatedWordData = {
-          word: this.currentWord.word,
-          one_line_desc: this.currentWord.one_line_desc,
-          details: this.currentWord.details,
-          tags: this.currentWord.tags,
-          tag_colors: this.currentWord.tag_colors,
-          synonyms: this.currentWord.synonyms || [],
-          antonyms: this.currentWord.antonyms || []
-        };
-
-        const updatedWord = await this.wordService.updateWord(originalWordId, updatedWordData);
-
-        if (updatedWord) {
-          updatedWord.id = originalWordId;
-          updatedWord.created_at = originalCreatedAt;
-          updatedWord.updated_at = new Date().toISOString();
-
-          this.currentWord = updatedWord;
-
-          const wordIndex = this.words.findIndex(word => word.id === originalWordId);
-          if (wordIndex !== -1) {
-            Object.assign(this.words[wordIndex], {
-              id: updatedWord.id,
-              word: updatedWord.word,
-              one_line_desc: updatedWord.one_line_desc
-            });
-          }
-
-          if (this.currentWord) {
-            await this.wordRenderer.renderWordDetails(this.currentWord);
-            this.uiUtils.updateWordInList(originalWordId, this.currentWord);
-          }
+      if (this.currentWord) {
+        if (isTemporaryWord) {
+          // For temporary words, just show success message after regeneration
+          this.toastManager.showSuccess('Word refreshed successfully');
         } else {
-          this.toastManager.showError('Failed to update word');
-        }
+          // For saved words, update the database record
+          const updatedWordData = {
+            word: this.currentWord.word,
+            one_line_desc: this.currentWord.one_line_desc,
+            details: this.currentWord.details,
+            tags: this.currentWord.tags,
+            tag_colors: this.currentWord.tag_colors,
+            synonyms: this.currentWord.synonyms || [],
+            antonyms: this.currentWord.antonyms || []
+          };
 
-        this.toastManager.showSuccess('Word refreshed successfully');
+          const updatedWord = await this.wordService.updateWord(originalWordId, updatedWordData);
+
+          if (updatedWord) {
+            updatedWord.id = originalWordId;
+            updatedWord.created_at = originalCreatedAt;
+            updatedWord.updated_at = new Date().toISOString();
+
+            this.currentWord = updatedWord;
+
+            const wordIndex = this.words.findIndex(word => word.id === originalWordId);
+            if (wordIndex !== -1) {
+              Object.assign(this.words[wordIndex], {
+                id: updatedWord.id,
+                word: updatedWord.word,
+                one_line_desc: updatedWord.one_line_desc
+              });
+            }
+
+            if (this.currentWord) {
+              await this.wordRenderer.renderWordDetails(this.currentWord);
+              this.uiUtils.updateWordInList(originalWordId, this.currentWord);
+            }
+
+            this.toastManager.showSuccess('Word refreshed successfully');
+          } else {
+            this.toastManager.showError('Failed to update word');
+          }
+        }
       }
     } catch (error) {
       console.error('Error refreshing word:', error);
