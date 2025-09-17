@@ -978,6 +978,10 @@ export class ModalManager {
       const content = await readFileContent(this.selectedWordsFile);
       await this.showImportWordsProgressOverlay();
 
+      // Get the update existing checkbox state
+      const updateExistingCheckbox = document.getElementById('update-existing-words') as HTMLInputElement;
+      const updateExisting = updateExistingCheckbox ? updateExistingCheckbox.checked : false;
+
       const callbacks: ImportCallbacks = {
         onProgress: (progress: ImportProgress) => {
           this.updateImportWordsProgress(progress);
@@ -993,7 +997,7 @@ export class ModalManager {
         },
       };
 
-      await this.wordImportService.startImport(content, callbacks);
+      await this.wordImportService.startImport(content, callbacks, updateExisting);
     } catch (error) {
       console.error('Error starting import:', error);
       this.toastManager.showError('Failed to start import');
@@ -1026,12 +1030,33 @@ export class ModalManager {
 
     // Show completion modal
     const messageElement = document.getElementById('import-complete-message')!;
+    const titleElement = document.getElementById('import-complete-title') as HTMLElement;
+    const iconContainer = document.getElementById('import-complete-icon') as HTMLElement;
     const okBtn = document.getElementById('import-complete-ok') as HTMLButtonElement;
 
     if (okBtn && !okBtn._listenerAdded) {
       okBtn.addEventListener('click', () => {
         this.hideImportWordsCompleteModal();
       });
+    }
+
+    // Reset icon to default success icon
+    if (iconContainer) {
+      iconContainer.innerHTML = `
+        <svg class="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M5 13l4 4L19 7"></path>
+        </svg>
+      `;
+    }
+
+    // Set title based on whether there were any errors or remaining words
+    const hasErrors = (progress.errors?.length || 0) > 0;
+    const hasRemaining = ((progress.total || 0) - (progress.current || 0)) > 0;
+    const isPartialSuccess = hasErrors || hasRemaining;
+
+    if (titleElement) {
+      titleElement.textContent = isPartialSuccess ? 'Import Complete - Partial Success' : 'Import Complete!';
     }
 
     if (messageElement) {
@@ -1142,39 +1167,39 @@ export class ModalManager {
     let html = `<div class="text-left space-y-2">`;
 
     if (successfulCount > 0) {
-      html += `<div class="flex items-center text-green-600">
-          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      html += `<div class="flex text-green-600">
+          <svg class="w-4 h-4 mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
           </svg>
-          <span class="font-medium">${successfulCount} words successfully imported</span>
+          <span class="font-medium text-center flex-1">${successfulCount} words successfully imported</span>
         </div>`;
     }
 
     if (skippedCount > 0) {
-      html += `<div class="flex items-center text-blue-600">
-          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      html += `<div class="flex text-blue-600">
+          <svg class="w-4 h-4 mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
           </svg>
-          <span class="font-medium">${skippedCount} words were skipped (already exist)</span>
+          <span class="font-medium text-center flex-1">${skippedCount} words were skipped (already exist)</span>
         </div>`;
     }
 
     if (failedCount > 0) {
       const error = progress.errors?.[0] || 'Unknown error';
-      html += `<div class="flex items-center text-red-600">
-          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      html += `<div class="flex text-red-600">
+          <svg class="w-4 h-4 mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
           </svg>
-          <span class="font-medium">Failed on "${failedWord}": ${error}</span>
+          <span class="font-medium text-center flex-1">Failed on "${failedWord}": ${error}</span>
         </div>`;
     }
 
     if (remainingCount > 0) {
-      html += `<div class="flex items-center text-amber-600">
-          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      html += `<div class="flex text-amber-600">
+          <svg class="w-4 h-4 mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
           </svg>
-          <span class="font-medium">${remainingCount} words remaining unprocessed</span>
+          <span class="font-medium text-center flex-1">${remainingCount} words remaining unprocessed</span>
         </div>`;
     }
 
