@@ -6,6 +6,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as http from 'http';
 import { StoreManager } from '../../utils/StoreManager.js';
+import { Utils } from '../../utils/Utils.js';
 
 export interface GoogleCredentials {
   clientId: string;
@@ -33,6 +34,8 @@ export class GoogleAuthService {
     this.mainWindow = mainWindow;
     this.storeManager = storeManager;
 
+
+
     // Load and cache all credentials once
     this.loadCredentials();
 
@@ -53,8 +56,11 @@ export class GoogleAuthService {
     // Always load credentials from credentials.json file (never cache them)
     const fileCredentials = this.loadCredentialsFromFile();
     if (fileCredentials) {
+      Utils.logToFile(`Loaded credentials from file: ${fileCredentials.clientId.substring(0, 20)}...`, 'INFO');
       return fileCredentials;
     }
+
+    Utils.logToFile('Failed to load credentials from file, falling back to environment variables', 'ERROR');
 
     // Final fallback to environment variables (for development)
     return {
@@ -78,9 +84,15 @@ export class GoogleAuthService {
   private getObfuscatedCredentials(): { credentials: GoogleCredentials; apiKey?: string } {
     try {
       // Path to encrypted credentials file (in app directory)
-      const encryptedPath = path.join(app.getAppPath(), 'credentials.enc');
+      const appPath = app.getAppPath();
+      // In packaged apps, encrypted file is in ASAR, so use direct app path
+      const encryptedPath = path.join(appPath, 'credentials.enc');
+
+      Utils.logToFile(`Looking for credentials enc at: ${encryptedPath}`, 'DEBUG');
+      Utils.logToFile(`App path: ${appPath}`, 'DEBUG');
 
       if (!fs.existsSync(encryptedPath)) {
+        Utils.logToFile(`credentials.enc not found at: ${encryptedPath}`, 'ERROR');
         throw new Error('Encrypted credentials file not found');
       }
 
@@ -174,12 +186,25 @@ export class GoogleAuthService {
 
     // Fallback: try to load from file (for backward compatibility)
     try {
-      const credentialsPath = path.join(app.getAppPath(), 'credentials.json');
+      // In packaged Electron apps, app.getAppPath() points to app.asar
+      const appPath = app.getAppPath();
+      const credentialsPath = path.join(appPath, 'credentials.json');
+
+      // But extraResources files are in the Resources directory alongside app.asar
+      const resourcesPath = appPath.includes('.asar') ? path.dirname(appPath) : appPath;
+      //const credentialsPath = path.join(resourcesPath, 'credentials.json');
+
+      Utils.logToFile(`Looking for credentials at: ${credentialsPath}`, 'DEBUG');
+      Utils.logToFile(`App path: ${appPath}`, 'DEBUG');
+      Utils.logToFile(`Resources path: ${resourcesPath}`, 'DEBUG');
+
       if (!fs.existsSync(credentialsPath)) {
+        Utils.logToFile(`credentials.json not found at: ${credentialsPath}`, 'ERROR');
         return null;
       }
 
       const credentialsContent = fs.readFileSync(credentialsPath, 'utf-8');
+      Utils.logToFile(`Read credentials content length: ${credentialsContent.length}`, 'DEBUG');
       const credentialsData = JSON.parse(credentialsContent);
 
       // Handle Google Cloud Console credentials format
@@ -201,10 +226,10 @@ export class GoogleAuthService {
         };
       }
 
-      console.warn('Invalid credentials.json format');
+      Utils.logToFile('Invalid credentials.json format', 'ERROR');
       return null;
     } catch (error) {
-      console.error('Failed to load credentials from file:', error);
+      Utils.logToFile(`Failed to load credentials from file: ${error}`, 'ERROR');
       return null;
     }
   }
