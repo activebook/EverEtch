@@ -17,8 +17,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   searchWords: (query: string) => ipcRenderer.invoke('search-words', query),
   getWord: (wordId: string) => ipcRenderer.invoke('get-word', wordId),
   getWordByName: (wordName: string) => ipcRenderer.invoke('get-word-by-name', wordName),
-  addWord: (wordData: any) => ipcRenderer.invoke('add-word', wordData),
-  updateWord: (wordId: string, wordData: any) => ipcRenderer.invoke('update-word', wordId, wordData),
+  addWord: (wordData: { word: string; one_line_desc: string; details: string; tags: string[]; tag_colors: Record<string, string>; synonyms: string[]; antonyms: string[]; remark?: string }) => ipcRenderer.invoke('add-word', wordData),
+  updateWord: (wordId: string, wordData: Partial<{ word: string; one_line_desc: string; details: string; tags: string[]; tag_colors: Record<string, string>; synonyms: string[]; antonyms: string[]; remark?: string }>) => ipcRenderer.invoke('update-word', wordId, wordData),
   updateWordRemark: (wordId: string, remark: string) => ipcRenderer.invoke('update-word-remark', wordId, remark),
   deleteWord: (wordId: string) => ipcRenderer.invoke('delete-word', wordId),
 
@@ -31,16 +31,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Profile config
   getProfileConfig: () => ipcRenderer.invoke('get-profile-config'),
-  updateProfileConfig: (config: any) => ipcRenderer.invoke('update-profile-config', config),
-
-
+  updateProfileConfig: (config: { id: string; name: string; system_prompt: string; model_config: { provider: string; model: string; endpoint: string; api_key: string; }; last_opened: string; }) => ipcRenderer.invoke('update-profile-config', config),
 
   // Markdown processing
   processMarkdown: (markdown: string) => ipcRenderer.invoke('process-markdown', markdown),
 
   // Store operations
   loadPanelWidths: () => ipcRenderer.invoke('load-panel-widths'),
-  savePanelWidths: (widths: any) => ipcRenderer.invoke('save-panel-widths', widths),
+  savePanelWidths: (widths: { left: number; middle: number; right: number }) => ipcRenderer.invoke('save-panel-widths', widths),
   loadSortOrder: () => ipcRenderer.invoke('load-sort-order'),
   saveSortOrder: (sortOrder: 'asc' | 'desc') => ipcRenderer.invoke('save-sort-order', sortOrder),
 
@@ -50,7 +48,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Model memo operations
   loadModelMemos: () => ipcRenderer.invoke('load-model-memos'),
-  addModelMemo: (memo: any) => ipcRenderer.invoke('add-model-memo', memo),
+  addModelMemo: (memo: { provider: 'openai' | 'google'; model: string; endpoint: string; apiKey: string }) => ipcRenderer.invoke('add-model-memo', memo),
   getModelMemo: (name: string) => ipcRenderer.invoke('get-model-memo', name),
   deleteModelMemo: (name: string) => ipcRenderer.invoke('delete-model-memo', name),
   markModelUsed: (name: string) => ipcRenderer.invoke('mark-model-used', name),
@@ -66,21 +64,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
   googleDriveDeleteFile: (fileId: string) => ipcRenderer.invoke('google-drive-delete-file', fileId),
 
   // Event listeners for streaming
-  onWordMeaningStreaming: (callback: Function) => {
-    ipcRenderer.on('word-meaning-streaming', (_event: any, content: string) => callback(content));
+  onWordMeaningStreaming: (callback: (content: string) => void) => {
+    ipcRenderer.on('word-meaning-streaming', (_event: Electron.IpcRendererEvent, content: string) => callback(content));
   },
 
-  onWordMetadataReady: (callback: Function) => {
-    ipcRenderer.on('word-metadata-ready', (_event: any, toolData: any) => callback(toolData));
+  onWordMetadataReady: (callback: (toolData: { summary: string; tags: string[]; tag_colors: Record<string, string>; synonyms: string[]; antonyms: string[]; generationId: string; success: boolean; message: string }) => void) => {
+    ipcRenderer.on('word-metadata-ready', (_event: Electron.IpcRendererEvent, toolData: { summary: string; tags: string[]; tag_colors: Record<string, string>; synonyms: string[]; antonyms: string[]; generationId: string; success: boolean; message: string }) => callback(toolData));
   },
 
   // Protocol handlers for custom URL scheme
-  onProtocolNavigateWord: (callback: Function) => {
-    ipcRenderer.on('protocol-navigate-word', (_event: any, wordName: string) => callback(wordName));
+  onProtocolNavigateWord: (callback: (wordName: string) => void) => {
+    ipcRenderer.on('protocol-navigate-word', (_event: Electron.IpcRendererEvent, wordName: string) => callback(wordName));
   },
 
-  onProtocolSwitchProfile: (callback: Function) => {
-    ipcRenderer.on('protocol-switch-profile', (_event: any, profileName: string) => callback(profileName));
+  onProtocolSwitchProfile: (callback: (profileName: string) => void) => {
+    ipcRenderer.on('protocol-switch-profile', (_event: Electron.IpcRendererEvent, profileName: string) => callback(profileName));
   },
 
   // App ready signal

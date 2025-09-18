@@ -115,7 +115,7 @@ export class GoogleDriveManager {
         this.toastManager.showSuccess(result.message);
 
         // Show the upload success modal with the uploaded file
-        return (result.fileId);
+        return (result.fileId || "");
       } else {
         this.toastManager.showError(result.message);
       }
