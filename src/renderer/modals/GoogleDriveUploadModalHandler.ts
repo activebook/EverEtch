@@ -18,6 +18,9 @@ export class GoogleDriveUploadModalHandler extends ModalHandler {
     if (!templateLoaded) return;
     this.showModal('google-drive-upload-modal');
 
+    // Set initial uploading state
+    this.setModalUploadingState();
+
     // Show upload results
     this.showUploadResults();
   }
@@ -39,6 +42,16 @@ export class GoogleDriveUploadModalHandler extends ModalHandler {
 
   private async showUploadResults(): Promise<void> {
     const justUploadedFileId = await this.googleDriveManager.handleExportToGoogleDrive();
+
+    // Check if upload failed (empty fileId)
+    if (!justUploadedFileId) {
+      // Upload failed, show failure state in modal
+      this.setModalFailureState();
+      return;
+    }
+
+    // Upload succeeded, update modal to success state
+    this.setModalSuccessState();
 
     const filesList = document.getElementById('google-drive-uploaded-files-list')!;
     if (!filesList) return;
@@ -68,6 +81,73 @@ export class GoogleDriveUploadModalHandler extends ModalHandler {
       filesList.innerHTML = `
         <div class="text-center text-slate-500 py-4">
           <p>Unable to load backup files</p>
+        </div>
+      `;
+    }
+  }
+
+  private setModalUploadingState(): void {
+    // Update modal title
+    const titleElement = document.querySelector('#google-drive-upload-modal h3') as HTMLElement;
+    if (titleElement) {
+      titleElement.innerHTML = `
+        <svg class="w-5 h-5 mr-2 text-amber-600 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+        </svg>
+        Uploading to Google Drive...
+      `;
+    }
+
+    // Update modal description
+    const descriptionElement = document.querySelector('#google-drive-upload-modal .text-slate-600') as HTMLElement;
+    if (descriptionElement) {
+      descriptionElement.textContent = 'Please wait while we upload your profile to Google Drive.';
+    }
+  }
+
+  private setModalSuccessState(): void {
+    // Update modal title
+    const titleElement = document.querySelector('#google-drive-upload-modal h3') as HTMLElement;
+    if (titleElement) {
+      titleElement.innerHTML = `
+        <svg class="w-5 h-5 mr-2 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        Upload Successful!
+      `;
+    }
+
+    // Update modal description
+    const descriptionElement = document.querySelector('#google-drive-upload-modal .text-slate-600') as HTMLElement;
+    if (descriptionElement) {
+      descriptionElement.textContent = 'Your profile has been successfully uploaded to Google Drive.';
+    }
+  }
+
+  private setModalFailureState(): void {
+    // Update modal title
+    const titleElement = document.querySelector('#google-drive-upload-modal h3') as HTMLElement;
+    if (titleElement) {
+      titleElement.innerHTML = `
+        <svg class="w-5 h-5 mr-2 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        Upload Failed
+      `;
+    }
+
+    // Update modal description
+    const descriptionElement = document.querySelector('#google-drive-upload-modal .text-slate-600') as HTMLElement;
+    if (descriptionElement) {
+      descriptionElement.textContent = 'Failed to upload your profile to Google Drive. Please check your connection and try again.';
+    }
+
+    // Clear the files list and show error message
+    const filesList = document.getElementById('google-drive-uploaded-files-list')!;
+    if (filesList) {
+      filesList.innerHTML = `
+        <div class="text-center text-red-500 py-4">
+          <p>Upload failed. Please try again.</p>
         </div>
       `;
     }
