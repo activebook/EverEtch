@@ -2,21 +2,21 @@ import { ModelMemo } from "../types.js";
 
 
 export class CustomModelDropdown {
-  private static instance: CustomModelDropdown | null = null;
+  //private static instance: CustomModelDropdown | null = null;
   private dropdownElement: HTMLElement | null = null;
   private anchorElement: HTMLElement | null = null;
   private onModelSelected?: (modelName: string) => Promise<boolean>;
   private onModelDeleted?: (modelName: string) => Promise<boolean>;
   private onModelSaved?: () => Promise<boolean>;
 
-  private constructor() { }
+  constructor() { }
 
-  static getInstance(): CustomModelDropdown {
-    if (!CustomModelDropdown.instance) {
-      CustomModelDropdown.instance = new CustomModelDropdown();
-    }
-    return CustomModelDropdown.instance;
-  }
+  // static getInstance(): CustomModelDropdown {
+  //   if (!CustomModelDropdown.instance) {
+  //     CustomModelDropdown.instance = new CustomModelDropdown();
+  //   }
+  //   return CustomModelDropdown.instance;
+  // }
 
   show(models: ModelMemo[], anchorElement: HTMLElement, callbacks: {
     onModelSelected?: (modelName: string) => Promise<boolean>;

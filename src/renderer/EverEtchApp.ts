@@ -42,7 +42,7 @@ export class EverEtchApp {
     this.profileService = new ProfileService();
     this.wordService = new WordService();
     this.modelMemoService = new ModelMemoService();
-    this.wordImportService = new WordImportService(this.wordService, this.toastManager);    
+    this.wordImportService = new WordImportService(this.wordService, this.toastManager);
     this.uiUtils = new UIUtils();
     this.wordRenderer = new WordRenderer(this.wordService, this.toastManager);
 
@@ -77,20 +77,19 @@ export class EverEtchApp {
 
     // Create modal manager
     this.modalManager = new ModalManager(
-      this.wordManager,
       this.toastManager,
       this.profileService,
       this.googleDriveManager,
       this.wordImportService,
       this.modelMemoService,
-      this.uiUtils      );
+      this.uiUtils);
 
     // Create event manager (depends on all other managers)
     this.eventManager = new EventManager(
       this.wordManager,
       this.modalManager,
       this.profileService,
-      this.uiUtils,      
+      this.uiUtils,
       this.toastManager
     );
   }
