@@ -48,6 +48,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   exportProfile: () => ipcRenderer.invoke('export-profile'),
   importProfile: () => ipcRenderer.invoke('import-profile'),
 
+  // Model memo operations
+  loadModelMemos: () => ipcRenderer.invoke('load-model-memos'),
+  addModelMemo: (memo: any) => ipcRenderer.invoke('add-model-memo', memo),
+  getModelMemo: (name: string) => ipcRenderer.invoke('get-model-memo', name),
+  deleteModelMemo: (name: string) => ipcRenderer.invoke('delete-model-memo', name),
+  markModelUsed: (name: string) => ipcRenderer.invoke('mark-model-used', name),
+
   // Google Drive operations
   googleAuthenticate: () => ipcRenderer.invoke('google-authenticate'),
   googleIsAuthenticated: () => ipcRenderer.invoke('google-is-authenticated'),

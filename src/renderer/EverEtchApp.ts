@@ -1,6 +1,7 @@
 import { ProfileService } from './services/ProfileService.js';
 import { WordService } from './services/WordService.js';
 import { WordImportService, ImportProgress, ImportCallbacks } from './services/WordImportService.js';
+import { ModelMemoService } from './services/ModelMemoService.js';
 import { ToastManager } from './components/ToastManager.js';
 import { WordRenderer } from './components/WordRenderer.js';
 import { UIUtils } from './utils/UIUtils.js';
@@ -20,6 +21,7 @@ export class EverEtchApp {
   private profileService: ProfileService;
   private wordService: WordService;
   private wordImportService: WordImportService;
+  private modelMemoService: ModelMemoService;
   private toastManager: ToastManager;
   private wordRenderer: WordRenderer;
   private uiUtils: UIUtils;
@@ -36,11 +38,12 @@ export class EverEtchApp {
 
   constructor() {
     // Initialize core services
+    this.toastManager = new ToastManager();
     this.profileService = new ProfileService();
     this.wordService = new WordService();
-    this.toastManager = new ToastManager();
+    this.modelMemoService = new ModelMemoService();
+    this.wordImportService = new WordImportService(this.wordService, this.toastManager);    
     this.uiUtils = new UIUtils();
-    this.wordImportService = new WordImportService(this.wordService, this.toastManager);
     this.wordRenderer = new WordRenderer(this.wordService, this.toastManager);
 
     // Initialize managers
@@ -79,7 +82,8 @@ export class EverEtchApp {
       this.profileService,
       this.googleDriveManager,
       this.wordImportService,
-      this.uiUtils);
+      this.modelMemoService,
+      this.uiUtils      );
 
     // Create event manager (depends on all other managers)
     this.eventManager = new EventManager(

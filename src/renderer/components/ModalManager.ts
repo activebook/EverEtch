@@ -6,6 +6,8 @@ import { WordImportService, ImportProgress, ImportCallbacks } from '../services/
 import { templateLoader } from '../utils/TemplateLoader.js';
 import { UIUtils } from '../utils/UIUtils.js';
 import { readFileContent, formatFileSize } from '../utils/Common.js';
+import { ModelMemoService } from '../services/ModelMemoService.js';
+import { CustomModelDropdown } from './CustomModelDropdown.js';
 
 export class ModalManager {
   private wordManager: WordManager;
@@ -13,7 +15,8 @@ export class ModalManager {
   private profileService: ProfileService;
   private googleDriveManager: GoogleDriveManager;
   private wordImportService: WordImportService;
-  private uiUtils: UIUtils;
+  private modelMemoService: ModelMemoService;
+  private uiUtils: UIUtils;  
   private loadedTemplates: Set<string> = new Set();
 
   constructor(wordManager: WordManager,
@@ -21,12 +24,14 @@ export class ModalManager {
     profileService: ProfileService,
     googleDriveManager: GoogleDriveManager,
     wordImportService: WordImportService,
-    uiUtils: UIUtils) {
+    modelMemoService: ModelMemoService,
+    uiUtils: UIUtils    ) {
     this.wordManager = wordManager;
     this.toastManager = toastManager;
     this.profileService = profileService;
     this.googleDriveManager = googleDriveManager;
     this.wordImportService = wordImportService;
+    this.modelMemoService = modelMemoService;
     this.uiUtils = uiUtils;
   }
 
@@ -153,6 +158,8 @@ export class ModalManager {
         (document.getElementById('api-endpoint') as HTMLInputElement).value = profileConfig.model_config.endpoint || '';
         (document.getElementById('api-key') as HTMLInputElement).value = profileConfig.model_config.api_key || '';
       }
+      // Reset the model dropdown selection
+      CustomModelDropdown.getInstance().resetSelectModel();
     } catch (error) {
       console.error('Error loading profile config:', error);
       this.toastManager.showError('Failed to load profile settings');
@@ -780,6 +787,22 @@ export class ModalManager {
       toggleApiKeyBtn._listenerAdded = true;
       toggleApiKeyBtn.addEventListener('click', () => this.toggleApiKeyVisibility());
     }
+
+    // Custom model memo dropdown button
+    const modelDropdownBtn = document.getElementById('model-dropdown-btn') as HTMLButtonElement;
+    if (modelDropdownBtn && !modelDropdownBtn._listenerAdded) {
+      modelDropdownBtn._listenerAdded = true;
+      modelDropdownBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.showCustomModelDropdown();
+      });
+      modelDropdownBtn.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          this.showCustomModelDropdown();
+        }
+      });
+    }
   }
 
   private setupHowtoModalHandlers(): void {
@@ -1238,5 +1261,130 @@ export class ModalManager {
       importCompleteOkBtn._listenerAdded = true;
       importCompleteOkBtn.addEventListener('click', () => this.hideImportWordsCompleteModal());
     }
+  }
+
+  // Model memo functionality
+  private async loadModelMemos(): Promise<void> {
+    try {
+      const models = await this.modelMemoService.loadModelMemos();
+      // Models are now handled by the CustomModelDropdown component
+      // No need to populate a select element
+    } catch (error) {
+      console.error('Error loading model memos:', error);
+      this.toastManager.showError('Failed to load model memos');
+    }
+  }
+
+  private async showCustomModelDropdown(): Promise<void> {
+    const modelDropdownBtn = document.getElementById('model-dropdown-btn') as HTMLButtonElement;
+    const models = await this.modelMemoService.loadModelMemos();
+    const dropdown = CustomModelDropdown.getInstance();
+    dropdown.show(models, modelDropdownBtn, {
+      onModelSelected: (modelName) => this.handleModelSelection(modelName),
+      onModelDeleted: (modelName) => this.handleModelDeletion(modelName),
+      onModelSaved: () => this.handleModelSave()
+    });
+  }
+
+  private async handleModelSelection(modelName: string): Promise<boolean> {
+    try {
+      const result = await this.modelMemoService.getModelMemo(modelName);
+
+      if (result.success && result.model) {
+        const model = result.model;
+
+        // Populate form fields
+        (document.getElementById('model-provider') as HTMLSelectElement).value = model.provider;
+        (document.getElementById('model-name') as HTMLInputElement).value = model.model;
+        (document.getElementById('api-endpoint') as HTMLInputElement).value = model.endpoint;
+        (document.getElementById('api-key') as HTMLInputElement).value = model.apiKey;
+
+        // Mark model as used
+        await this.modelMemoService.markModelUsed(modelName);
+
+        this.toastManager.showSuccess(`Model "${model.name}" loaded successfully`);
+        return true;
+      } else {
+        this.toastManager.showError(result.message || 'Failed to load model');
+      }
+    } catch (error) {
+      console.error('Error selecting model from dropdown:', error);
+      this.toastManager.showError('Failed to load model configuration');
+    }
+    return false;
+  }
+
+  private async handleModelDeletion(modelName: string): Promise<boolean> {
+    const confirmed = confirm(`Are you sure you want to delete the model "${modelName}"?`);
+    if (!confirmed) {
+      return false;
+    }
+
+    try {
+      const deleteResult = await this.modelMemoService.deleteModelMemo(modelName);
+
+      if (deleteResult.success) {
+        this.toastManager.showSuccess(`Model "${modelName}" deleted successfully`);
+        // Hide the dropdown
+        CustomModelDropdown.getInstance().hide();
+        // Reload model list
+        this.showCustomModelDropdown();
+        return true;
+      } else {
+        this.toastManager.showError(deleteResult.message || 'Failed to delete model');
+      }
+    } catch (error) {
+      console.error('Error deleting model from dropdown:', error);
+      this.toastManager.showError('Failed to delete model configuration');
+    }
+    return false;
+  }
+
+  private async handleModelSave(): Promise<boolean> {
+    const providerElement = document.getElementById('model-provider') as HTMLSelectElement;
+    const modelElement = document.getElementById('model-name') as HTMLInputElement;
+    const endpointElement = document.getElementById('api-endpoint') as HTMLInputElement;
+    const apiKeyElement = document.getElementById('api-key') as HTMLInputElement;
+
+    if (!providerElement || !modelElement || !endpointElement || !apiKeyElement) {
+      this.toastManager.showError('Form elements not found');
+      return false;
+    }
+
+    const provider = providerElement.value as 'openai' | 'google';
+    const model = modelElement.value.trim();
+    const endpoint = endpointElement.value.trim();
+    const apiKey = apiKeyElement.value.trim();
+
+    if (!model) {
+      this.toastManager.showError('Model name cannot be empty');
+      return false;
+    }
+
+    try {
+      const result = await this.modelMemoService.addModelMemo({
+        name: "",
+        provider,
+        model,
+        endpoint,
+        apiKey
+      });
+
+      if (result.success) {
+        const memoName = result.model?.name;
+        this.toastManager.showSuccess(`Model "${memoName}" saved successfully`);
+        // Hide the dropdown
+        CustomModelDropdown.getInstance().hide();
+        // Reload model list
+        this.showCustomModelDropdown();
+        return true;
+      } else {
+        this.toastManager.showError(result.message || 'Failed to save model');
+      }
+    } catch (error) {
+      console.error('Error saving model from dropdown:', error);
+      this.toastManager.showError('Failed to save model configuration');
+    }
+    return false;
   }
 }

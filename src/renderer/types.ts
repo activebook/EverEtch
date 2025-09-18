@@ -32,6 +32,13 @@ declare global {
             exportProfile: () => Promise<any>;
             importProfile: () => Promise<any>;
 
+            // Model memo operations
+            loadModelMemos: () => Promise<ModelMemo[]>;
+            addModelMemo: (memo: Omit<ModelMemo, 'name'|'createdAt'>) => Promise<{ success: boolean; message?: string; model?: ModelMemo }>;
+            getModelMemo: (name: string) => Promise<{ success: boolean; message?: string; model?: ModelMemo }>;
+            deleteModelMemo: (name: string) => Promise<{ success: boolean; message?: string }>;
+            markModelUsed: (name: string) => Promise<boolean>;
+
             // Google Drive operations
             googleAuthenticate: () => Promise<any>;
             googleIsAuthenticated: () => Promise<any>;
@@ -137,4 +144,14 @@ export interface AppState {
     associatedWordsState: AssociatedWordsState;
     isSearchMode: boolean;
     isGenerating: boolean;
+}
+
+export interface ModelMemo {
+    name: string;
+    provider: 'openai' | 'google';
+    model: string;
+    endpoint: string;
+    apiKey: string;
+    createdAt: string;
+    lastUsed?: string;
 }

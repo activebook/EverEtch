@@ -12,6 +12,7 @@ import { AIModelClient, WORD_DUMMY_METAS } from './ai/AIModelClient.js';
 import { GoogleAuthService } from './service/google/GoogleAuthService.js';
 import { GoogleDriveService } from './service/google/GoogleDriveService.js';
 import { ImportExportService } from './service/common/ImportExportService.js';
+import { ModelManager } from './utils/ModelManager.js';
 import { marked } from 'marked';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -685,5 +686,66 @@ ipcMain.handle('google-drive-delete-file', async (event, fileId: string) => {
       success: false,
       message: `Delete failed: ${error instanceof Error ? error.message : 'Unknown error'}`
     };
+  }
+});
+
+// Model memo operations
+ipcMain.handle('load-model-memos', async () => {
+  try {
+    const models = ModelManager.loadModels();
+    return models;
+  } catch (error) {
+    console.error('Failed to load model memos:', error);
+    return [];
+  }
+});
+
+ipcMain.handle('add-model-memo', async (event, memoData: any) => {
+  try {
+    const newModel = ModelManager.addModel(memoData);
+    return { success: true, model: newModel };
+  } catch (error) {
+    console.error('Failed to add model memo:', error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Failed to save model configuration'
+    };
+  }
+});
+
+ipcMain.handle('get-model-memo', async (event, name: string) => {
+  try {
+    const model = ModelManager.getModel(name);
+    if (model) {
+      return { success: true, model };
+    } else {
+      return { success: false, message: 'Model not found' };
+    }
+  } catch (error) {
+    console.error('Failed to get model memo:', error);
+    return { success: false, message: 'Failed to load model configuration' };
+  }
+});
+
+ipcMain.handle('delete-model-memo', async (event, name: string) => {
+  try {
+    const success = ModelManager.deleteModel(name);
+    return {
+      success,
+      message: success ? 'Model deleted successfully' : 'Model not found'
+    };
+  } catch (error) {
+    console.error('Failed to delete model memo:', error);
+    return { success: false, message: 'Failed to delete model configuration' };
+  }
+});
+
+ipcMain.handle('mark-model-used', async (event, name: string) => {
+  try {
+    const success = ModelManager.markModelUsed(name);
+    return success;
+  } catch (error) {
+    console.error('Failed to mark model as used:', error);
+    return false;
   }
 });
