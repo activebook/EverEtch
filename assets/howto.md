@@ -96,6 +96,24 @@ gregarious
 3. Enter your **API key**
 4. Select **model** (gpt-4, gemini-pro, etc.)
 
+### Model Management
+EverEtch allows you to save and quickly switch between different AI model configurations:
+
+#### Saving Models
+1. Configure your desired provider, model, endpoint, and API key
+2. Click **Save Current Model** at the bottom of the saved models dropdown
+3. Your model configuration is saved with an auto-generated name
+
+#### Loading Saved Models
+1. Click the **Saved Models** dropdown in settings
+2. Select any previously saved model from the list
+3. All settings (provider, model, endpoint, API key) are automatically loaded
+
+#### Managing Saved Models
+- **Delete**: Click the 🗑️ icon next to any saved model to remove it
+- **Auto-sort**: Models are sorted by last used date (most recent first)
+- **Quick Access**: Saved models appear in the dropdown for instant switching
+
 ### System Prompt
 Customize AI behavior:
 ```
@@ -173,4 +191,4 @@ You are a helpful assistant that explains word meanings clearly for language lea
 
 **Remember**: Small, consistent sessions beat cramming!
 
-*EverEtch v1.4.4*
+*EverEtch v1.4.8*

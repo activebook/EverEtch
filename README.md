@@ -52,6 +52,7 @@ Just enter any word and get instant meanings, examples, and related words all po
 Set up your AI helper in the settings:
 - **OpenAI**: Add your API key for GPT models
 - **Google**: Add your API key for Gemini models
+- **Model Management**: Save and switch between different AI model configurations instantly
 
 ### Profiles
 - Create separate collections for different languages
