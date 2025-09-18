@@ -54,6 +54,8 @@ Set up your AI helper in the settings:
 - **Google**: Add your API key for Gemini models
 - **Model Management**: Save and switch between different AI model configurations instantly
 
+![UI Screenshot](screenshots/UI_MODELS.png)
+
 ### Profiles
 - Create separate collections for different languages
 - Switch between profiles instantly
