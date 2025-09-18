@@ -6,22 +6,22 @@ import { ToastManager } from '../components/ToastManager.js';
 
 export class EventManager {
   private wordManager: WordManager;
-  private modalManager: ModalManager;  
+  private modalManager: ModalManager;
   private profileService: ProfileService;
-  private uiUtils: UIUtils;  
+  private uiUtils: UIUtils;
   private toastManager: ToastManager;
 
   constructor(
     wordManager: WordManager,
-    modalManager: ModalManager,    
+    modalManager: ModalManager,
     profileService: ProfileService,
-    uiUtils: UIUtils,    
+    uiUtils: UIUtils,
     toastManager: ToastManager
   ) {
     this.wordManager = wordManager;
-    this.modalManager = modalManager;    
+    this.modalManager = modalManager;
     this.profileService = profileService;
-    this.uiUtils = uiUtils;    
+    this.uiUtils = uiUtils;
     this.toastManager = toastManager;
 
     // Event listeners will be set up by EverEtchApp after initialization
@@ -94,6 +94,11 @@ export class EventManager {
             this.wordManager.handleGenerate();
           }
         }
+      });
+
+      // Set up custom load words event listener for modal-triggered load words
+      document.addEventListener('load-words', (event: any) => {
+        this.wordManager.loadWords();
       });
     }
   }
@@ -171,7 +176,7 @@ export class EventManager {
         this.modalManager.showHowtoModal();
       });
     }
- 
+
     // More button and inline actions
     const moreBtn = document.getElementById('more-btn') as HTMLButtonElement;
     const inlineActions = document.getElementById('inline-actions') as HTMLElement;
