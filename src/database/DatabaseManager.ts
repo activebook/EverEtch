@@ -1,6 +1,7 @@
 import sqlite3 from 'sqlite3';
 import { Utils } from '../utils/Utils.js';
 import { DatabaseRecovery } from './DatabaseRecovery.js';
+import { VectorDatabaseManager } from './VectorDatabaseManager.js';
 
 export interface WordDocument {
   id: string;
@@ -41,25 +42,67 @@ export interface ProfileConfig {
     endpoint: string;
     api_key: string;
   };
+  embedding_config?: {
+    provider: string;
+    model: string;
+    endpoint: string;
+    api_key: string;
+    batch_size: number;
+    similarity_threshold: number;
+    enabled: boolean;
+  };
   last_opened: string;
 }
 
 export class DatabaseManager {
   private db: sqlite3.Database | null = null;
   private dbPath: string = '';
+  private vectorDb: VectorDatabaseManager | null = null;
 
-  constructor() {}
+  constructor() { }
+
+  // Event callbacks for auto-sync
+  private onWordAdded?: (wordDoc: WordDocument) => void;
+  private onWordUpdated?: (wordDoc: WordDocument) => void;
+  private onWordDeleted?: (wordId: string) => void;
+
+  /**
+   * Set callback for when words are added (for auto-sync)
+   */
+  setWordAddedCallback(callback: (wordDoc: WordDocument) => void): void {
+    this.onWordAdded = callback;
+  }
+
+  /**
+   * Set callback for when words are updated (for auto-sync)
+   */
+  setWordUpdatedCallback(callback: (wordDoc: WordDocument) => void): void {
+    this.onWordUpdated = callback;
+  }
+
+  /**
+   * Set callback for when words are deleted (for auto-sync)
+   */
+  setWordDeletedCallback(callback: (wordId: string) => void): void {
+    this.onWordDeleted = callback;
+  }
 
   initialize(profileName: string): Promise<void> {
     return new Promise((resolve, reject) => {
       Utils.ensureDataDirectory();
       this.dbPath = Utils.getDatabasePath(profileName);
-      this.db = new sqlite3.Database(this.dbPath, (err) => {
+      this.db = new sqlite3.Database(this.dbPath, async (err) => {
         if (err) {
           reject(err);
           return;
         }
-        this.createTables().then(resolve).catch(reject);
+        try {
+          await this.createTables();
+          await this.initializeVectorDatabase(this.dbPath); // Initialize vector database immediately
+          resolve();
+        } catch (initError) {
+          reject(initError);
+        }
       });
     });
   }
@@ -111,12 +154,27 @@ export class DatabaseManager {
   }
 
 
+  getWordsCount(): Promise<number> {
+    return new Promise((resolve, reject) => {
+      if (!this.db) {
+        resolve(0);
+        return;
+      }
+
+      this.db.get('SELECT COUNT(*) as total FROM documents WHERE type = ?', ['word'], (err, row: { total: number } | undefined) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+      })
+    })
+  }
 
   // Paginated word loading for lazy loading - optimized to only fetch required fields
-  getWordsPaginated(offset: number, limit: number, sortOrder: 'asc' | 'desc' = 'desc'): Promise<{words: WordListItem[], hasMore: boolean, total: number}> {
+  getWordsPaginated(offset: number, limit: number, sortOrder: 'asc' | 'desc' = 'desc'): Promise<{ words: WordListItem[], hasMore: boolean, total: number }> {
     return new Promise(async (resolve, reject) => {
       if (!this.db) {
-        resolve({words: [], hasMore: false, total: 0});
+        resolve({ words: [], hasMore: false, total: 0 });
         return;
       }
 
@@ -165,7 +223,62 @@ export class DatabaseManager {
         const total = totalResult.total;
         const hasMore = offset + limit < total;
 
-        resolve({words, hasMore, total});
+        resolve({ words, hasMore, total });
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
+  // Paginated word documents loading - returns full WordDocument objects
+  getWordDocumentsPaginated(offset: number, limit: number, sortOrder: 'asc' | 'desc' = 'desc'): Promise<{ words: WordDocument[], hasMore: boolean, total: number }> {
+    return new Promise(async (resolve, reject) => {
+      if (!this.db) {
+        resolve({ words: [], hasMore: false, total: 0 });
+        return;
+      }
+
+      try {
+        // Get total count using index (guaranteed optimization)
+        const totalResult = await new Promise<{ total: number }>((resolveCount, rejectCount) => {
+          this.db!.get('SELECT COUNT(*) as total FROM documents WHERE type = ?', ['word'], (err, row: { total: number } | undefined) => {
+            if (err) {
+              rejectCount(err);
+              return;
+            }
+            resolveCount({ total: row?.total || 0 });
+          });
+        });
+
+        // Get paginated data - fetch complete document data
+        const dataResult = await new Promise<{ id: string, data: string }[]>((resolveData, rejectData) => {
+          const orderDirection = sortOrder === 'asc' ? 'ASC' : 'DESC';
+          const query = `
+            SELECT id, data
+            FROM documents
+            WHERE type = 'word'
+            ORDER BY created_at ${orderDirection}, updated_at ${orderDirection}
+            LIMIT ${limit} OFFSET ${offset}
+          `;
+
+          this.db!.all(query, (err, rows: { id: string, data: string }[]) => {
+            if (err) {
+              rejectData(err);
+              return;
+            }
+            resolveData(rows);
+          });
+        });
+
+        const words: WordDocument[] = dataResult.map(row => {
+          const wordDoc = JSON.parse(row.data) as WordDocument;
+          return wordDoc;
+        });
+
+        const total = totalResult.total;
+        const hasMore = offset + limit < total;
+
+        resolve({ words, hasMore, total });
       } catch (err) {
         reject(err);
       }
@@ -282,10 +395,14 @@ export class DatabaseManager {
           this.db.run(
             'UPDATE documents SET data = ?, updated_at = ? WHERE id = ?',
             [JSON.stringify(updatedWord), updatedWord.updated_at, existingWord.id],
-            function(err) {
+            (err: any) => {
               if (err) {
                 reject(err);
               } else {
+                // Trigger word updated callback for auto-sync
+                if (this.onWordUpdated) {
+                  this.onWordUpdated(updatedWord);
+                }
                 resolve(updatedWord);
               }
             }
@@ -305,10 +422,14 @@ export class DatabaseManager {
           this.db.run(
             'INSERT INTO documents (id, type, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
             [id, 'word', JSON.stringify(wordDoc), now, now],
-            function(err) {
+            (err: any) => {
               if (err) {
                 reject(err);
               } else {
+                // Trigger word added callback for auto-sync
+                if (this.onWordAdded) {
+                  this.onWordAdded(wordDoc);
+                }
                 resolve(wordDoc);
               }
             }
@@ -349,10 +470,14 @@ export class DatabaseManager {
         this.db.run(
           'UPDATE documents SET data = ?, updated_at = ? WHERE id = ?',
           [JSON.stringify(updated), updated.updated_at, wordId],
-          function(err) {
+          (err: any) => {
             if (err) {
               reject(err);
             } else {
+              // Trigger word updated callback for auto-sync
+              if (this.onWordUpdated) {
+                this.onWordUpdated(updated);
+              }
               resolve(updated);
             }
           }
@@ -370,21 +495,25 @@ export class DatabaseManager {
         return;
       }
 
-      this.db.run('DELETE FROM documents WHERE id = ? AND type = ?', [wordId, 'word'], function(err) {
+      this.db.run('DELETE FROM documents WHERE id = ? AND type = ?', [wordId, 'word'], function (this: any, err: any) {
         if (err) {
           reject(err);
         } else {
+          // Trigger word deleted callback for auto-sync
+          if (this.onWordDeleted) {
+            this.onWordDeleted(wordId);
+          }
           resolve(this.changes > 0);
         }
-      });
+      }.bind(this));
     });
   }
 
   // Unified paginated related words search using FTS5 - replaces getAssociatedWordsPaginated
-  getRelatedWordsPaginated(searchTerm: string, offset: number, limit: number): Promise<{words: WordListItem[], hasMore: boolean, total: number}> {
+  getRelatedWordsPaginated(searchTerm: string, offset: number, limit: number): Promise<{ words: WordListItem[], hasMore: boolean, total: number }> {
     return new Promise(async (resolve, reject) => {
       if (!this.db) {
-        resolve({words: [], hasMore: false, total: 0});
+        resolve({ words: [], hasMore: false, total: 0 });
         return;
       }
 
@@ -455,7 +584,7 @@ export class DatabaseManager {
         const total = totalResult.total;
         const hasMore = offset + limit < total;
 
-        resolve({words, hasMore, total});
+        resolve({ words, hasMore, total });
 
       } catch (err) {
         // Fallback to LIKE-based pagination if FTS5 fails
@@ -468,10 +597,10 @@ export class DatabaseManager {
   /**
    * Fallback method for paginated comprehensive search using LIKE queries
    */
-  private fallbackGetRelatedWordsPaginated(searchTerm: string, offset: number, limit: number): Promise<{words: WordListItem[], hasMore: boolean, total: number}> {
+  private fallbackGetRelatedWordsPaginated(searchTerm: string, offset: number, limit: number): Promise<{ words: WordListItem[], hasMore: boolean, total: number }> {
     return new Promise(async (resolve, reject) => {
       if (!this.db) {
-        resolve({words: [], hasMore: false, total: 0});
+        resolve({ words: [], hasMore: false, total: 0 });
         return;
       }
 
@@ -564,7 +693,7 @@ export class DatabaseManager {
         const total = totalResult.total;
         const hasMore = offset + limit < total;
 
-        resolve({words, hasMore, total});
+        resolve({ words, hasMore, total });
 
       } catch (err) {
         reject(err);
@@ -609,7 +738,7 @@ export class DatabaseManager {
       this.db.run(
         'INSERT OR REPLACE INTO documents (id, type, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
         [id, 'profile_config', JSON.stringify(configDoc), now, now],
-        function(err) {
+        function (err) {
           if (err) {
             reject(err);
           } else {
@@ -682,6 +811,31 @@ export class DatabaseManager {
         });
       }
     });
+  }
+
+  /**
+   * Initialize vector database for semantic search
+   */
+  private async initializeVectorDatabase(dbPath: string): Promise<void> {
+    if (!this.vectorDb) {
+      this.vectorDb = new VectorDatabaseManager(this.db!);
+      await this.vectorDb.initialize(dbPath, this.db!);
+      console.log('✅ Vector database initialized with shared connection');
+    }
+  }
+
+  /**
+   * Get vector database instance
+   */
+  getVectorDatabase(): VectorDatabaseManager | null {
+    return this.vectorDb;
+  }
+
+  /**
+   * Get database instance for direct access (for batch processing)
+   */
+  getDatabase(): sqlite3.Database | null {
+    return this.db;
   }
 
   /**

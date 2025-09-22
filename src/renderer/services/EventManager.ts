@@ -169,6 +169,14 @@ export class EventManager {
       });
     }
 
+    // Semantic search button
+    const semanticSettingsBtn = document.getElementById('semantic-settings-btn') as HTMLButtonElement;
+    if (semanticSettingsBtn) {
+      semanticSettingsBtn.addEventListener('click', () => {
+        this.modalManager.showSemanticSettingsModal();
+      });
+    }
+
     // Howto button
     const howtoBtn = document.getElementById('howto-btn') as HTMLButtonElement;
     if (howtoBtn) {

@@ -1,6 +1,6 @@
 {
   "name": "everetch",
-  "version": "1.4.12",
+  "version": "1.5.1",
   "type": "module",
   "description": "A slim word memo application",
   "main": "lib/main.js",
@@ -48,6 +48,7 @@
     "googleapis": "^159.0.0",
     "marked": "^16.2.1",
     "openai": "^5.20.0",
+    "sqlite-vec": "^0.1.7-alpha.2",
     "sqlite3": "^5.1.6",
     "undici": "^7.15.0"
   },

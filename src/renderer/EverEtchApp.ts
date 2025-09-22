@@ -11,6 +11,7 @@ import { ModalManager } from './components/ModalManager.js';
 import { GoogleDriveManager } from './services/GoogleDriveManager.js';
 import { ProtocolManager } from './services/ProtocolManager.js';
 import { EventManager } from './services/EventManager.js';
+import { SemanticSearchControls } from './components/SemanticSearchControls.js';
 
 // Constants for pagination
 const WORDS_PAGE_SIZE = 10; // For release builds, set to 10, debug 5
@@ -33,6 +34,7 @@ export class EverEtchApp {
   private googleDriveManager!: GoogleDriveManager;
   private protocolManager!: ProtocolManager;
   private eventManager!: EventManager;
+  private semanticSearchControls!: SemanticSearchControls;
 
   // Minimal app-level state (managers handle their own state)
 
@@ -91,6 +93,12 @@ export class EverEtchApp {
       this.profileService,
       this.uiUtils,
       this.toastManager
+    );
+
+    // Create semantic search controls
+    this.semanticSearchControls = new SemanticSearchControls(
+      this.toastManager,
+      this.uiUtils
     );
   }
 

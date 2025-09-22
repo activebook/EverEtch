@@ -206,7 +206,7 @@ export class ProfileSetModalHandler extends ModalHandler {
 
   private async showCustomModelDropdown(): Promise<void> {
     const modelDropdownBtn = document.getElementById('model-dropdown-btn') as HTMLButtonElement;
-    const models = await this.modelMemoService.loadModelMemos();    
+    const models = await this.modelMemoService.loadChatModelMemos();    
     this.modelDropdown.show(models, modelDropdownBtn, {
       onModelSelected: (modelName) => this.handleModelSelection(modelName),
       onModelDeleted: (modelName) => this.handleModelDeletion(modelName),
@@ -295,7 +295,8 @@ export class ProfileSetModalHandler extends ModalHandler {
         provider,
         model,
         endpoint,
-        apiKey
+        apiKey,
+        type: 'chat',
       });
 
       if (result.success) {

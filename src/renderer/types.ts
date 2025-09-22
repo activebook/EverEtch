@@ -158,6 +158,15 @@ export interface ProfileConfig {
         endpoint: string;
         api_key: string;
     };
+    embedding_config?: {
+        provider: string;
+        model: string;
+        endpoint: string;
+        api_key: string;
+        batch_size: number;
+        similarity_threshold: number;
+        enabled?: boolean;
+    };
     last_opened: string;
 }
 
@@ -201,8 +210,15 @@ export interface ModelMemo {
     model: string;
     endpoint: string;
     apiKey: string;
+    type: 'chat' | 'embedding';
     createdAt: string;
     lastUsed?: string;
+}
+
+export interface SemanticSearchSettings {
+    enabled: boolean;
+    similarity_threshold: number;
+    batch_size: number;
 }
 
 declare global {
@@ -250,7 +266,9 @@ declare global {
 
             // Model memo operations
             loadModelMemos: () => Promise<ModelMemo[]>;
-            addModelMemo: (memo: Omit<ModelMemo, 'name'|'createdAt'>) => Promise<ModelResult>;
+            loadChatModelMemos: () => Promise<ModelMemo[]>;
+            loadEmbeddingModelMemos: () => Promise<ModelMemo[]>;
+            addModelMemo: (memo: Omit<ModelMemo, 'name'|'createdAt'|'type'>) => Promise<ModelResult>;
             getModelMemo: (name: string) => Promise<ModelResult>;
             deleteModelMemo: (name: string) => Promise<ModelDeleteResult>;
             markModelUsed: (name: string) => Promise<boolean>;
@@ -269,6 +287,10 @@ declare global {
             loadSortOrder: () => Promise<'asc' | 'desc'>;
             saveSortOrder: (sortOrder: 'asc' | 'desc') => Promise<void>;
 
+            // Semantic search settings persistence
+            loadSemanticSearchSettings: () => Promise<SemanticSearchSettings | null>;
+            saveSemanticSearchSettings: (settings: SemanticSearchSettings) => Promise<void>;
+
             // Event listeners for streaming
             onWordMeaningStreaming: (callback: (content: string) => void) => void;
             onWordMetadataReady: (callback: (toolData: WordGenerationResult) => void) => void;
@@ -276,6 +298,24 @@ declare global {
             // Protocol handlers for custom URL scheme
             onProtocolNavigateWord: (callback: (wordName: string) => void) => void;
             onProtocolSwitchProfile: (callback: (profileName: string) => void) => void;
+
+            // Semantic Search operations
+            startSemanticBatchProcessing: (config: any) => Promise<{ success: boolean; message: string; }>;
+            cancelSemanticBatchProcessing: () => Promise<{ success: boolean; message: string; }>;
+            updateSemanticConfig: (config: { id: string; name: string; embedding_config: {
+              provider: string; model: string; endpoint: string; api_key: string; batch_size: number; similarity_threshold: number; }; }) => Promise<{ success: boolean; message: string; }>;
+            performSemanticSearch: (query: string, limit?: number) => Promise<{ success: boolean; message: string; results: any[] }>;
+
+            // Semantic Search event listeners
+            onSemanticBatchProgress: (callback: (progress: { processed: number; total: number; }) => void) => void;
+            onSemanticBatchComplete: (callback: (result: {
+              success: boolean;
+              totalWords: number;
+              processed: number;
+              failed: number;
+              error: string;
+              duration: number;
+            }) => void) => void;
 
             removeAllListeners: (event: string) => void;
         };

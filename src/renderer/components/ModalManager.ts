@@ -16,6 +16,7 @@ import { WordsImportCompleteModalHandler } from '../modals/WordsImportCompleteMo
 import { WordsImportProgressModalHandler } from '../modals/WordsImportProgressModalHandler.js';
 import { GoogleDriveDownloadModalHandler } from '../modals/GoogleDriveDownloadModalHandler.js';
 import { GoogleDriveUploadModalHandler } from '../modals/GoogleDriveUploadModalHandler.js';
+import { SemanticSettingsModalHandler } from '../modals/SemanticSettingsModalHandler.js';
 
 export class ModalManager {
   private toastManager: ToastManager;
@@ -37,6 +38,7 @@ export class ModalManager {
   private wordsImportProgress: WordsImportProgressModalHandler;
   private googleDriveDownloadModalHandler: GoogleDriveDownloadModalHandler;
   private googleDriveUploadModalHandler: GoogleDriveUploadModalHandler;
+  private semanticSettingsModalHandler: SemanticSettingsModalHandler;
 
   constructor(
     toastManager: ToastManager,
@@ -104,6 +106,12 @@ export class ModalManager {
       this.wordsImportComplete,
       this.wordsImportProgress
     );
+
+    // Initialize semantic search settings modal handler
+    this.semanticSettingsModalHandler = new SemanticSettingsModalHandler(
+      this.uiUtils,
+      this.toastManager
+    );
   }
 
   // Profile modal methods - delegated to ProfileModalHandler
@@ -153,5 +161,14 @@ export class ModalManager {
 
   hideImportWordsModal(): void {
     this.wordsImportModalHandler.hide();
+  }
+
+  // Semantic search settings modal methods
+  async showSemanticSettingsModal(): Promise<void> {
+    await this.semanticSettingsModalHandler.show();
+  }
+
+  hideSemanticSettingsModal(): void {
+    this.semanticSettingsModalHandler.hide();
   }
 }

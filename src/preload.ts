@@ -41,6 +41,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   savePanelWidths: (widths: { left: number; middle: number; right: number }) => ipcRenderer.invoke('save-panel-widths', widths),
   loadSortOrder: () => ipcRenderer.invoke('load-sort-order'),
   saveSortOrder: (sortOrder: 'asc' | 'desc') => ipcRenderer.invoke('save-sort-order', sortOrder),
+  loadSemanticSearchSettings: () => ipcRenderer.invoke('load-semantic-search-settings'),
+  saveSemanticSearchSettings: (settings: { enabled: boolean; similarity_threshold: number; batch_size: number }) => ipcRenderer.invoke('save-semantic-search-settings', settings),
 
   // Profile import/export
   exportProfile: () => ipcRenderer.invoke('export-profile'),
@@ -48,7 +50,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Model memo operations
   loadModelMemos: () => ipcRenderer.invoke('load-model-memos'),
-  addModelMemo: (memo: { provider: 'openai' | 'google'; model: string; endpoint: string; apiKey: string }) => ipcRenderer.invoke('add-model-memo', memo),
+  loadChatModelMemos: () => ipcRenderer.invoke('load-chat-model-memos'),
+  loadEmbeddingModelMemos: () => ipcRenderer.invoke('load-embedding-model-memos'),
+  addModelMemo: (memo: { provider: 'openai' | 'google'; model: string; endpoint: string; apiKey: string; type: 'chat' | 'embedding' }) => ipcRenderer.invoke('add-model-memo', memo),
   getModelMemo: (name: string) => ipcRenderer.invoke('get-model-memo', name),
   deleteModelMemo: (name: string) => ipcRenderer.invoke('delete-model-memo', name),
   markModelUsed: (name: string) => ipcRenderer.invoke('mark-model-used', name),
@@ -88,5 +92,34 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   removeAllListeners: (event: string) => {
     ipcRenderer.removeAllListeners(event);
-  }
+  },
+
+  // Semantic Batch&Search operations
+  startSemanticBatchProcessing: (config: any) => ipcRenderer.invoke('start-semantic-batch-processing', config),
+  cancelSemanticBatchProcessing: () => ipcRenderer.invoke('cancel-semantic-batch-processing'),
+  updateSemanticConfig: (config: { id: string; name: string; embedding_config: { 
+    provider: string; model: string; endpoint: string; api_key: string; batch_size: number; similarity_threshold: number; }; }) => ipcRenderer.invoke('update-semantic-config', config),
+  performSemanticSearch: (query: string, limit?: number) => ipcRenderer.invoke('perform-semantic-search', query, limit),
+
+  // Semantic Batch event listeners
+  onSemanticBatchProgress: (callback: (progress: { processed: number; total: number; }) => void) => {
+    ipcRenderer.on('semantic-batch-progress', (_event: Electron.IpcRendererEvent, progress: { processed: number; total: number; }) => callback(progress));
+  },
+  onSemanticBatchComplete: (callback: (result: {
+    success: boolean;
+    totalWords: number;
+    processed: number;
+    failed: number;
+    error: string;
+    duration: number;
+  }) => void) => {
+    ipcRenderer.on('semantic-batch-complete', (_event: Electron.IpcRendererEvent, result: {
+      success: boolean;
+      totalWords: number;
+      processed: number;
+      failed: number;
+      error: string;
+      duration: number;
+    }) => callback(result));
+  },
 });

@@ -7,12 +7,15 @@ import { Utils } from './utils/Utils.js';
 import { StoreManager } from './utils/StoreManager.js';
 import { DatabaseManager } from './database/DatabaseManager.js';
 import { ProfileManager } from './database/ProfileManager.js';
+import { ModelManager } from './utils/ModelManager.js';
 import { AIModelClient, WORD_DUMMY_METAS } from './ai/AIModelClient.js';
 import { GoogleAuthService } from './service/google/GoogleAuthService.js';
 import { GoogleDriveService } from './service/google/GoogleDriveService.js';
 import { ImportExportService } from './service/common/ImportExportService.js';
-import { ModelManager } from './utils/ModelManager.js';
+import { SemanticBatchService } from './semantic/SemanticBatchService.js';
+import { SemanticSearchService } from './semantic/SemanticSearchService.js';
 import { marked } from 'marked';
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -28,6 +31,8 @@ let storeManager: StoreManager;
 let googleAuthService: GoogleAuthService;
 let googleDriveService: GoogleDriveService;
 let importExportService: ImportExportService;
+let semanticBatchService: SemanticBatchService;
+let semanticSearchService: SemanticSearchService;
 let queuedProtocolAction: { type: string, data: any } | null = null; // Store queued protocol actions
 
 // Configure marked for proper line break handling
@@ -76,6 +81,8 @@ async function createWindow() {
     googleAuthService = new GoogleAuthService(mainWindow, storeManager);
     googleDriveService = new GoogleDriveService(googleAuthService);
     importExportService = new ImportExportService(dbManager, profileManager);
+    semanticBatchService = new SemanticBatchService(dbManager, profileManager);
+    semanticSearchService = new SemanticSearchService(dbManager, profileManager);
 
     mainWindow.loadFile(path.join(__dirname, 'renderer/index.html'));
 
@@ -84,6 +91,8 @@ async function createWindow() {
       // Callback function after window is ready
       // Set up proxy environment variables
       SysProxy.apply();
+      // Set up auto-sync vector callbacks
+      setupAutoSyncVectorCallbacks();
     }, () => { });
 
     if (process.env.NODE_ENV === 'development') {
@@ -457,6 +466,14 @@ ipcMain.handle('save-sort-order', (event, sortOrder: 'asc' | 'desc') => {
   storeManager.saveSortOrder(sortOrder);
 });
 
+ipcMain.handle('load-semantic-search-settings', () => {
+  return storeManager.loadSemanticSearchSettings();
+});
+
+ipcMain.handle('save-semantic-search-settings', (event, settings: any) => {
+  storeManager.saveSemanticSearchSettings(settings);
+});
+
 // Profile config operations
 ipcMain.handle('get-profile-config', async () => {
   return await profileManager.getCurrentProfile();
@@ -699,6 +716,26 @@ ipcMain.handle('load-model-memos', async () => {
   }
 });
 
+ipcMain.handle('load-chat-model-memos', async () => {
+  try {
+    const models = ModelManager.loadChatModels();
+    return models;
+  } catch (error) {
+    console.error('Failed to load chat model memos:', error);
+    return [];
+  }
+});
+
+ipcMain.handle('load-embedding-model-memos', async () => {
+  try {
+    const models = ModelManager.loadEmbeddingModels();
+    return models;
+  } catch (error) {
+    console.error('Failed to load embedding model memos:', error);
+    return [];
+  }
+});
+
 ipcMain.handle('add-model-memo', async (event, memoData: any) => {
   try {
     const newModel = ModelManager.addModel(memoData);
@@ -746,5 +783,182 @@ ipcMain.handle('mark-model-used', async (event, name: string) => {
   } catch (error) {
     console.error('Failed to mark model as used:', error);
     return false;
+  }
+});
+
+// Semantic Search IPC handlers
+// Auto-sync: Set up callbacks for word operations
+function setupAutoSyncVectorCallbacks() {
+  if (!dbManager || !semanticSearchService) return;
+
+  // Set up callbacks for automatic embedding generation
+  dbManager.setWordAddedCallback(async (wordDoc: any) => {
+    try {
+      const profile = await profileManager.getCurrentProfile();
+      if (profile?.embedding_config?.enabled) {
+        console.log(`🔄 Auto-sync: Generating embedding for new word: ${wordDoc.word}`);
+        await semanticBatchService.storeWordEmbedding(wordDoc, profile);
+      }
+    } catch (error) {
+      console.warn(`Failed to auto-generate embedding for word ${wordDoc.word}:`, error);
+    }
+  });
+
+  dbManager.setWordUpdatedCallback(async (wordDoc: any) => {
+    try {
+      const profile = await profileManager.getCurrentProfile();
+      if (profile?.embedding_config?.enabled) {
+        console.log(`🔄 Auto-sync: Updating embedding for word: ${wordDoc.word}`);
+        await semanticBatchService.storeWordEmbedding(wordDoc, profile);
+      }
+    } catch (error) {
+      console.warn(`Failed to auto-update embedding for word ${wordDoc.word}:`, error);
+    }
+  });
+
+  dbManager.setWordDeletedCallback(async (wordId: string) => {
+    try {
+      const profile = await profileManager.getCurrentProfile();
+      if (profile?.embedding_config?.enabled) {
+        // Clean up embedding when word is deleted
+        // We actually don't need to call it, because foreign key would automatically delete no-use ones 
+        //await dbManager.getVectorDatabase()!.deleteEmbedding(wordId);        
+        console.log(`🗑️ Auto-sync: Cleaned up embedding for deleted word: ${wordId}`);
+      }
+    } catch (error) {
+      console.warn(`Failed to clean up embedding for deleted word ${wordId}:`, error);
+    }
+  });
+}
+
+ipcMain.handle('start-semantic-batch-processing', async (event, config: any) => {
+  try {
+    // Update profile with embedding configuration
+    const currentProfile = await profileManager.getCurrentProfile();
+    const updatedProfile = { ...currentProfile };
+    updatedProfile.embedding_config = config;
+    if (updatedProfile.embedding_config) {
+      updatedProfile.embedding_config.enabled = true;
+      await profileManager.updateProfileConfig(currentProfile!.name, updatedProfile);
+    }
+
+    // Start batch processing
+    const result = await semanticBatchService.startBatchProcessing(
+      {
+        batchSize: config.batch_size || 10,
+        onProgress: (processed, total) => {
+          // Send progress updates to renderer
+          mainWindow.webContents.send('semantic-batch-progress', {
+            processed,
+            total,
+          });
+        },
+        onComplete: (result) => {
+          // Send completion updates to renderer
+          mainWindow.webContents.send('semantic-batch-complete', result);
+        }
+      }
+    );
+    return {
+      success: true,
+      message: `Start batch processing`,
+    };
+  } catch (error) {
+    console.error('Failed to start semantic search processing:', error);
+    return {
+      success: false,
+      message: `Processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+});
+
+ipcMain.handle('cancel-semantic-batch-processing', async () => {
+  try {
+    semanticBatchService.cancelProcessing();
+
+    // Update profile with embedding configuration
+    const currentProfile = await profileManager.getCurrentProfile();
+    const updatedProfile = { ...currentProfile };
+    if (updatedProfile.embedding_config) {
+      updatedProfile.embedding_config.enabled = false;
+      await profileManager.updateProfileConfig(currentProfile!.name, updatedProfile);
+    }
+    return {
+      success: true,
+      message: 'Cancelled semantic batch processing'
+    };
+  } catch (error) {
+    console.error('Failed to cancel semantic search processing:', error);
+    return {
+      success: false,
+      message: `Cancellation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+});
+
+ipcMain.handle('update-semantic-config', async (event, config: any) => {
+
+  const currentProfile = await profileManager.getCurrentProfile();
+  const updatedProfile = { ...currentProfile };
+  updatedProfile.embedding_config = config.embedding_config;
+  const result = await profileManager.updateProfileConfig(currentProfile!.name, updatedProfile);
+  if (!result) {
+    return {
+      success: false,
+      message: 'Failed to update semantic batch config',
+    }
+  } else {
+    return {
+      success: true,
+      message: 'Semantic batch config updated',
+    }
+  }
+})
+
+ipcMain.handle('perform-semantic-search', async (event, query: string, limit: number = 10) => {
+  try {
+    if (!semanticSearchService) {
+      return {
+        success: false,
+        message: 'Semantic search not initialized',
+        results: []
+      };
+    }
+
+    const currentProfile = await profileManager.getCurrentProfile();
+    if (!currentProfile?.embedding_config) {
+      return {
+        success: false,
+        message: 'No current profile embedding configured',
+        results: []
+      };
+    }
+    
+    if (!currentProfile.embedding_config.enabled) {
+      return {
+        success: false,
+        message: 'Embedding not enabled for current profile',
+        results: []
+      };
+    }
+    
+    const response = await semanticSearchService.search(query, { 
+      limit: 100, 
+      threshold: currentProfile.embedding_config.similarity_threshold,
+      includeEmbeddingStats: false
+     });
+
+    return {
+      success: true,
+      message: `Found ${response.words.length} results`,
+      results: response.words
+    };
+  } catch (error) {
+    console.error('Failed to perform semantic search:', error);
+    return {
+      success: false,
+      message: `Search failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      results: []
+    };
   }
 });
