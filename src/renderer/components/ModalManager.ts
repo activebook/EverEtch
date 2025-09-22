@@ -66,8 +66,7 @@ export class ModalManager {
       this.uiUtils,
       this.toastManager,
       this.profileService,
-      this.modelMemoService,
-      new CustomModelDropdown());
+      this.modelMemoService);
 
     this.googleDriveDownloadModalHandler = new GoogleDriveDownloadModalHandler(
       this.uiUtils,
@@ -110,7 +109,8 @@ export class ModalManager {
     // Initialize semantic search settings modal handler
     this.semanticSettingsModalHandler = new SemanticSettingsModalHandler(
       this.uiUtils,
-      this.toastManager
+      this.toastManager,
+      this.profileService
     );
   }
 

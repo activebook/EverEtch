@@ -14,13 +14,12 @@ export class ProfileSetModalHandler extends ModalHandler {
     uiUtils: UIUtils,
     toastManager: ToastManager,
     profileService: ProfileService,
-    modelMemoService: ModelMemoService,
-    modelDropdown: CustomModelDropdown
+    modelMemoService: ModelMemoService
   ) {
     super(uiUtils, toastManager);
     this.profileService = profileService;
     this.modelMemoService = modelMemoService;
-    this.modelDropdown = modelDropdown;
+    this.modelDropdown = new CustomModelDropdown();
   }
 
   // Settings Modal methods

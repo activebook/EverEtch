@@ -1,26 +1,49 @@
 import { ModalHandler } from './ModalHandler.js';
 import { ToastManager } from '../components/ToastManager.js';
+import { ProfileService } from '../services/ProfileService.js';
+import { CustomModelDropdown } from '../components/CustomModelDropdown.js';
 import { UIUtils } from '../utils/UIUtils.js';
+import { ProfileConfig } from '../types.js';
+
+export enum ButtonState {
+  IDLE = 'idle',
+  PROCESSING = 'processing',
+  COMPLETED = 'completed',
+  ERROR = 'error'
+}
 
 export class SemanticSettingsModalHandler extends ModalHandler {
   private isProcessing: boolean = false;
+  private currentButtonState: ButtonState = ButtonState.IDLE;
+  private profileService: ProfileService;
+  private modelDropdown: CustomModelDropdown;
 
   constructor(
     uiUtils: UIUtils,
-    toastManager: ToastManager
+    toastManager: ToastManager,
+    profileService: ProfileService
   ) {
     super(uiUtils, toastManager);
+    this.profileService = profileService;
+    this.modelDropdown = new CustomModelDropdown();
   }
 
   /**
    * Show the modal
    */
   async show(): Promise<void> {
-    console.log('Loading semantic settings modal');
     const templateLoaded = await this.ensureTemplateLoaded('semantic-settings-modal', 'semantic-settings-modal');
     if (!templateLoaded) return;
 
-    console.log('Showing semantic settings modal');
+    try {
+      this.loadCurrentConfiguration();
+      // Reset the model dropdown selection
+      this.modelDropdown.resetSelectModel();
+    } catch (error) {
+      console.error('Error loading profile config:', error);
+      this.showError('Failed to load profile settings');
+    }
+
     this.showModal('semantic-settings-modal');
     await this.loadCurrentConfiguration();
   }
@@ -36,32 +59,30 @@ export class SemanticSettingsModalHandler extends ModalHandler {
     this.hideModal('semantic-settings-modal');
   }
 
-  protected setupModalEvent(): void {
-    this.attachEventListeners();
-    //await this.loadCurrentConfiguration();
-  }
-
   /**
    * Attach event listeners to modal elements
    */
-  private attachEventListeners(): void {
+  protected setupModalEvent(): void {
     // Start/Cancel button
     const startBtn = document.getElementById('start-btn') as HTMLButtonElement;
-    const cancelBtn = document.getElementById('cancel-btn') as HTMLButtonElement;
+    const closeBtn = document.getElementById('close-btn') as HTMLButtonElement;
 
-    if (startBtn) {
-      startBtn.addEventListener('click', () => this.handleStartClick());
+    if (startBtn && !startBtn._listenerAdded) {
+      startBtn._listenerAdded = true;
+      startBtn.addEventListener('click', () => this.handleStartBatch());
     }
 
-    if (cancelBtn) {
-      cancelBtn.addEventListener('click', () => this.handleCancelClick());
+    if (closeBtn && !closeBtn._listenerAdded) {
+      closeBtn._listenerAdded = true;
+      closeBtn.addEventListener('click', () => this.hide());
     }
 
     // API key visibility toggle
     const toggleApiKeyBtn = document.getElementById('toggle-embedding-api-key') as HTMLButtonElement;
     const apiKeyInput = document.getElementById('embedding-api-key') as HTMLInputElement;
 
-    if (toggleApiKeyBtn && apiKeyInput) {
+    if (toggleApiKeyBtn && !toggleApiKeyBtn._listenerAdded) {
+      toggleApiKeyBtn._listenerAdded = true;
       toggleApiKeyBtn.addEventListener('click', () => this.toggleApiKeyVisibility(apiKeyInput, toggleApiKeyBtn));
     }
 
@@ -69,11 +90,70 @@ export class SemanticSettingsModalHandler extends ModalHandler {
     const thresholdSlider = document.getElementById('similarity-threshold') as HTMLInputElement;
     const thresholdValue = document.getElementById('threshold-value') as HTMLElement;
 
-    if (thresholdSlider && thresholdValue) {
+    if (thresholdSlider && !thresholdSlider._listenerAdded) {
+      thresholdSlider._listenerAdded = true;
       thresholdSlider.addEventListener('input', (e) => {
         const value = parseFloat((e.target as HTMLInputElement).value);
         thresholdValue.textContent = `${Math.round(value * 100)}%`;
       });
+    }
+
+    // Set up model dropdown
+
+    // Initialize button state to IDLE
+    this.currentButtonState = ButtonState.IDLE;
+    this.updateButtonState(ButtonState.IDLE);
+
+    // Set up batch events
+    this.setupBatchEvents();
+  }
+
+  private setupBatchEvents(): void {
+    // Set up word meaning streaming listener
+    window.electronAPI.onSemanticBatchProgress((progress: { processed: number; total: number; }) => {
+      this.handleSemanticBatchProgress(progress);
+    });
+
+    // Set up word metadata ready listener
+    window.electronAPI.onSemanticBatchComplete((result: {
+      success: boolean;
+      totalWords: number;
+      processed: number;
+      failed: number;
+      error: string;
+      duration: number;
+    }) => {
+      this.handleSemanticBatchComplete(result);
+    });
+  }
+
+  private handleSemanticBatchProgress(progress: { processed: number; total: number; }): void {
+    const progressBar = document.getElementById('progress-bar') as HTMLProgressElement;
+    const progressText = document.getElementById('progress-text') as HTMLElement;
+
+    if (progressBar && progressText) {
+      progressBar.value = progress.processed;
+      progressBar.max = progress.total;
+      progressText.textContent = `${progress.processed} / ${progress.total}`
+    }
+  }
+
+  private handleSemanticBatchComplete(result: {
+    success: boolean;
+    totalWords: number;
+    processed: number;
+    failed: number;
+    error: string;
+    duration: number;
+  }): void {
+    this.isProcessing = false;
+
+    if (result.success) {
+      this.updateButtonState(ButtonState.COMPLETED);
+      this.showSuccess(`Semantic search completed successfully. Total words: ${result.totalWords}, Processed: ${result.processed}, Failed: ${result.failed}`);
+    } else {
+      this.updateButtonState(ButtonState.ERROR);
+      this.showError(`Semantic search failed: ${result.error}`);
     }
   }
 
@@ -83,18 +163,15 @@ export class SemanticSettingsModalHandler extends ModalHandler {
   private async loadCurrentConfiguration(): Promise<void> {
     try {
       // Load configuration from profile
-      const profile = await window.electronAPI.getProfileConfig();
-      if (profile && profile.embedding_config) {
+      const profileConfig = await this.profileService.getProfileConfig();
+      if (profileConfig && profileConfig.embedding_config) {
         // Load configuration from profile's embedding_config
-        this.loadConfigurationFromProfile(profile);
+        this.loadConfigurationFromProfile(profileConfig);
         this.updateStatusIndicator(true);
       } else {
         this.setDefaultConfiguration();
         this.updateStatusIndicator(false);
       }
-
-      // Load statistics
-      await this.loadStatistics();
     } catch (error) {
       console.error('Error loading configuration:', error);
       this.showError('Failed to load semantic search configuration');
@@ -104,7 +181,7 @@ export class SemanticSettingsModalHandler extends ModalHandler {
   /**
    * Load configuration from profile's embedding_config
    */
-  private loadConfigurationFromProfile(profile: any): void {
+  private loadConfigurationFromProfile(profile: ProfileConfig): void {
     const providerSelect = document.getElementById('embedding-provider') as HTMLSelectElement;
     const modelInput = document.getElementById('embedding-model') as HTMLInputElement;
     const endpointInput = document.getElementById('embedding-endpoint') as HTMLInputElement;
@@ -113,14 +190,14 @@ export class SemanticSettingsModalHandler extends ModalHandler {
     const thresholdSlider = document.getElementById('similarity-threshold') as HTMLInputElement;
     const thresholdValue = document.getElementById('threshold-value') as HTMLElement;
 
-    if (providerSelect) providerSelect.value = profile.embedding_config.provider || 'openai';
-    if (modelInput) modelInput.value = profile.embedding_config.model || 'text-embedding-ada-002';
-    if (endpointInput) endpointInput.value = profile.embedding_config.endpoint || 'https://api.openai.com/v1';
-    if (apiKeyInput) apiKeyInput.value = profile.embedding_config.api_key || '';
-    if (batchSizeInput) batchSizeInput.value = (profile.embedding_config.batch_size || 10).toString();
+    if (providerSelect) providerSelect.value = profile.embedding_config?.provider || 'openai';
+    if (modelInput) modelInput.value = profile.embedding_config?.model || 'text-embedding-ada-002';
+    if (endpointInput) endpointInput.value = profile.embedding_config?.endpoint || 'https://api.openai.com/v1';
+    if (apiKeyInput) apiKeyInput.value = profile.embedding_config?.api_key || '';
+    if (batchSizeInput) batchSizeInput.value = (profile.embedding_config?.batch_size || 10).toString();
     if (thresholdSlider) {
-      thresholdSlider.value = (profile.embedding_config.similarity_threshold || 0.5).toString();
-      if (thresholdValue) thresholdValue.textContent = `${Math.round((profile.embedding_config.similarity_threshold || 0.5) * 100)}%`;
+      thresholdSlider.value = (profile.embedding_config?.similarity_threshold || 0.5).toString();
+      if (thresholdValue) thresholdValue.textContent = `${Math.round((profile.embedding_config?.similarity_threshold || 0.5) * 100)}%`;
     }
   }
 
@@ -172,20 +249,6 @@ export class SemanticSettingsModalHandler extends ModalHandler {
   }
 
   /**
-   * Load and display statistics
-   * Note: Statistics are now handled through batch processing events
-   * This method is kept for backward compatibility but simplified
-   */
-  private async loadStatistics(): Promise<void> {
-    // Statistics will be updated when batch processing completes
-    // For now, just hide the statistics section since we don't have direct access to vector DB stats
-    const statsSection = document.getElementById('statistics-section') as HTMLElement;
-    if (statsSection) {
-      statsSection.classList.add('hidden');
-    }
-  }
-
-  /**
    * Get configuration from form
    */
   private getConfigurationFromForm(): any {
@@ -212,52 +275,125 @@ export class SemanticSettingsModalHandler extends ModalHandler {
   }
 
   /**
-   * Update UI for processing state
+   * Update button state with sophisticated UI management
    */
-  private updateUIForProcessing(processing: boolean): void {
+  private updateButtonState(newState: ButtonState): void {
+    this.currentButtonState = newState;
     const startBtn = document.getElementById('start-btn') as HTMLButtonElement;
     const cancelBtn = document.getElementById('cancel-btn') as HTMLButtonElement;
     const formElements = document.querySelectorAll('#semantic-search-settings-modal input, #semantic-search-settings-modal select');
 
-    if (processing) {
-      if (startBtn) {
-        startBtn.textContent = 'Processing...';
-        startBtn.disabled = true;
-        startBtn.classList.add('bg-amber-400', 'cursor-not-allowed');
-        startBtn.classList.remove('bg-amber-500', 'hover:bg-amber-600');
-      }
-      if (cancelBtn) {
-        cancelBtn.classList.remove('hidden');
-      }
-
-      // Disable form elements
-      formElements.forEach((element: any) => {
-        element.disabled = true;
-      });
-    } else {
-      if (startBtn) {
-        startBtn.textContent = 'Start Processing';
-        startBtn.disabled = false;
-        startBtn.classList.remove('bg-amber-400', 'cursor-not-allowed');
-        startBtn.classList.add('bg-amber-500', 'hover:bg-amber-600');
-      }
-      if (cancelBtn) {
-        cancelBtn.classList.add('hidden');
-      }
-
-      // Enable form elements
-      formElements.forEach((element: any) => {
-        element.disabled = false;
-      });
+    // Remove all existing classes first
+    if (startBtn) {
+      startBtn.className = 'px-6 py-2 rounded-lg transition-all duration-200 hover:shadow-lg font-medium text-sm';
     }
+
+    switch (newState) {
+      case ButtonState.IDLE:
+        if (startBtn) {
+          startBtn.textContent = 'Start Processing';
+          startBtn.disabled = false;
+          startBtn.classList.add('bg-blue-500', 'hover:bg-blue-600', 'text-white');
+          this.setupButtonHoverEffect(startBtn, 'Start Processing', 'bg-blue-500 hover:bg-blue-600');
+        }
+        // Cancel button always visible and just closes modal
+        if (cancelBtn) {
+          cancelBtn.classList.remove('hidden');
+        }
+        // Enable form elements
+        formElements.forEach((element: any) => {
+          element.disabled = false;
+        });
+        break;
+
+      case ButtonState.PROCESSING:
+        if (startBtn) {
+          startBtn.textContent = 'Processing...';
+          startBtn.disabled = true;
+          startBtn.classList.add('bg-amber-400', 'cursor-not-allowed', 'text-white');
+          this.setupButtonHoverEffect(startBtn, 'Stop', 'bg-red-500 hover:bg-red-600');
+        }
+        // Cancel button always visible and just closes modal
+        if (cancelBtn) {
+          cancelBtn.classList.remove('hidden');
+        }
+        // Disable form elements
+        formElements.forEach((element: any) => {
+          element.disabled = true;
+        });
+        break;
+
+      case ButtonState.COMPLETED:
+        if (startBtn) {
+          startBtn.textContent = 'Started';
+          startBtn.disabled = false;
+          startBtn.classList.add('bg-green-500', 'hover:bg-green-600', 'text-white');
+          this.setupButtonHoverEffect(startBtn, 'Stop', 'bg-red-500 hover:bg-red-600');
+        }
+        // Cancel button always visible and just closes modal
+        if (cancelBtn) {
+          cancelBtn.classList.add('hidden');
+        }
+        // Enable form elements
+        formElements.forEach((element: any) => {
+          element.disabled = false;
+        });
+        break;
+
+      case ButtonState.ERROR:
+        if (startBtn) {
+          startBtn.textContent = 'Start';
+          startBtn.disabled = false;
+          startBtn.classList.add('bg-blue-500', 'hover:bg-blue-600', 'text-white');
+          this.setupButtonHoverEffect(startBtn, 'Start', 'bg-blue-500 hover:bg-blue-600');
+        }
+        // Cancel button always visible and just closes modal
+        if (cancelBtn) {
+          cancelBtn.classList.remove('hidden');
+        }
+        // Enable form elements
+        formElements.forEach((element: any) => {
+          element.disabled = false;
+        });
+        break;
+    }
+  }
+
+  /**
+   * Setup hover effects for buttons
+   */
+  private setupButtonHoverEffect(button: HTMLButtonElement, hoverText: string, hoverClasses: string): void {
+    let hoverSetup = false;
+
+    const setupHover = () => {
+      if (!hoverSetup) {
+        button.addEventListener('mouseenter', () => {
+          if (this.currentButtonState === ButtonState.PROCESSING && hoverText === 'Stop') {
+            button.textContent = hoverText;
+            button.className = 'px-6 py-2 rounded-lg transition-all duration-200 hover:shadow-lg font-medium text-sm bg-red-500 hover:bg-red-600 text-white';
+          } else if (this.currentButtonState === ButtonState.COMPLETED && hoverText === 'Stop') {
+            button.textContent = hoverText;
+            button.className = 'px-6 py-2 rounded-lg transition-all duration-200 hover:shadow-lg font-medium text-sm bg-red-500 hover:bg-red-600 text-white';
+          }
+        });
+
+        button.addEventListener('mouseleave', () => {
+          this.updateButtonState(this.currentButtonState);
+        });
+
+        hoverSetup = true;
+      }
+    };
+
+    setupHover();
   }
 
   /**
    * Handle start button click
    */
-  private async handleStartClick(): Promise<void> {
+  private async handleStartBatch(): Promise<void> {
     if (this.isProcessing) {
-      await this.handleCancelClick();
+      await this.handleCancelBatch();
       return;
     }
 
@@ -275,7 +411,7 @@ export class SemanticSettingsModalHandler extends ModalHandler {
       }
 
       // Update profile with embedding configuration
-      const currentProfile = await window.electronAPI.getProfileConfig();
+      const currentProfile = await this.profileService.getProfileConfig();
       if (!currentProfile) {
         this.showError('No profile selected');
         return;
@@ -290,22 +426,15 @@ export class SemanticSettingsModalHandler extends ModalHandler {
         }
       };
 
-      const updateResult = await window.electronAPI.updateSemanticConfig(updatedProfile);
-      if (!updateResult.success) {
-        this.showError(updateResult.message || 'Failed to update profile configuration');
-        return;
-      }
-
       // Start batch processing
       this.isProcessing = true;
-      this.updateUIForProcessing(true);
+      this.updateButtonState(ButtonState.PROCESSING);
 
       const result = await window.electronAPI.startSemanticBatchProcessing(config);
 
       if (result.success) {
         this.showSuccess('Semantic search processing completed successfully!');
         this.updateStatusIndicator(true);
-        await this.loadStatistics();
       } else {
         this.showError(result.message || 'Processing failed');
       }
@@ -315,7 +444,7 @@ export class SemanticSettingsModalHandler extends ModalHandler {
       this.showError('Failed to start semantic search');
     } finally {
       this.isProcessing = false;
-      this.updateUIForProcessing(false);
+      //this.updateButtonState(ButtonState.IDLE);
     }
   }
 
@@ -348,11 +477,23 @@ export class SemanticSettingsModalHandler extends ModalHandler {
   /**
    * Handle cancel button click
    */
-  private async handleCancelClick(): Promise<void> {
+  private async handleCancelBatch(): Promise<void> {
     if (this.isProcessing) {
-      this.showSuccess('Semantic search processing cancelled');
+      try {
+        const result = await window.electronAPI.cancelSemanticBatchProcessing();
+        if (result.success) {
+          this.showSuccess('Semantic search processing cancelled');
+        } else {
+          this.showError(result.message || 'Cancel processing failed');
+        }
+      } catch (error) {
+        console.error('Error cancelling semantic search:', error);
+        this.showError('Failed to cancel semantic search');
+      } finally {
+        this.isProcessing = false;
+        this.updateButtonState(ButtonState.IDLE);
+      }
     }
-    this.hide();
   }
 
   /**
@@ -372,6 +513,4 @@ export class SemanticSettingsModalHandler extends ModalHandler {
       if (eyeOffIcon) eyeOffIcon.classList.add('hidden');
     }
   }
-
-  
 }
