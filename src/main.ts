@@ -834,11 +834,20 @@ ipcMain.handle('start-semantic-batch-processing', async (event, config: any) => 
   try {
     // Update profile with embedding configuration
     const currentProfile = await profileManager.getCurrentProfile();
-    const updatedProfile = { ...currentProfile, ...config };
-    if (updatedProfile.embedding_config) {
-      updatedProfile.embedding_config.enabled = true;
-      await profileManager.updateProfileConfig(currentProfile!.name, updatedProfile);
+
+    // Properly merge embedding_config to preserve existing structure
+    const updatedProfile = { ...currentProfile };
+    console.debug('🔧 Starting semantic batch processing with config:', config);
+
+    if (config.embedding_config) {
+      updatedProfile.embedding_config = {
+        ...currentProfile?.embedding_config,
+        ...config.embedding_config,
+        enabled: true // Always enable when starting batch processing
+      };
     }
+
+    await profileManager.updateProfileConfig(currentProfile!.name, updatedProfile);
 
     // Start batch processing
     const result = await semanticBatchService.startBatchProcessing(
