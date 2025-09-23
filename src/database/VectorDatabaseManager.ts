@@ -92,10 +92,11 @@ export class VectorDatabaseManager {
       `);
 
       // Create index for efficient model-based filtering
-      this.db.exec(`
-        CREATE INDEX IF NOT EXISTS idx_embedding_model
-        ON word_embeddings(model_used, word_id);
-      `);
+      // Sqlite-vec doesn't support create index
+      // this.db.exec(`
+      //   CREATE INDEX IF NOT EXISTS idx_embedding_model
+      //   ON word_embeddings(model_used, word_id);
+      // `);
 
       console.log('✅ Vector database tables created successfully');
     } catch (error) {
@@ -204,50 +205,87 @@ export class VectorDatabaseManager {
   }
 
   /**
-   * Perform semantic search using vector similarity
-   * Uses sqlite-vec's vec0 virtual table with match operator and distance ordering
-   */
-  semanticSearch(queryEmbedding: number[], limit: number = 50, threshold: number = 0.5): SemanticWordItem[] {
-    if (!this.db) {
-      return [];
-    }
+    * Perform semantic search using vector similarity
+    * Uses sqlite-vec's vec0 virtual table with match operator and distance ordering
+    */
+   semanticSearch(queryEmbedding: number[], limit: number = 50, threshold: number = 0.5): SemanticWordItem[] {
+     console.log('🔍 Starting semantic search with parameters:');
+     console.log(`   - Query embedding dimensions: ${queryEmbedding.length}`);
+     console.log(`   - Limit: ${limit}`);
+     console.log(`   - Threshold: ${threshold}`);
+     console.log(`   - Max distance allowed: ${1-threshold}`);
 
-    try {
-      // Use sqlite-vec's vec_distance_cosine function for explicit cosine distance calculation
-      // Cosine distance ranges from 0 to 2:
-      // 0 = identical direction, 1 = orthogonal, 2 = opposite direction
-      const rows = this.db.prepare(`
-        SELECT
-          we.word_id,
-          d.data,
-          vec_distance_cosine(we.embedding, ?) AS distance
-        FROM word_embeddings we
-        JOIN documents d ON we.word_id = d.id
-        WHERE d.type = 'word'
-        AND vec_distance_cosine(we.embedding, ?) <= ?
-        ORDER BY distance ASC
-        LIMIT ?
-      `).all(JSON.stringify(queryEmbedding), JSON.stringify(queryEmbedding), (1-threshold), limit) as any[];
+     if (!this.db) {
+       console.error('❌ Database not initialized, returning empty results');
+       return [];
+     }
 
-      const results: SemanticWordItem[] = rows.map((row: any) => {
-        const data = JSON.parse(row.data);
-        return {
-          word_item: {
-            id: row.word_id,
-            word: data.word,
-            one_line_desc: data.one_line_desc || '',
-            remark: data.remark
-          },
-          similarity: 1.0 - row.distance  // Convert distance to similarity (lower distance = higher similarity)
-        };
-      });
+     try {
+       // Use sqlite-vec's vec_distance_cosine function for explicit cosine distance calculation
+       // Cosine distance ranges from 0 to 2:
+       // 0 = identical direction, 1 = orthogonal, 2 = opposite direction
+       const sqlQuery = `
+         SELECT
+           we.word_id,
+           d.data,
+           vec_distance_cosine(we.embedding, ?) AS distance
+         FROM word_embeddings we
+         JOIN documents d ON we.word_id = d.id
+         WHERE d.type = 'word'
+         AND vec_distance_cosine(we.embedding, ?) <= ?
+         ORDER BY distance ASC
+         LIMIT ?
+       `;
 
-      return results;
-    } catch (error) {
-      console.error('❌ Error performing semantic search:', error);
-      return [];
-    }
-  }
+       console.log('🔍 Executing SQL query:');
+       console.log(sqlQuery);
+       console.log('🔍 Query parameters [threshold, limit]:', [(1-threshold), limit]);
+
+       const startTime = Date.now();
+       const rows = this.db.prepare(sqlQuery).all(JSON.stringify(queryEmbedding), JSON.stringify(queryEmbedding), (1-threshold), limit) as any[];
+       const queryTime = Date.now() - startTime;
+
+       console.log(`✅ Query completed in ${queryTime}ms`);
+       console.log(`📊 Found ${rows.length} potential matches from database`);
+
+       if (rows.length > 0) {
+         console.log('📋 Top 5 results preview:');
+         rows.slice(0, 5).forEach((row, index) => {
+           console.log(`   ${index + 1}. Word ID: ${row.word_id}, Distance: ${row.distance.toFixed(4)}`);
+         });
+       }
+
+       const results: SemanticWordItem[] = rows.map((row: any) => {
+         const data = JSON.parse(row.data);
+         return {
+           word_item: {
+             id: row.word_id,
+             word: data.word,
+             one_line_desc: data.one_line_desc || '',
+             remark: data.remark
+           },
+           similarity: 1.0 - row.distance  // Convert distance to similarity (lower distance = higher similarity)
+         };
+       });
+
+       console.log(`✅ Successfully processed ${results.length} semantic search results`);
+       if (results.length > 0) {
+         console.log(`📈 Similarity range: ${results[results.length - 1].similarity.toFixed(4)} - ${results[0].similarity.toFixed(4)}`);
+         console.log(`📝 Top result: "${results[0].word_item.word}" with similarity ${results[0].similarity.toFixed(4)}`);
+       }
+
+       return results;
+     } catch (error) {
+       console.error('❌ Error performing semantic search:', error);
+       console.error('❌ Error details:', {
+         queryEmbeddingLength: queryEmbedding.length,
+         limit,
+         threshold,
+         errorMessage: error instanceof Error ? error.message : String(error)
+       });
+       return [];
+     }
+   }
 
   /**
    * Get statistics about stored embeddings
