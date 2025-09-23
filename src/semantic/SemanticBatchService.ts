@@ -93,10 +93,10 @@ export class SemanticBatchService {
         throw new Error('Processing cancelled');
       }
 
-      // Check if word needs processing
-      const existingEmbedding = await this.vectorManager!.getEmbedding(
-        { word_id: wordData.id, embedding: [], model_used: profile.embedding_config!.model });
-      if (existingEmbedding) {
+      // Check if word needs processing (more efficient than getEmbedding)
+      const exists = await this.vectorManager!.embeddingExists(wordData.id, profile.embedding_config!.model);
+      if (exists) {
+        console.log(`⏭️ Skipping word ${wordData.id} - embedding already exists`);
         result.processed++;
         continue; // Skip this word
       }
@@ -109,30 +109,31 @@ export class SemanticBatchService {
     }
 
     try {
-      console.log(`🔄 Generating embeddings for ${proceedWords.length} words...`);
-      const batchResult = await this.embeddingClient!.generateBatchWordEmbeddings(proceedWords, profile);
-      if (!batchResult.embeddings) {
-        throw new Error('Embedding generation failed');
-      }
+       console.log(`🔄 Generating embeddings for ${proceedWords.length} words...`);
+       const batchResult = await this.embeddingClient!.generateBatchWordEmbeddings(proceedWords, profile);
+       if (!batchResult.embeddings) {
+         throw new Error('Embedding generation failed');
+       }
 
-      console.log(`✅ Generated ${batchResult.embeddings.length} embeddings`);
+       console.log(`✅ Generated ${batchResult.embeddings.length} embeddings`);
 
-      // Create embeddings array for batch storage
-      const batchSE: SemanticEmbedding[] = [];
-      for (let i = 0; i < proceedWords.length; i++) {
-        const wordData = proceedWords[i];
-        const embedding = batchResult.embeddings[i];
-        batchSE.push({
-          word_id: wordData.id,
-          embedding,
-          model_used: batchResult.model_used
-        });
-      }
+       // Create embeddings array for batch storage
+       const batchSE: SemanticEmbedding[] = [];
+       for (let i = 0; i < proceedWords.length; i++) {
+         const wordData = proceedWords[i];
+         const embedding = batchResult.embeddings[i];
+         batchSE.push({
+           word_id: wordData.id,
+           embedding,
+           model_used: batchResult.model_used
+         });
+       }
 
-      console.log(`💾 Storing ${batchSE.length} embeddings...`);
-      await this.vectorManager!.batchStoreEmbeddings(batchSE);
-      result.processed += proceedWords.length;
-      console.log(`✅ Successfully stored ${batchSE.length} embeddings`);
+       console.log(`💾 Storing ${batchSE.length} embeddings...`);
+       console.log(`📋 Word IDs being stored: ${batchSE.map(se => se.word_id).join(', ')}`);
+       await this.vectorManager!.batchStoreEmbeddings(batchSE);
+       result.processed += proceedWords.length;
+       console.log(`✅ Successfully stored ${batchSE.length} embeddings`);
     } catch (error) {
       result.failed += proceedWords.length;
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

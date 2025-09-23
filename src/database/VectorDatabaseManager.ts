@@ -106,6 +106,30 @@ export class VectorDatabaseManager {
   }
 
   /**
+   * Check if embedding exists for a word and model
+   */
+  embeddingExists(wordId: string, modelUsed: string): boolean {
+    if (!this.db) {
+      console.log('❌ Database not initialized in embeddingExists');
+      return false;
+    }
+
+    try {
+      console.log(`🔍 Checking existence: word_id=${wordId}, model=${modelUsed}`);
+      const row = this.db.prepare(`
+        SELECT 1 FROM word_embeddings WHERE word_id = ? AND model_used = ?
+      `).get(wordId, modelUsed) as any;
+
+      const exists = !!row;
+      console.log(`📋 Existence check result for word_id=${wordId}, model=${modelUsed}: ${exists ? 'EXISTS' : 'NOT FOUND'}`);
+      return exists;
+    } catch (error) {
+      console.error('❌ Error checking if embedding exists:', error);
+      return false;
+    }
+  }
+
+  /**
    * Store or update word embedding
    */
   storeEmbedding(se: SemanticEmbedding): void {
@@ -114,14 +138,26 @@ export class VectorDatabaseManager {
     }
 
     try {
-      // Store embedding in vector table
-      // Convert embedding array to JSON string for storage
-      this.db.prepare(`
-        INSERT OR REPLACE INTO word_embeddings (word_id, embedding, model_used)
-        VALUES (?, ?, ?)
-      `).run(se.word_id, JSON.stringify(se.embedding), se.model_used);
+      const exists = this.embeddingExists(se.word_id, se.model_used);
 
-      console.debug(`✅ Embedding stored for word ${se.word_id} using model ${se.model_used}`);
+      if (exists) {
+        // Update existing embedding
+        this.db.prepare(`
+          UPDATE word_embeddings
+          SET embedding = ?
+          WHERE word_id = ? AND model_used = ?
+        `).run(JSON.stringify(se.embedding), se.word_id, se.model_used);
+
+        console.debug(`✅ Embedding updated for word ${se.word_id} using model ${se.model_used}`);
+      } else {
+        // Insert new embedding
+        this.db.prepare(`
+          INSERT INTO word_embeddings (word_id, embedding, model_used)
+          VALUES (?, ?, ?)
+        `).run(se.word_id, JSON.stringify(se.embedding), se.model_used);
+
+        console.debug(`✅ Embedding inserted for word ${se.word_id} using model ${se.model_used}`);
+      }
     } catch (error) {
       console.error('❌ Error storing embedding:', error);
       throw error;
@@ -137,10 +173,14 @@ export class VectorDatabaseManager {
     }
 
     if (embeddings.length === 0) {
+      console.log('ℹ️ No embeddings to store in batch');
       return; // Nothing to do
     }
 
     try {
+      console.log(`💾 Starting batch store of ${embeddings.length} embeddings`);
+      console.log(`📋 Word IDs: ${embeddings.map(e => e.word_id).join(', ')}`);
+
       // Use a transaction for better performance and atomicity
       const transaction = this.db.transaction((embeddings: SemanticEmbedding[]) => {
         const embeddingStmt = this.db!.prepare(`
@@ -150,7 +190,7 @@ export class VectorDatabaseManager {
 
         for (const { word_id, embedding, model_used } of embeddings) {
           embeddingStmt.run(word_id, JSON.stringify(embedding), model_used);
-          console.debug(`✅ Embedding stored for word ${word_id}`);
+          console.debug(`✅ Embedding stored for word ${word_id} using model ${model_used}`);
         }
       });
 
