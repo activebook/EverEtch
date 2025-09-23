@@ -7,8 +7,6 @@ export interface WordEmbedding {
   word_id: string;
   embedding: number[];
   model_used: string;
-  created_at: string;
-  updated_at: string;
 }
 
 export interface SemanticEmbedding {
@@ -88,11 +86,8 @@ export class VectorDatabaseManager {
       this.db.exec(`
         CREATE VIRTUAL TABLE IF NOT EXISTS word_embeddings USING vec0(
           word_id TEXT,
-          embedding float[3072], -- Default embedding dimension, will be adjusted based on model
-          model_used TEXT,
-          created_at DATETIME,
-          updated_at DATETIME,
-          distance_metric=cosine   -- set metric
+          embedding float[2048], -- Default embedding dimension, will be adjusted based on model
+          model_used TEXT
         );
       `);
 
@@ -218,23 +213,21 @@ export class VectorDatabaseManager {
     }
 
     try {
-      // Use sqlite-vec's vec0 virtual table with match operator
-      // The match operator performs nearest neighbor search and returns distance
-      // Remember, we use cosine [0-2]
-      // 0 = identical direction, 1 = orthogonal, 2 = opposite direction.
+      // Use sqlite-vec's vec_distance_cosine function for explicit cosine distance calculation
+      // Cosine distance ranges from 0 to 2:
+      // 0 = identical direction, 1 = orthogonal, 2 = opposite direction
       const rows = this.db.prepare(`
         SELECT
           we.word_id,
           d.data,
-          distance
+          vec_distance_cosine(we.embedding, ?) AS distance
         FROM word_embeddings we
         JOIN documents d ON we.word_id = d.id
         WHERE d.type = 'word'
-        AND we.embedding MATCH ?
-        AND distance <= ?
+        AND vec_distance_cosine(we.embedding, ?) <= ?
         ORDER BY distance ASC
         LIMIT ?
-      `).all(JSON.stringify(queryEmbedding), (1-threshold), limit) as any[];
+      `).all(JSON.stringify(queryEmbedding), JSON.stringify(queryEmbedding), (1-threshold), limit) as any[];
 
       const results: SemanticWordItem[] = rows.map((row: any) => {
         const data = JSON.parse(row.data);

@@ -69,7 +69,8 @@ export class EmbeddingModelClient {
       const response = await openai.embeddings.create({
         model: profile.embedding_config!.model,
         input: text,
-        encoding_format: 'float'
+        encoding_format: 'float',
+        dimensions: 2048,
       });
 
       const tokens_used = response.usage?.total_tokens || 0;
@@ -116,6 +117,7 @@ export class EmbeddingModelClient {
     try {
       const config = {
         taskType: 'SEMANTIC_SIMILARITY',
+        outputDimensionality: 2048,
       };
 
       // Handle both single text and array of texts
