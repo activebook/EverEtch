@@ -12,6 +12,10 @@ export enum ButtonState {
   ERROR = 'error'
 }
 
+const START_BTN_TEXT_IDLE = "Start Semantic Search";
+const START_BTN_TEXT_COMPLETED = "Semantic Search Started";
+const START_BTN_TEXT_PROCESSING = "In Processing...";
+
 export class SemanticSettingsModalHandler extends ModalHandler {
   private isProcessing: boolean = false;
   private profileService: ProfileService;
@@ -297,7 +301,7 @@ export class SemanticSettingsModalHandler extends ModalHandler {
     switch (newState) {
       case ButtonState.IDLE:
         if (startBtn) {
-          startBtn.textContent = 'Start Processing';
+          startBtn.textContent = START_BTN_TEXT_IDLE;
           startBtn.disabled = false;
           startBtn.classList.add('bg-blue-500', 'hover:bg-blue-600', 'text-white');
         }
@@ -313,7 +317,7 @@ export class SemanticSettingsModalHandler extends ModalHandler {
 
       case ButtonState.PROCESSING:
         if (startBtn) {
-          startBtn.textContent = 'In Processing...';
+          startBtn.textContent = START_BTN_TEXT_PROCESSING;
           startBtn.disabled = true;
           startBtn.classList.add('bg-green-400', 'hover:bg-green-500', 'text-white');
         }
@@ -329,7 +333,7 @@ export class SemanticSettingsModalHandler extends ModalHandler {
 
       case ButtonState.COMPLETED:
         if (startBtn) {
-          startBtn.textContent = 'Started';
+          startBtn.textContent = START_BTN_TEXT_COMPLETED;
           startBtn.disabled = true;
           startBtn.classList.add('bg-green-500', 'hover:bg-green-600', 'text-white');
         }
@@ -345,7 +349,7 @@ export class SemanticSettingsModalHandler extends ModalHandler {
 
       case ButtonState.ERROR:
         if (startBtn) {
-          startBtn.textContent = 'Start';
+          startBtn.textContent = START_BTN_TEXT_IDLE;
           startBtn.disabled = false;
           startBtn.classList.add('bg-blue-500', 'hover:bg-blue-600', 'text-white');
         }
