@@ -20,6 +20,7 @@ export class SemanticSettingsModalHandler extends ModalHandler {
   private isProcessing: boolean = false;
   private profileService: ProfileService;
   private modelDropdown: CustomModelDropdown;
+  private batchEventsRegistered: boolean = false;
 
   constructor(
     uiUtils: UIUtils,
@@ -113,6 +114,11 @@ export class SemanticSettingsModalHandler extends ModalHandler {
   }
 
   private setupBatchEvents(): void {
+    // Prevent multiple registrations of the same event listeners
+    if (this.batchEventsRegistered) {
+      return;
+    }
+
     // Set up word meaning streaming listener
     window.electronAPI.onSemanticBatchProgress((progress: { processed: number; total: number; }) => {
       this.handleSemanticBatchProgress(progress);
@@ -129,6 +135,8 @@ export class SemanticSettingsModalHandler extends ModalHandler {
     }) => {
       this.handleSemanticBatchComplete(result);
     });
+
+    this.batchEventsRegistered = true;
   }
 
   private handleSemanticBatchProgress(progress: { processed: number; total: number; }): void {

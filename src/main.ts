@@ -821,8 +821,7 @@ function setupAutoSyncVectorCallbacks() {
       const profile = await profileManager.getCurrentProfile();
       if (profile?.embedding_config?.enabled) {
         // Clean up embedding when word is deleted
-        // We actually don't need to call it, because foreign key would automatically delete no-use ones 
-        //await dbManager.getVectorDatabase()!.deleteEmbedding(wordId);        
+        await semanticBatchService.deleteWordEmbedding(wordId);        
         console.log(`🗑️ Auto-sync: Cleaned up embedding for deleted word: ${wordId}`);
       }
     } catch (error) {

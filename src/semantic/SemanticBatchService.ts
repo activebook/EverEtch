@@ -304,4 +304,20 @@ export class SemanticBatchService {
     });
 
   }
+
+  /**
+   * Delete word embedding from vector database
+   * @param wordId 
+   * @param profile 
+   */
+  async deleteWordEmbedding(
+    wordId: string
+  ): Promise<void> {
+
+    // Initialize services
+    this.initialize();
+
+    // Delete embedding
+    await this.vectorManager!.deleteEmbedding(wordId);
+  }
 }

@@ -15,7 +15,6 @@ export interface SemanticSearchResponse {
   queryEmbedding?: number[];
   embeddingStats?: {
     totalEmbeddings: number;
-    uniqueModels: string[];
     averageEmbeddingSize: number;
   };
   searchTime: number;

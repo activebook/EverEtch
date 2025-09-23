@@ -1,4 +1,4 @@
-import sqlite3 from 'sqlite3';
+import Database from 'better-sqlite3';
 import * as sqliteVec from 'sqlite-vec';
 import { Utils } from '../utils/Utils.js';
 import { WordListItem } from "../database/DatabaseManager.js";
@@ -23,60 +23,81 @@ export interface SemanticWordItem {
 }
 
 export class VectorDatabaseManager {
-  private db: sqlite3.Database | null = null;
+  private db: Database.Database | null = null;
 
-  constructor(db?: sqlite3.Database) {
+  constructor(db?: Database.Database) {
     if (db) {
       this.db = db;
     }
   }
 
-  initialize(dbPath: string, existingDb?: sqlite3.Database): Promise<void> {
+  initialize(dbPath: string, existingDb?: Database.Database): Promise<void> {
     return new Promise((resolve, reject) => {
-      // If we already have a database connection, use it
-      if (existingDb) {
-        this.db = existingDb;
-        this.createVectorTables().then(resolve).catch(reject);
-        return;
-      }
-
-      // Otherwise create a new connection
-      Utils.ensureDataDirectory();
-
-      // Open database with sqlite-vec support
-      this.db = new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE, (err: any) => {
-        if (err) {
-          reject(err);
+      try {
+        // If we already have a database connection, use it
+        if (existingDb) {
+          this.db = existingDb;
+          this.loadVectorExtension();
+          this.createVectorTables();
+          resolve();
           return;
         }
-        this.createVectorTables().then(resolve).catch(reject);
-      });
+
+        // Otherwise create a new connection
+        Utils.ensureDataDirectory();
+
+        // Open database with sqlite-vec support
+        this.db = new Database(dbPath);
+
+        // Load the sqlite-vec extension
+        this.loadVectorExtension();
+        this.createVectorTables();
+        resolve();
+      } catch (error) {
+        reject(error);
+      }
     });
   }
 
-  private async createVectorTables(): Promise<void> {
+  /**
+   * Load the sqlite-vec extension into the database
+   */
+  private loadVectorExtension(): void {
     if (!this.db) {
       throw new Error('Database not initialized');
     }
 
     try {
-      // Create vector table for storing embeddings
-      // The key part is ON DELETE CASCADE, it WOULD automatically delete
-      await this.db.exec(`
-        CREATE TABLE IF NOT EXISTS word_embeddings (
-          word_id TEXT PRIMARY KEY,
-          embedding BLOB NOT NULL,
-          model_used TEXT NOT NULL,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (word_id) REFERENCES documents(id) ON DELETE CASCADE
+      // Load the sqlite-vec extension using the sqlite-vec package
+      sqliteVec.load(this.db);
+      console.log('✅ sqlite-vec extension loaded successfully');
+    } catch (error) {
+      console.error('❌ Error loading sqlite-vec extension:', error);
+      throw error;
+    }
+  }
+
+  private createVectorTables(): void {
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
+
+    try {
+      // Create vector table using vec0 virtual table type
+      // This provides efficient similarity search using the match operator
+      this.db.exec(`
+        CREATE VIRTUAL TABLE IF NOT EXISTS word_embeddings USING vec0(
+          word_id TEXT,
+          embedding float[3072], -- Default embedding dimension, will be adjusted based on model
+          model_used TEXT,
+          created_at DATETIME,
+          updated_at DATETIME,
+          distance_metric=cosine   -- set metric
         );
       `);
 
-      // Create index for efficient vector similarity search
-      // Note: We can't use parameters in index expressions, so we create a basic index
-      // The actual similarity search will be done in the WHERE clause of queries
-      await this.db.exec(`
+      // Create index for efficient model-based filtering
+      this.db.exec(`
         CREATE INDEX IF NOT EXISTS idx_embedding_model
         ON word_embeddings(model_used, word_id);
       `);
@@ -91,33 +112,30 @@ export class VectorDatabaseManager {
   /**
    * Store or update word embedding
    */
-  async storeEmbedding(se: SemanticEmbedding): Promise<void> {
+  storeEmbedding(se: SemanticEmbedding): void {
     if (!this.db) {
       throw new Error('Database not initialized');
     }
 
-    return new Promise((resolve, reject) => {
-      const now = Utils.formatDate();
+    try {
+      // Store embedding in vector table
+      // Convert embedding array to JSON string for storage
+      this.db.prepare(`
+        INSERT OR REPLACE INTO word_embeddings (word_id, embedding, model_used)
+        VALUES (?, ?, ?)
+      `).run(se.word_id, JSON.stringify(se.embedding), se.model_used);
 
-      this.db!.run(`
-        INSERT OR REPLACE INTO word_embeddings (word_id, embedding, model_used, updated_at)
-        VALUES (?, ?, ?, ?)
-      `, [se.word_id, JSON.stringify(se.embedding), se.model_used, now], function (err) {
-        if (err) {
-          console.error('❌ Error storing embedding:', err);
-          reject(err);
-        } else {
-          console.debug(`✅ Embedding stored for word ${se.word_id} using model ${se.model_used}`);
-          resolve();
-        }
-      });
-    });
+      console.debug(`✅ Embedding stored for word ${se.word_id} using model ${se.model_used}`);
+    } catch (error) {
+      console.error('❌ Error storing embedding:', error);
+      throw error;
+    }
   }
 
   /**
    * Batch store multiple word embeddings efficiently
    */
-  async batchStoreEmbeddings(embeddings: Array<SemanticEmbedding>): Promise<void> {
+  batchStoreEmbeddings(embeddings: Array<SemanticEmbedding>): void {
     if (!this.db) {
       throw new Error('Database not initialized');
     }
@@ -126,78 +144,46 @@ export class VectorDatabaseManager {
       return; // Nothing to do
     }
 
-    return new Promise((resolve, reject) => {
-      const now = Utils.formatDate();
-
+    try {
       // Use a transaction for better performance and atomicity
-      this.db!.serialize(() => {
-        this.db!.run('BEGIN TRANSACTION', (err: any) => {
-          if (err) {
-            console.error('❌ Error beginning transaction:', err);
-            reject(err);
-            return;
-          }
+      const transaction = this.db.transaction((embeddings: SemanticEmbedding[]) => {
+        const embeddingStmt = this.db!.prepare(`
+          INSERT OR REPLACE INTO word_embeddings (word_id, embedding, model_used)
+          VALUES (?, ?, ?)
+        `);
 
-          let completed = 0;
-          let hasError = false;
-
-          // Process each embedding
-          embeddings.forEach(({ word_id, embedding, model_used }) => {
-            if (hasError) return; // Stop if there's already an error
-
-            this.db!.run(`
-              INSERT OR REPLACE INTO word_embeddings (word_id, embedding, model_used, updated_at)
-              VALUES (?, ?, ?, ?)
-            `, [word_id, JSON.stringify(embedding), model_used, now], (err: any) => {
-              if (err) {
-                console.error(`❌ Error storing embedding for word ${word_id}:`, err);
-                hasError = true;
-                reject(err);
-                return;
-              }
-
-              completed++;
-              console.debug(`✅ Embedding stored for word ${word_id}`);
-
-              // Commit transaction when all embeddings are processed
-              if (completed === embeddings.length && !hasError) {
-                this.db!.run('COMMIT', (err: any) => {
-                  if (err) {
-                    console.error('❌ Error committing transaction:', err);
-                    reject(err);
-                  } else {
-                    console.log(`✅ Successfully stored ${embeddings.length} embeddings in batch`);
-                    resolve();
-                  }
-                });
-              }
-            });
-          });
-        });
+        for (const { word_id, embedding, model_used } of embeddings) {
+          embeddingStmt.run(word_id, JSON.stringify(embedding), model_used);
+          console.debug(`✅ Embedding stored for word ${word_id}`);
+        }
       });
-    });
+
+      transaction(embeddings);
+      console.log(`✅ Successfully stored ${embeddings.length} embeddings in batch`);
+    } catch (error) {
+      console.error('❌ Error batch storing embeddings:', error);
+      throw error;
+    }
   }
 
   /**
    * Get embedding for a word by model
    */
-  async getEmbedding(se: SemanticEmbedding): Promise<number[] | null> {
+  getEmbedding(se: SemanticEmbedding): number[] | null {
     if (!this.db) {
       return null;
     }
 
-    return new Promise((resolve, reject) => {
-      this.db!.get(`
+    try {
+      const row = this.db.prepare(`
         SELECT embedding FROM word_embeddings WHERE word_id = ? AND model_used = ?
-      `, [se.word_id, se.model_used], (err, row: any) => {
-        if (err) {
-          console.error('❌ Error getting embedding:', err);
-          resolve(null);
-        } else {
-          resolve(row ? JSON.parse(row.embedding) : null);
-        }
-      });
-    });
+      `).get(se.word_id, se.model_used) as any;
+
+      return row ? JSON.parse(row.embedding) : null;
+    } catch (error) {
+      console.error('❌ Error getting embedding:', error);
+      return null;
+    }
   }
 
   /**
@@ -205,113 +191,98 @@ export class VectorDatabaseManager {
    * PS. we actually don't need to call it,
    * because foreign key would automatically delete no-use ones
    */
-  async deleteEmbedding(wordId: string): Promise<boolean> {
+  deleteEmbedding(wordId: string): boolean {
     if (!this.db) {
       return false;
     }
 
-    return new Promise((resolve, reject) => {
-      this.db!.run(`
+    try {
+      const result = this.db.prepare(`
         DELETE FROM word_embeddings WHERE word_id = ?
-      `, [wordId], function (err) {
-        if (err) {
-          console.error('❌ Error deleting embedding:', err);
-          resolve(false);
-        } else {
-          resolve(this.changes > 0);
-        }
-      });
-    });
+      `).run(wordId);
+
+      return result.changes > 0;
+    } catch (error) {
+      console.error('❌ Error deleting embedding:', error);
+      return false;
+    }
   }
 
   /**
    * Perform semantic search using vector similarity
+   * Uses sqlite-vec's vec0 virtual table with match operator and distance ordering
    */
-  async semanticSearch(queryEmbedding: number[], limit: number = 50, threshold: number = 0.5): Promise<SemanticWordItem[]> {
+  semanticSearch(queryEmbedding: number[], limit: number = 50, threshold: number = 0.5): SemanticWordItem[] {
     if (!this.db) {
       return [];
     }
 
-    return new Promise((resolve, reject) => {
-      this.db!.all(`
+    try {
+      // Use sqlite-vec's vec0 virtual table with match operator
+      // The match operator performs nearest neighbor search and returns distance
+      // Remember, we use cosine [0-2]
+      // 0 = identical direction, 1 = orthogonal, 2 = opposite direction.
+      const rows = this.db.prepare(`
         SELECT
           we.word_id,
           d.data,
-          sqlite_vec_cosine_similarity(we.embedding, ?) as similarity
+          distance
         FROM word_embeddings we
         JOIN documents d ON we.word_id = d.id
         WHERE d.type = 'word'
-        AND sqlite_vec_cosine_similarity(we.embedding, ?) >= ?
-        ORDER BY similarity DESC
+        AND we.embedding MATCH ?
+        AND distance <= ?
+        ORDER BY distance ASC
         LIMIT ?
-      `, [JSON.stringify(queryEmbedding), JSON.stringify(queryEmbedding), threshold, limit], (err, rows: any[]) => {
-        if (err) {
-          console.error('❌ Error performing semantic search:', err);
-          resolve([]);
-        } else {
-          const results: SemanticWordItem[] = rows.map((row: any) => {
-            const data = JSON.parse(row.data);
-            return {
-              word_item: {
-                id: row.word_id,
-                word: data.word,
-                one_line_desc: data.one_line_desc || '',
-                remark: data.remark
-              },
-              similarity: row.similarity
-            };
-          });
-          resolve(results);
-        }
+      `).all(JSON.stringify(queryEmbedding), (1-threshold), limit) as any[];
+
+      const results: SemanticWordItem[] = rows.map((row: any) => {
+        const data = JSON.parse(row.data);
+        return {
+          word_item: {
+            id: row.word_id,
+            word: data.word,
+            one_line_desc: data.one_line_desc || '',
+            remark: data.remark
+          },
+          similarity: 1.0 - row.distance  // Convert distance to similarity (lower distance = higher similarity)
+        };
       });
-    });
+
+      return results;
+    } catch (error) {
+      console.error('❌ Error performing semantic search:', error);
+      return [];
+    }
   }
 
   /**
    * Get statistics about stored embeddings
    */
-  async getEmbeddingStats(): Promise<{
+  getEmbeddingStats(): {
     totalEmbeddings: number;
-    uniqueModels: string[];
     averageEmbeddingSize: number;
-  }> {
+  } {
     if (!this.db) {
-      return { totalEmbeddings: 0, uniqueModels: [], averageEmbeddingSize: 0 };
+      return { totalEmbeddings: 0, averageEmbeddingSize: 0 };
     }
 
-    return new Promise((resolve, reject) => {
-      this.db!.get(`
+    try {
+      const stats = this.db.prepare(`
         SELECT
           COUNT(*) as total,
-          COUNT(DISTINCT model_used) as model_count,
-          AVG(LENGTH(embedding)) as avg_size
+          AVG(json_array_length(embedding)) as avg_dimensions
         FROM word_embeddings
-      `, (err, stats: any) => {
-        if (err) {
-          console.error('❌ Error getting embedding stats:', err);
-          resolve({ totalEmbeddings: 0, uniqueModels: [], averageEmbeddingSize: 0 });
-          return;
-        }
+      `).get() as any;
 
-        this.db!.all(`
-          SELECT DISTINCT model_used
-          FROM word_embeddings
-          ORDER BY model_used
-        `, (err2, models: any[]) => {
-          if (err2) {
-            console.error('❌ Error getting models:', err2);
-            resolve({ totalEmbeddings: 0, uniqueModels: [], averageEmbeddingSize: 0 });
-            return;
-          }
-
-          resolve({
-            totalEmbeddings: stats.total || 0,
-            uniqueModels: models.map((m: any) => m.model_used),
-            averageEmbeddingSize: Math.round(stats.avg_size || 0)
-          });
-        });
-      });
-    });
+      return {
+        totalEmbeddings: stats.total || 0,
+        averageEmbeddingSize: Math.round(stats.avg_dimensions || 0)
+      };
+    } catch (error) {
+      console.error('❌ Error getting embedding stats:', error);
+      return { totalEmbeddings: 0, averageEmbeddingSize: 0 };
+    }
   }
 
 }

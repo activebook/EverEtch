@@ -1,4 +1,4 @@
-import sqlite3 from 'sqlite3';
+import Database from 'better-sqlite3';
 import { Utils } from '../utils/Utils.js';
 import { DatabaseRecovery } from './DatabaseRecovery.js';
 import { VectorDatabaseManager } from './VectorDatabaseManager.js';
@@ -55,7 +55,7 @@ export interface ProfileConfig {
 }
 
 export class DatabaseManager {
-  private db: sqlite3.Database | null = null;
+  private db: Database.Database | null = null;
   private dbPath: string = '';
   private vectorDb: VectorDatabaseManager | null = null;
 
@@ -89,68 +89,57 @@ export class DatabaseManager {
 
   initialize(profileName: string): Promise<void> {
     return new Promise((resolve, reject) => {
-      Utils.ensureDataDirectory();
-      this.dbPath = Utils.getDatabasePath(profileName);
-      this.db = new sqlite3.Database(this.dbPath, async (err) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-        try {
-          await this.createTables();
-          await this.initializeVectorDatabase(this.dbPath); // Initialize vector database immediately
-          resolve();
-        } catch (initError) {
-          reject(initError);
-        }
-      });
-    });
-  }
-
-  private createTables(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (!this.db) {
-        reject(new Error('Database not initialized'));
-        return;
+      try {
+        Utils.ensureDataDirectory();
+        this.dbPath = Utils.getDatabasePath(profileName);
+        this.db = new Database(this.dbPath);
+        this.db.pragma('journal_mode = WAL');
+        this.createTables();
+        this.initializeVectorDatabase(this.dbPath); // Initialize vector database immediately
+        resolve();
+      } catch (error) {
+        reject(error);
       }
-
-      // Create documents table for NoSQL-style storage
-      const sql = `
-        CREATE TABLE IF NOT EXISTS documents (
-          id TEXT PRIMARY KEY,
-          type TEXT NOT NULL,
-          data TEXT NOT NULL,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        );
-
-        -- Basic indexes
-        CREATE INDEX IF NOT EXISTS idx_type ON documents(type);
-        CREATE INDEX IF NOT EXISTS idx_created_at ON documents(created_at);
-        CREATE INDEX IF NOT EXISTS idx_updated_at ON documents(updated_at);
-
-        -- Word-specific indexes
-        CREATE INDEX IF NOT EXISTS idx_word_lookup ON documents(type, json_extract(data, '$.word'));
-      `;
-
-      this.db.exec(sql, (err) => {
-        if (err) {
-          reject(err);
-        } else {
-          // Handle FTS table creation/updates
-          this.createOrUpdateFTSTable().then(resolve).catch(reject);
-        }
-      });
     });
   }
 
-  private createOrUpdateFTSTable(): Promise<void> {
+  private createTables(): void {
     if (!this.db) {
-      return Promise.resolve();
+      throw new Error('Database not initialized');
+    }
+
+    // Create documents table for NoSQL-style storage
+    const sql = `
+      CREATE TABLE IF NOT EXISTS documents (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        data TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Basic indexes
+      CREATE INDEX IF NOT EXISTS idx_type ON documents(type);
+      CREATE INDEX IF NOT EXISTS idx_created_at ON documents(created_at);
+      CREATE INDEX IF NOT EXISTS idx_updated_at ON documents(updated_at);
+
+      -- Word-specific indexes
+      CREATE INDEX IF NOT EXISTS idx_word_lookup ON documents(type, json_extract(data, '$.word'));
+    `;
+
+    this.db.exec(sql);
+
+    // Handle FTS table creation/updates
+    this.createOrUpdateFTSTable();
+  }
+
+  private createOrUpdateFTSTable(): void {
+    if (!this.db) {
+      return;
     }
 
     const recovery = new DatabaseRecovery(this.db);
-    return recovery.createOrUpdateFTSTable();
+    recovery.createOrUpdateFTSTable();
   }
 
 
@@ -161,13 +150,12 @@ export class DatabaseManager {
         return;
       }
 
-      this.db.get('SELECT COUNT(*) as total FROM documents WHERE type = ?', ['word'], (err, row: { total: number } | undefined) => {
-        if (err) {
-          reject(err);
-          return;
-        }
+      try {
+        const row = this.db.prepare('SELECT COUNT(*) as total FROM documents WHERE type = ?').get('word') as { total: number } | undefined;
         resolve(row?.total || 0);
-      });
+      } catch (error) {
+        reject(error);
+      }
     });
   }
 
@@ -181,39 +169,24 @@ export class DatabaseManager {
 
       try {
         // Get total count using index (guaranteed optimization)
-        const totalResult = await new Promise<{ total: number }>((resolveCount, rejectCount) => {
-          this.db!.get('SELECT COUNT(*) as total FROM documents WHERE type = ?', ['word'], (err, row: { total: number } | undefined) => {
-            if (err) {
-              rejectCount(err);
-              return;
-            }
-            resolveCount({ total: row?.total || 0 });
-          });
-        });
+        const totalRow = this.db!.prepare('SELECT COUNT(*) as total FROM documents WHERE type = ?').get('word') as { total: number } | undefined;
+        const totalResult = { total: totalRow?.total || 0 };
 
         // Get paginated data using indexes - only fetch required fields for performance
-        const dataResult = await new Promise<{ id: string, word: string, one_line_desc: string, remark: string }[]>((resolveData, rejectData) => {
-          const orderDirection = sortOrder === 'asc' ? 'ASC' : 'DESC';
-          const query = `
-            SELECT
-              id,
-              json_extract(data, '$.word') as word,
-              json_extract(data, '$.one_line_desc') as one_line_desc,
-              json_extract(data, '$.remark') as remark
-            FROM documents
-            WHERE type = 'word'
-            ORDER BY created_at ${orderDirection}, updated_at ${orderDirection}
-            LIMIT ${limit} OFFSET ${offset}
-          `;
+        const orderDirection = sortOrder === 'asc' ? 'ASC' : 'DESC';
+        const query = `
+          SELECT
+            id,
+            json_extract(data, '$.word') as word,
+            json_extract(data, '$.one_line_desc') as one_line_desc,
+            json_extract(data, '$.remark') as remark
+          FROM documents
+          WHERE type = 'word'
+          ORDER BY created_at ${orderDirection}, updated_at ${orderDirection}
+          LIMIT ${limit} OFFSET ${offset}
+        `;
 
-          this.db!.all(query, (err, rows: { id: string, word: string, one_line_desc: string, remark: string }[]) => {
-            if (err) {
-              rejectData(err);
-              return;
-            }
-            resolveData(rows);
-          });
-        });
+        const dataResult = this.db!.prepare(query).all() as { id: string, word: string, one_line_desc: string, remark: string }[];
 
         const words: WordListItem[] = dataResult.map(row => ({
           id: row.id,
@@ -239,35 +212,20 @@ export class DatabaseManager {
 
     try {
       // Get total count using index (guaranteed optimization)
-      const totalResult = await new Promise<{ total: number }>((resolveCount, rejectCount) => {
-        this.db!.get('SELECT COUNT(*) as total FROM documents WHERE type = ?', ['word'], (err, row: { total: number } | undefined) => {
-          if (err) {
-            rejectCount(err);
-            return;
-          }
-          resolveCount({ total: row?.total || 0 });
-        });
-      });
+      const totalRow = this.db!.prepare('SELECT COUNT(*) as total FROM documents WHERE type = ?').get('word') as { total: number } | undefined;
+      const totalResult = { total: totalRow?.total || 0 };
 
       // Get paginated data - fetch complete document data
-      const dataResult = await new Promise<{ id: string, data: string }[]>((resolveData, rejectData) => {
-        const orderDirection = sortOrder === 'asc' ? 'ASC' : 'DESC';
-        const query = `
-          SELECT id, data
-          FROM documents
-          WHERE type = 'word'
-          ORDER BY created_at ${orderDirection}, updated_at ${orderDirection}
-          LIMIT ${limit} OFFSET ${offset}
-        `;
+      const orderDirection = sortOrder === 'asc' ? 'ASC' : 'DESC';
+      const query = `
+        SELECT id, data
+        FROM documents
+        WHERE type = 'word'
+        ORDER BY created_at ${orderDirection}, updated_at ${orderDirection}
+        LIMIT ${limit} OFFSET ${offset}
+      `;
 
-        this.db!.all(query, (err, rows: { id: string, data: string }[]) => {
-          if (err) {
-            rejectData(err);
-            return;
-          }
-          resolveData(rows);
-        });
-      });
+      const dataResult = this.db!.prepare(query).all() as { id: string, data: string }[];
 
       const words: WordDocument[] = dataResult.map(row => {
         const wordDoc = JSON.parse(row.data) as WordDocument;
@@ -293,32 +251,29 @@ export class DatabaseManager {
         return;
       }
 
-      // Use LIKE for reliable substring search in word field only - optimized to only fetch required fields
-      const sql = `
-        SELECT
-          id,
-          json_extract(data, '$.word') as word,
-          json_extract(data, '$.one_line_desc') as one_line_desc,
-          json_extract(data, '$.remark') as remark
-        FROM documents
-        WHERE type = 'word'
-        AND json_extract(data, '$.word') LIKE ?
-        ORDER BY
-          CASE WHEN json_extract(data, '$.word') LIKE ? THEN 1 ELSE 2 END,
-          json_extract(data, '$.word')
-        LIMIT 10
-      `;
+      try {
+        // Use LIKE for reliable substring search in word field only - optimized to only fetch required fields
+        const sql = `
+          SELECT
+            id,
+            json_extract(data, '$.word') as word,
+            json_extract(data, '$.one_line_desc') as one_line_desc,
+            json_extract(data, '$.remark') as remark
+          FROM documents
+          WHERE type = 'word'
+          AND json_extract(data, '$.word') LIKE ?
+          ORDER BY
+            CASE WHEN json_extract(data, '$.word') LIKE ? THEN 1 ELSE 2 END,
+            json_extract(data, '$.word')
+          LIMIT 10
+        `;
 
-      // Search for substring anywhere in word
-      const searchPattern = `%${query}%`;
-      // Prioritize words that start with the query
-      const prefixPattern = `${query}%`;
+        // Search for substring anywhere in word
+        const searchPattern = `%${query}%`;
+        // Prioritize words that start with the query
+        const prefixPattern = `${query}%`;
 
-      this.db.all(sql, [searchPattern, prefixPattern], (err, rows: { id: string, word: string, one_line_desc: string, remark: string }[]) => {
-        if (err) {
-          reject(err);
-          return;
-        }
+        const rows = this.db.prepare(sql).all(searchPattern, prefixPattern) as { id: string, word: string, one_line_desc: string, remark: string }[];
 
         const words: WordListItem[] = rows.map(row => ({
           id: row.id,
@@ -327,7 +282,9 @@ export class DatabaseManager {
           remark: row.remark || undefined
         }));
         resolve(words);
-      });
+      } catch (error) {
+        reject(error);
+      }
     });
   }
 
@@ -339,14 +296,13 @@ export class DatabaseManager {
         return;
       }
 
-      this.db.get('SELECT data FROM documents WHERE id = ? AND type = ?', [wordId, 'word'], (err, row: { data: string } | undefined) => {
-        if (err) {
-          reject(err);
-          return;
-        }
+      try {
+        const row = this.db.prepare('SELECT data FROM documents WHERE id = ? AND type = ?').get(wordId, 'word') as { data: string } | undefined;
         console.debug('Word: ', row?.data);
         resolve(row ? JSON.parse(row.data) : null);
-      });
+      } catch (error) {
+        reject(error);
+      }
     });
   }
 
@@ -358,17 +314,12 @@ export class DatabaseManager {
         return;
       }
 
-      this.db.get(
-        'SELECT data FROM documents WHERE type = ? AND json_extract(data, \'$.word\') = ?',
-        ['word', wordName],
-        (err, row: { data: string } | undefined) => {
-          if (err) {
-            reject(err);
-            return;
-          }
-          resolve(row ? JSON.parse(row.data) : null);
-        }
-      );
+      try {
+        const row = this.db.prepare('SELECT data FROM documents WHERE type = ? AND json_extract(data, \'$.word\') = ?').get('word', wordName) as { data: string } | undefined;
+        resolve(row ? JSON.parse(row.data) : null);
+      } catch (error) {
+        reject(error);
+      }
     });
   }
 
@@ -391,21 +342,13 @@ export class DatabaseManager {
             updated_at: Utils.formatDate()
           };
 
-          this.db.run(
-            'UPDATE documents SET data = ?, updated_at = ? WHERE id = ?',
-            [JSON.stringify(updatedWord), updatedWord.updated_at, existingWord.id],
-            (err: any) => {
-              if (err) {
-                reject(err);
-              } else {
-                // Trigger word updated callback for auto-sync
-                if (this.onWordUpdated) {
-                  this.onWordUpdated(updatedWord);
-                }
-                resolve(updatedWord);
-              }
-            }
-          );
+          this.db.prepare('UPDATE documents SET data = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(updatedWord), updatedWord.updated_at, existingWord.id);
+
+          // Trigger word updated callback for auto-sync
+          if (this.onWordUpdated) {
+            this.onWordUpdated(updatedWord);
+          }
+          resolve(updatedWord);
         } else {
           // Create new word
           const id = Utils.generateId('word');
@@ -418,21 +361,13 @@ export class DatabaseManager {
             updated_at: now
           };
 
-          this.db.run(
-            'INSERT INTO documents (id, type, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
-            [id, 'word', JSON.stringify(wordDoc), now, now],
-            (err: any) => {
-              if (err) {
-                reject(err);
-              } else {
-                // Trigger word added callback for auto-sync
-                if (this.onWordAdded) {
-                  this.onWordAdded(wordDoc);
-                }
-                resolve(wordDoc);
-              }
-            }
-          );
+          this.db.prepare('INSERT INTO documents (id, type, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?)').run(id, 'word', JSON.stringify(wordDoc), now, now);
+
+          // Trigger word added callback for auto-sync
+          if (this.onWordAdded) {
+            this.onWordAdded(wordDoc);
+          }
+          resolve(wordDoc);
         }
       } catch (err) {
         reject(err);
@@ -466,21 +401,13 @@ export class DatabaseManager {
           updated_at: new Date().toISOString()
         });
 
-        this.db.run(
-          'UPDATE documents SET data = ?, updated_at = ? WHERE id = ?',
-          [JSON.stringify(updated), updated.updated_at, wordId],
-          (err: any) => {
-            if (err) {
-              reject(err);
-            } else {
-              // Trigger word updated callback for auto-sync
-              if (this.onWordUpdated) {
-                this.onWordUpdated(updated);
-              }
-              resolve(updated);
-            }
-          }
-        );
+        this.db.prepare('UPDATE documents SET data = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(updated), updated.updated_at, wordId);
+
+        // Trigger word updated callback for auto-sync
+        if (this.onWordUpdated) {
+          this.onWordUpdated(updated);
+        }
+        resolve(updated);
       } catch (err) {
         reject(err);
       }
@@ -494,17 +421,13 @@ export class DatabaseManager {
         return;
       }
 
-      this.db.run('DELETE FROM documents WHERE id = ? AND type = ?', [wordId, 'word'], function (this: any, err: any) {
-        if (err) {
-          reject(err);
-        } else {
-          // Trigger word deleted callback for auto-sync
-          if (this.onWordDeleted) {
-            this.onWordDeleted(wordId);
-          }
-          resolve(this.changes > 0);
-        }
-      }.bind(this));
+      const result = this.db.prepare('DELETE FROM documents WHERE id = ? AND type = ?').run(wordId, 'word');
+
+      // Trigger word deleted callback for auto-sync
+      if (this.onWordDeleted) {
+        this.onWordDeleted(wordId);
+      }
+      resolve(result.changes > 0);
     });
   }
 
@@ -521,57 +444,42 @@ export class DatabaseManager {
         const ftsQuery = `"${searchTerm}" OR "${searchTerm}"*`;
 
         // First get total count
-        const totalResult = await new Promise<{ total: number }>((resolveCount, rejectCount) => {
-          const countSql = `
-            SELECT COUNT(*) as total
-            FROM words_fts f
-            WHERE words_fts MATCH ?
-          `;
+        const countSql = `
+          SELECT COUNT(*) as total
+          FROM words_fts f
+          WHERE words_fts MATCH ?
+        `;
 
-          this.db!.get(countSql, [ftsQuery], (err, row: { total: number } | undefined) => {
-            if (err) {
-              rejectCount(err);
-              return;
-            }
-            resolveCount({ total: row?.total || 0 });
-          });
-        });
+        const totalRow = this.db!.prepare(countSql).get(ftsQuery) as { total: number } | undefined;
+        const totalResult = { total: totalRow?.total || 0 };
 
         // Then get paginated results
-        const dataResult = await new Promise<{ id: string, word: string, one_line_desc: string, remark: string }[]>((resolveData, rejectData) => {
-          const sql = `
-            SELECT
-              f.id,
-              f.word,
-              f.one_line_desc,
-              f.remark
-            FROM words_fts f
-            WHERE words_fts MATCH ?
-            ORDER BY
-              CASE
-                WHEN LOWER(f.word) = LOWER(?) THEN 1  -- Exact word match (highest priority)
-                WHEN LOWER(f.word) LIKE LOWER(?) THEN 2  -- Word starts with term
-                ELSE 3  -- Other matches
-              END,
-              bm25(words_fts),
-              f.word
-            LIMIT ${limit} OFFSET ${offset}
-          `;
+        const sql = `
+          SELECT
+            f.id,
+            f.word,
+            f.one_line_desc,
+            f.remark
+          FROM words_fts f
+          WHERE words_fts MATCH ?
+          ORDER BY
+            CASE
+              WHEN LOWER(f.word) = LOWER(?) THEN 1  -- Exact word match (highest priority)
+              WHEN LOWER(f.word) LIKE LOWER(?) THEN 2  -- Word starts with term
+              ELSE 3  -- Other matches
+            END,
+            bm25(words_fts),
+            f.word
+          LIMIT ${limit} OFFSET ${offset}
+        `;
 
-          const params = [
-            ftsQuery,         // FTS5 search query
-            searchTerm,       // exact word match priority
-            `${searchTerm}%`  // word starts with priority
-          ];
+        const params = [
+          ftsQuery,         // FTS5 search query
+          searchTerm,       // exact word match priority
+          `${searchTerm}%`  // word starts with priority
+        ];
 
-          this.db!.all(sql, params, (err, rows: { id: string, word: string, one_line_desc: string, remark: string }[]) => {
-            if (err) {
-              rejectData(err);
-              return;
-            }
-            resolveData(rows);
-          });
-        });
+        const dataResult = this.db!.prepare(sql).all(...params) as { id: string, word: string, one_line_desc: string, remark: string }[];
 
         const words: WordListItem[] = dataResult.map(row => ({
           id: row.id,
@@ -607,80 +515,65 @@ export class DatabaseManager {
         const searchPattern = `%${searchTerm}%`;
 
         // Get total count first
-        const totalResult = await new Promise<{ total: number }>((resolveCount, rejectCount) => {
-          const countSql = `
-            SELECT COUNT(DISTINCT id) as total
-            FROM documents
-            WHERE type = 'word' AND (
-              LOWER(json_extract(data, '$.word')) LIKE LOWER(?)
-              OR LOWER(json_extract(data, '$.tags')) LIKE LOWER(?)
-              OR LOWER(json_extract(data, '$.synonyms')) LIKE LOWER(?)
-              OR LOWER(json_extract(data, '$.antonyms')) LIKE LOWER(?)
-              OR LOWER(json_extract(data, '$.one_line_desc')) LIKE LOWER(?)
-            )
-          `;
+        const countSql = `
+          SELECT COUNT(DISTINCT id) as total
+          FROM documents
+          WHERE type = 'word' AND (
+            LOWER(json_extract(data, '$.word')) LIKE LOWER(?)
+            OR LOWER(json_extract(data, '$.tags')) LIKE LOWER(?)
+            OR LOWER(json_extract(data, '$.synonyms')) LIKE LOWER(?)
+            OR LOWER(json_extract(data, '$.antonyms')) LIKE LOWER(?)
+            OR LOWER(json_extract(data, '$.one_line_desc')) LIKE LOWER(?)
+          )
+        `;
 
-          const params = [
-            searchPattern, // word
-            searchPattern, // tags
-            searchPattern, // synonyms
-            searchPattern, // antonyms
-            searchPattern  // description (no details column anymore)
-          ];
+        const countParams = [
+          searchPattern, // word
+          searchPattern, // tags
+          searchPattern, // synonyms
+          searchPattern, // antonyms
+          searchPattern  // description (no details column anymore)
+        ];
 
-          this.db!.get(countSql, params, (err, row: { total: number } | undefined) => {
-            if (err) {
-              rejectCount(err);
-              return;
-            }
-            resolveCount({ total: row?.total || 0 });
-          });
-        });
+        const totalRow = this.db!.prepare(countSql).get(...countParams) as { total: number } | undefined;
+        const totalResult = { total: totalRow?.total || 0 };
 
         // Get paginated results
-        const dataResult = await new Promise<{ id: string, word: string, one_line_desc: string, remark: string }[]>((resolveData, rejectData) => {
-          const sql = `
-            SELECT DISTINCT
-              id,
-              json_extract(data, '$.word') as word,
-              json_extract(data, '$.one_line_desc') as one_line_desc,
-              json_extract(data, '$.remark') as remark
-            FROM documents
-            WHERE type = 'word' AND (
-              LOWER(json_extract(data, '$.word')) LIKE LOWER(?)
-              OR LOWER(json_extract(data, '$.tags')) LIKE LOWER(?)
-              OR LOWER(json_extract(data, '$.synonyms')) LIKE LOWER(?)
-              OR LOWER(json_extract(data, '$.antonyms')) LIKE LOWER(?)
-              OR LOWER(json_extract(data, '$.one_line_desc')) LIKE LOWER(?)
-            )
-            ORDER BY
-              CASE
-                WHEN LOWER(json_extract(data, '$.word')) = LOWER(?) THEN 1
-                WHEN LOWER(json_extract(data, '$.word')) LIKE LOWER(?) THEN 2
-                ELSE 3
-              END,
-              json_extract(data, '$.word')
-            LIMIT ${limit} OFFSET ${offset}
-          `;
+        const sql = `
+          SELECT DISTINCT
+            id,
+            json_extract(data, '$.word') as word,
+            json_extract(data, '$.one_line_desc') as one_line_desc,
+            json_extract(data, '$.remark') as remark
+          FROM documents
+          WHERE type = 'word' AND (
+            LOWER(json_extract(data, '$.word')) LIKE LOWER(?)
+            OR LOWER(json_extract(data, '$.tags')) LIKE LOWER(?)
+            OR LOWER(json_extract(data, '$.synonyms')) LIKE LOWER(?)
+            OR LOWER(json_extract(data, '$.antonyms')) LIKE LOWER(?)
+            OR LOWER(json_extract(data, '$.one_line_desc')) LIKE LOWER(?)
+          )
+          ORDER BY
+            CASE
+              WHEN LOWER(json_extract(data, '$.word')) = LOWER(?) THEN 1
+              WHEN LOWER(json_extract(data, '$.word')) LIKE LOWER(?) THEN 2
+              ELSE 3
+            END,
+            json_extract(data, '$.word')
+          LIMIT ${limit} OFFSET ${offset}
+        `;
 
-          const params = [
-            searchPattern, // word
-            searchPattern, // tags
-            searchPattern, // synonyms
-            searchPattern, // antonyms
-            searchPattern, // description (no details column anymore)
-            searchTerm,     // exact match priority
-            `${searchTerm}%` // starts with priority
-          ];
+        const params = [
+          searchPattern, // word
+          searchPattern, // tags
+          searchPattern, // synonyms
+          searchPattern, // antonyms
+          searchPattern, // description (no details column anymore)
+          searchTerm,     // exact match priority
+          `${searchTerm}%` // starts with priority
+        ];
 
-          this.db!.all(sql, params, (err, rows: { id: string, word: string, one_line_desc: string, remark: string }[]) => {
-            if (err) {
-              rejectData(err);
-              return;
-            }
-            resolveData(rows);
-          });
-        });
+        const dataResult = this.db!.prepare(sql).all(...params) as { id: string, word: string, one_line_desc: string, remark: string }[];
 
         const words: WordListItem[] = dataResult.map(row => ({
           id: row.id,
@@ -708,13 +601,12 @@ export class DatabaseManager {
         return;
       }
 
-      this.db.get('SELECT data FROM documents WHERE type = ?', ['profile_config'], (err, row: { data: string } | undefined) => {
-        if (err) {
-          reject(err);
-          return;
-        }
+      try {
+        const row = this.db.prepare('SELECT data FROM documents WHERE type = ?').get('profile_config') as { data: string } | undefined;
         resolve(row ? JSON.parse(row.data) : null);
-      });
+      } catch (error) {
+        reject(error);
+      }
     });
   }
 
@@ -725,26 +617,21 @@ export class DatabaseManager {
         return;
       }
 
-      const id = 'profile_config';
-      const now = new Date().toISOString();
+      try {
+        const id = 'profile_config';
+        const now = new Date().toISOString();
 
-      const configDoc: ProfileConfig = {
-        id,
-        ...config,
-        last_opened: now
-      };
+        const configDoc: ProfileConfig = {
+          id,
+          ...config,
+          last_opened: now
+        };
 
-      this.db.run(
-        'INSERT OR REPLACE INTO documents (id, type, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
-        [id, 'profile_config', JSON.stringify(configDoc), now, now],
-        function (err) {
-          if (err) {
-            reject(err);
-          } else {
-            resolve(configDoc);
-          }
-        }
-      );
+        this.db.prepare('INSERT OR REPLACE INTO documents (id, type, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?)').run(id, 'profile_config', JSON.stringify(configDoc), now, now);
+        resolve(configDoc);
+      } catch (error) {
+        reject(error);
+      }
     });
   }
 
@@ -753,16 +640,9 @@ export class DatabaseManager {
       if (this.db) {
         // Check if database is already closed or in a bad state
         try {
-          this.db.close((err) => {
-            this.db = null;
-            if (err) {
-              // Only log non-misuse errors, as SQLITE_MISUSE often means already closed
-              if (!err.message.includes('SQLITE_MISUSE')) {
-                console.error('Error closing database:', err);
-              }
-            }
-            resolve();
-          });
+          this.db.close();
+          this.db = null;
+          resolve();
         } catch (error) {
           // Database might already be closed
           this.db = null;
@@ -781,33 +661,18 @@ export class DatabaseManager {
    */
   reconnectToDatabase(profileName: string): Promise<void> {
     return new Promise((resolve, reject) => {
-      // Close any existing connection
-      if (this.db) {
-        this.db.close((closeErr) => {
-          if (closeErr) {
-            console.error('Error closing existing database:', closeErr);
-          }
+      try {
+        // Close any existing connection
+        if (this.db) {
+          this.db.close();
+        }
 
-          // Now open the new database
-          this.dbPath = Utils.getDatabasePath(profileName);
-          this.db = new sqlite3.Database(this.dbPath, (err) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve();
-            }
-          });
-        });
-      } else {
-        // No existing connection, just open the database
+        // Now open the new database
         this.dbPath = Utils.getDatabasePath(profileName);
-        this.db = new sqlite3.Database(this.dbPath, (err) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve();
-          }
-        });
+        this.db = new Database(this.dbPath);
+        resolve();
+      } catch (error) {
+        reject(error);
       }
     });
   }
@@ -833,7 +698,7 @@ export class DatabaseManager {
   /**
    * Get database instance for direct access (for batch processing)
    */
-  getDatabase(): sqlite3.Database | null {
+  getDatabase(): Database.Database | null {
     return this.db;
   }
 
@@ -845,31 +710,20 @@ export class DatabaseManager {
   static async validateDatabaseFormat(dbPath: string): Promise<boolean> {
     return new Promise((resolve) => {
       try {
-        const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READONLY, (err: any) => {
-          if (err) {
-            resolve(false);
-            return;
-          }
+        const db = new Database(dbPath, { readonly: true });
 
-          // Check if required tables exist
-          db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='documents'", (err: any, row: any) => {
-            if (err || !row) {
-              db.close();
-              resolve(false);
-              return;
-            }
+        // Check if required tables exist
+        const tableRow = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='documents'").get() as any;
+        if (!tableRow) {
+          db.close();
+          resolve(false);
+          return;
+        }
 
-            // Check if profile_config exists
-            db.get("SELECT data FROM documents WHERE type='profile_config' LIMIT 1", (err: any, row: any) => {
-              db.close();
-              if (err || !row) {
-                resolve(false);
-              } else {
-                resolve(true);
-              }
-            });
-          });
-        });
+        // Check if profile_config exists
+        const configRow = db.prepare("SELECT data FROM documents WHERE type='profile_config' LIMIT 1").get() as any;
+        db.close();
+        resolve(!!configRow);
       } catch (error) {
         console.error('Error validating database:', error);
         resolve(false);

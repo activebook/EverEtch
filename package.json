@@ -44,6 +44,7 @@
   },
   "dependencies": {
     "@google/genai": "^1.19.0",
+    "better-sqlite3": "^12.4.1",
     "electron-store": "^10.1.0",
     "googleapis": "^159.0.0",
     "marked": "^16.2.1",
