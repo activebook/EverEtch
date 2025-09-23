@@ -33,6 +33,7 @@ export class EventManager {
     this.setupProfileEvents();
     this.setupUIEvents();
     this.setupStreamingEvents();
+    this.setupSemanticSearchEvents();
   }
 
   private setupWordInputEvents(): void {
@@ -233,7 +234,7 @@ export class EventManager {
 
     window.electronAPI.onProtocolSwitchProfile(async (profileName: string) => {
       await this.handleProtocolSwitchProfile(profileName);
-    });
+    });    
   }
 
   // Event handler implementations
@@ -478,5 +479,21 @@ export class EventManager {
 
     // Reload panel widths
     await this.uiUtils.loadPanelWidths();
+  }
+
+  private setupSemanticSearchEvents(): void { 
+    // Set up semantic search status change listener
+    document.addEventListener('semantic-search-status-changed', (event: any) => {
+      this.handleSemanticSearchStatusChange(event.detail.enabled);
+    });
+  }
+
+  private handleSemanticSearchStatusChange(enabled: boolean): void {
+    console.log(`🔍 EventManager: Semantic search status changed to: ${enabled ? 'enabled' : 'disabled'}`);
+
+    this.semanticSearchControls.setEnabled(enabled);
+    
+    // Log the status change for debugging
+    console.log(`📊 Semantic search UI updated: ${enabled ? 'enabled' : 'disabled'}`);
   }
 }

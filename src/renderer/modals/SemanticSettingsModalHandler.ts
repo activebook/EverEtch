@@ -257,6 +257,24 @@ export class SemanticSettingsModalHandler extends ModalHandler {
         statusText.className = 'text-sm font-medium text-slate-700';
       }
     }
+
+    // Send custom event to notify other components about semantic search status change
+    this.sendSemanticSearchStatusEvent(enabled);
+  }
+
+  /**
+   * Send custom event to notify other components about semantic search status
+   */
+  private sendSemanticSearchStatusEvent(enabled: boolean): void {
+    const event = new CustomEvent('semantic-search-status-changed', {
+      detail: {
+        enabled: enabled,
+        timestamp: new Date().toISOString()
+      }
+    });
+
+    document.dispatchEvent(event);
+    console.log(`📡 Semantic search status event sent: enabled=${enabled}`);
   }
 
   /**
