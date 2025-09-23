@@ -84,7 +84,8 @@ export class SemanticBatchService {
       throw new Error('Embedding configuration not found in profile');
     }
 
-    let proceedWords = []
+    const proceedWords: WordDocument[] = [];
+
     // Process words in parallel within the batch
     for (const wordData of words) {
       // Check if processing should be cancelled
@@ -100,30 +101,43 @@ export class SemanticBatchService {
         continue; // Skip this word
       }
 
-      // Wait for generating embedding
       proceedWords.push(wordData);
     }
+
     if (proceedWords.length === 0) {
       return result;
     }
 
     try {
+      console.log(`🔄 Generating embeddings for ${proceedWords.length} words...`);
       const batchResult = await this.embeddingClient!.generateBatchWordEmbeddings(proceedWords, profile);
       if (!batchResult.embeddings) {
         throw new Error('Embedding generation failed');
       }
 
-      let batchSE = [] as SemanticEmbedding[];
-      await proceedWords.forEach(async (wordData, index) => {
-        const embedding = batchResult.embeddings[index];
-        batchSE.push({ word_id: wordData.id, embedding, model_used: batchResult.model_used });
-      });
+      console.log(`✅ Generated ${batchResult.embeddings.length} embeddings`);
+
+      // Create embeddings array for batch storage
+      const batchSE: SemanticEmbedding[] = [];
+      for (let i = 0; i < proceedWords.length; i++) {
+        const wordData = proceedWords[i];
+        const embedding = batchResult.embeddings[i];
+        batchSE.push({
+          word_id: wordData.id,
+          embedding,
+          model_used: batchResult.model_used
+        });
+      }
+
+      console.log(`💾 Storing ${batchSE.length} embeddings...`);
       await this.vectorManager!.batchStoreEmbeddings(batchSE);
       result.processed += proceedWords.length;
+      console.log(`✅ Successfully stored ${batchSE.length} embeddings`);
     } catch (error) {
       result.failed += proceedWords.length;
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       result.error = errorMessage;
+      console.error(`❌ Batch processing failed: ${errorMessage}`);
     }
 
     return result;
@@ -135,12 +149,16 @@ export class SemanticBatchService {
   async startBatchProcessing(
     options: BatchProcessingOptions = {}
   ): Promise<BatchProcessingResult> {
+    console.log('🚀 Starting batch processing...');
+
     if (this.isProcessing) {
+      console.error('❌ Batch processing already in progress');
       throw new Error('Batch processing already in progress');
     }
 
     // Initialize services
     this.initialize();
+    console.log('✅ Services initialized');
 
     this.isProcessing = true;
     this.abortController = new AbortController();
@@ -155,15 +173,21 @@ export class SemanticBatchService {
       };
 
       // Get current profile config
+      console.log('🔍 Getting current profile...');
       const currentProfile = await this.profileManager.getCurrentProfile();
       if (!currentProfile) {
+        console.error('❌ No profile configured');
         throw new Error('No profile configured');
       }
+      console.log('✅ Profile loaded:', currentProfile.name);
 
       // Check words count
+      console.log('🔍 Counting words...');
       const totalWords = await this.dbManager.getWordsCount();
+      console.log(`📊 Total words: ${totalWords}`);
 
       if (totalWords === 0) {
+        console.log('ℹ️ No words to process');
         return {
           success: true,
           totalWords: 0,
@@ -181,24 +205,31 @@ export class SemanticBatchService {
       // Process words in batches
       const batchSize = finalOptions.batchSize || 10;
       const totalBatches = Math.ceil(totalWords / batchSize);
+      console.log(`📦 Processing in ${totalBatches} batches of ${batchSize} words each`);
 
       for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
         // Check if processing should be cancelled
         if (finalOptions.signal?.aborted) {
+          console.log('🛑 Processing cancelled by user');
           throw new Error('Processing cancelled by user');
         }
 
         const startIndex = batchIndex * batchSize;
+        console.log(`🔄 Processing batch ${batchIndex + 1}/${totalBatches} (words ${startIndex + 1}-${Math.min(startIndex + batchSize, totalWords)})`);
+
         const batch = await this.dbManager.getWordDocumentsPaginated(startIndex, batchSize);
+        console.log(`📋 Batch contains ${batch.words.length} words`);
 
         // Process this batch
         const batchResult = await this.processBatch(batch.words, currentProfile, finalOptions);
+        console.log(`✅ Batch result: ${batchResult.processed} processed, ${batchResult.failed} failed`);
 
         totalProcessed += batchResult.processed;
         totalFailed += batchResult.failed;
         error = batchResult.error;
 
         if (totalFailed > 0) {
+          console.log(`❌ Stopping at first failure: ${error}`);
           // Stop at first failure
           break;
         }
@@ -221,6 +252,8 @@ export class SemanticBatchService {
         duration
       };
 
+      console.log(`🎯 Batch processing completed:`, result);
+
       // Call completion callback
       if (finalOptions.onComplete) {
         finalOptions.onComplete(result);
@@ -234,6 +267,7 @@ export class SemanticBatchService {
     } finally {
       this.isProcessing = false;
       this.abortController = null;
+      console.log('🧹 Cleanup completed');
     }
   }
 

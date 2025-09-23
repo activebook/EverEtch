@@ -835,8 +835,7 @@ ipcMain.handle('start-semantic-batch-processing', async (event, config: any) => 
   try {
     // Update profile with embedding configuration
     const currentProfile = await profileManager.getCurrentProfile();
-    const updatedProfile = { ...currentProfile };
-    updatedProfile.embedding_config = config;
+    const updatedProfile = { ...currentProfile, ...config };
     if (updatedProfile.embedding_config) {
       updatedProfile.embedding_config.enabled = true;
       await profileManager.updateProfileConfig(currentProfile!.name, updatedProfile);

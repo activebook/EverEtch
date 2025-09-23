@@ -14,7 +14,6 @@ export enum ButtonState {
 
 export class SemanticSettingsModalHandler extends ModalHandler {
   private isProcessing: boolean = false;
-  private currentButtonState: ButtonState = ButtonState.IDLE;
   private profileService: ProfileService;
   private modelDropdown: CustomModelDropdown;
 
@@ -36,7 +35,7 @@ export class SemanticSettingsModalHandler extends ModalHandler {
     if (!templateLoaded) return;
 
     try {
-      this.loadCurrentConfiguration();
+      await this.loadCurrentConfiguration();
       // Reset the model dropdown selection
       this.modelDropdown.resetSelectModel();
     } catch (error) {
@@ -45,7 +44,6 @@ export class SemanticSettingsModalHandler extends ModalHandler {
     }
 
     this.showModal('semantic-settings-modal');
-    await this.loadCurrentConfiguration();
   }
 
   /**
@@ -63,13 +61,19 @@ export class SemanticSettingsModalHandler extends ModalHandler {
    * Attach event listeners to modal elements
    */
   protected setupModalEvent(): void {
-    // Start/Cancel button
-    const startBtn = document.getElementById('start-btn') as HTMLButtonElement;
-    const closeBtn = document.getElementById('close-btn') as HTMLButtonElement;
+    // Start/Stop button
+    const startBtn = document.getElementById('semantic-batch-start-btn') as HTMLButtonElement;
+    const stopBtn = document.getElementById('semantic-batch-stop-btn') as HTMLButtonElement;
+    const closeBtn = document.getElementById('semantic-settings-close-modal-btn') as HTMLButtonElement;
 
     if (startBtn && !startBtn._listenerAdded) {
       startBtn._listenerAdded = true;
       startBtn.addEventListener('click', () => this.handleStartBatch());
+    }
+
+    if (stopBtn && !stopBtn._listenerAdded) {
+      stopBtn._listenerAdded = true;
+      stopBtn.addEventListener('click', () => this.handleStopBatch());
     }
 
     if (closeBtn && !closeBtn._listenerAdded) {
@@ -99,10 +103,6 @@ export class SemanticSettingsModalHandler extends ModalHandler {
     }
 
     // Set up model dropdown
-
-    // Initialize button state to IDLE
-    this.currentButtonState = ButtonState.IDLE;
-    this.updateButtonState(ButtonState.IDLE);
 
     // Set up batch events
     this.setupBatchEvents();
@@ -153,7 +153,7 @@ export class SemanticSettingsModalHandler extends ModalHandler {
       this.showSuccess(`Semantic search completed successfully. Total words: ${result.totalWords}, Processed: ${result.processed}, Failed: ${result.failed}`);
     } else {
       this.updateButtonState(ButtonState.ERROR);
-      this.showError(`Semantic search failed: ${result.error}`);
+      this.showError(`Semantic search failed: ${result.error}. Total words: ${result.totalWords}, Processed: ${result.processed}, Failed: ${result.failed}`);
     }
   }
 
@@ -166,11 +166,18 @@ export class SemanticSettingsModalHandler extends ModalHandler {
       const profileConfig = await this.profileService.getProfileConfig();
       if (profileConfig && profileConfig.embedding_config) {
         // Load configuration from profile's embedding_config
-        this.loadConfigurationFromProfile(profileConfig);
-        this.updateStatusIndicator(true);
+        this.loadConfigurationFromProfile(profileConfig);        
+        if (profileConfig.embedding_config.enabled) {
+          this.updateStatusIndicator(true);
+          this.updateButtonState(ButtonState.COMPLETED);
+        } else {
+          this.updateStatusIndicator(false);
+          this.updateButtonState(ButtonState.IDLE);
+        }
       } else {
         this.setDefaultConfiguration();
         this.updateStatusIndicator(false);
+        this.updateButtonState(ButtonState.IDLE);
       }
     } catch (error) {
       console.error('Error loading configuration:', error);
@@ -275,13 +282,12 @@ export class SemanticSettingsModalHandler extends ModalHandler {
   }
 
   /**
-   * Update button state with sophisticated UI management
+   * Update button state with proper UI management
    */
   private updateButtonState(newState: ButtonState): void {
-    this.currentButtonState = newState;
-    const startBtn = document.getElementById('start-btn') as HTMLButtonElement;
-    const cancelBtn = document.getElementById('cancel-btn') as HTMLButtonElement;
-    const formElements = document.querySelectorAll('#semantic-search-settings-modal input, #semantic-search-settings-modal select');
+    const startBtn = document.getElementById('semantic-batch-start-btn') as HTMLButtonElement;
+    const stopBtn = document.getElementById('semantic-batch-stop-btn') as HTMLButtonElement;
+    const formElements = document.querySelectorAll('#semantic-settings-modal input, #semantic-settings-modal select');
 
     // Remove all existing classes first
     if (startBtn) {
@@ -294,11 +300,10 @@ export class SemanticSettingsModalHandler extends ModalHandler {
           startBtn.textContent = 'Start Processing';
           startBtn.disabled = false;
           startBtn.classList.add('bg-blue-500', 'hover:bg-blue-600', 'text-white');
-          this.setupButtonHoverEffect(startBtn, 'Start Processing', 'bg-blue-500 hover:bg-blue-600');
         }
-        // Cancel button always visible and just closes modal
-        if (cancelBtn) {
-          cancelBtn.classList.remove('hidden');
+        // Hide stop button in IDLE state
+        if (stopBtn) {
+          stopBtn.classList.add('hidden');
         }
         // Enable form elements
         formElements.forEach((element: any) => {
@@ -308,14 +313,13 @@ export class SemanticSettingsModalHandler extends ModalHandler {
 
       case ButtonState.PROCESSING:
         if (startBtn) {
-          startBtn.textContent = 'Processing...';
+          startBtn.textContent = 'In Processing...';
           startBtn.disabled = true;
-          startBtn.classList.add('bg-amber-400', 'cursor-not-allowed', 'text-white');
-          this.setupButtonHoverEffect(startBtn, 'Stop', 'bg-red-500 hover:bg-red-600');
+          startBtn.classList.add('bg-green-400', 'hover:bg-green-500', 'text-white');
         }
-        // Cancel button always visible and just closes modal
-        if (cancelBtn) {
-          cancelBtn.classList.remove('hidden');
+        // Show stop button in PROCESSING state
+        if (stopBtn) {
+          stopBtn.classList.remove('hidden');
         }
         // Disable form elements
         formElements.forEach((element: any) => {
@@ -326,13 +330,12 @@ export class SemanticSettingsModalHandler extends ModalHandler {
       case ButtonState.COMPLETED:
         if (startBtn) {
           startBtn.textContent = 'Started';
-          startBtn.disabled = false;
+          startBtn.disabled = true;
           startBtn.classList.add('bg-green-500', 'hover:bg-green-600', 'text-white');
-          this.setupButtonHoverEffect(startBtn, 'Stop', 'bg-red-500 hover:bg-red-600');
         }
-        // Cancel button always visible and just closes modal
-        if (cancelBtn) {
-          cancelBtn.classList.add('hidden');
+        // Show stop button in COMPLETED state
+        if (stopBtn) {
+          stopBtn.classList.remove('hidden');
         }
         // Enable form elements
         formElements.forEach((element: any) => {
@@ -345,11 +348,10 @@ export class SemanticSettingsModalHandler extends ModalHandler {
           startBtn.textContent = 'Start';
           startBtn.disabled = false;
           startBtn.classList.add('bg-blue-500', 'hover:bg-blue-600', 'text-white');
-          this.setupButtonHoverEffect(startBtn, 'Start', 'bg-blue-500 hover:bg-blue-600');
         }
-        // Cancel button always visible and just closes modal
-        if (cancelBtn) {
-          cancelBtn.classList.remove('hidden');
+        // Hide stop button in ERROR state
+        if (stopBtn) {
+          stopBtn.classList.add('hidden');
         }
         // Enable form elements
         formElements.forEach((element: any) => {
@@ -359,41 +361,14 @@ export class SemanticSettingsModalHandler extends ModalHandler {
     }
   }
 
-  /**
-   * Setup hover effects for buttons
-   */
-  private setupButtonHoverEffect(button: HTMLButtonElement, hoverText: string, hoverClasses: string): void {
-    let hoverSetup = false;
 
-    const setupHover = () => {
-      if (!hoverSetup) {
-        button.addEventListener('mouseenter', () => {
-          if (this.currentButtonState === ButtonState.PROCESSING && hoverText === 'Stop') {
-            button.textContent = hoverText;
-            button.className = 'px-6 py-2 rounded-lg transition-all duration-200 hover:shadow-lg font-medium text-sm bg-red-500 hover:bg-red-600 text-white';
-          } else if (this.currentButtonState === ButtonState.COMPLETED && hoverText === 'Stop') {
-            button.textContent = hoverText;
-            button.className = 'px-6 py-2 rounded-lg transition-all duration-200 hover:shadow-lg font-medium text-sm bg-red-500 hover:bg-red-600 text-white';
-          }
-        });
-
-        button.addEventListener('mouseleave', () => {
-          this.updateButtonState(this.currentButtonState);
-        });
-
-        hoverSetup = true;
-      }
-    };
-
-    setupHover();
-  }
 
   /**
    * Handle start button click
    */
   private async handleStartBatch(): Promise<void> {
     if (this.isProcessing) {
-      await this.handleCancelBatch();
+      await this.handleStopBatch();
       return;
     }
 
@@ -433,18 +408,19 @@ export class SemanticSettingsModalHandler extends ModalHandler {
       const result = await window.electronAPI.startSemanticBatchProcessing(config);
 
       if (result.success) {
-        this.showSuccess('Semantic search processing completed successfully!');
         this.updateStatusIndicator(true);
       } else {
-        this.showError(result.message || 'Processing failed');
+        // Force stop
+        this.handleStopBatch();
       }
 
     } catch (error) {
       console.error('Error starting semantic search:', error);
       this.showError('Failed to start semantic search');
+      // Force stop
+      this.handleStopBatch();
     } finally {
       this.isProcessing = false;
-      //this.updateButtonState(ButtonState.IDLE);
     }
   }
 
@@ -475,24 +451,26 @@ export class SemanticSettingsModalHandler extends ModalHandler {
   }
 
   /**
-   * Handle cancel button click
+   * Handle stop button click
    */
-  private async handleCancelBatch(): Promise<void> {
-    if (this.isProcessing) {
-      try {
-        const result = await window.electronAPI.cancelSemanticBatchProcessing();
-        if (result.success) {
-          this.showSuccess('Semantic search processing cancelled');
-        } else {
-          this.showError(result.message || 'Cancel processing failed');
-        }
-      } catch (error) {
-        console.error('Error cancelling semantic search:', error);
-        this.showError('Failed to cancel semantic search');
-      } finally {
-        this.isProcessing = false;
-        this.updateButtonState(ButtonState.IDLE);
+  private async handleStopBatch(): Promise<void> {
+    // Because stop btn only show up on Processing and Complete state
+    // We can assume it's always in right state
+    try {
+      const result = await window.electronAPI.cancelSemanticBatchProcessing();
+      if (result.success) {
+        this.showSuccess('Semantic search processing stopped');
+      } else {
+        this.showError(result.message || 'Stop processing failed');
       }
+    } catch (error) {
+      console.error('Error stopping semantic search:', error);
+      this.showError('Failed to stop semantic search');
+    } finally {
+      this.isProcessing = false;
+      // Update status indicator to disabled when stopping
+      this.updateStatusIndicator(false);
+      this.updateButtonState(ButtonState.IDLE);
     }
   }
 

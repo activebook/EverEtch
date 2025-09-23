@@ -166,8 +166,9 @@ export class DatabaseManager {
           reject(err);
           return;
         }
-      })
-    })
+        resolve(row?.total || 0);
+      });
+    });
   }
 
   // Paginated word loading for lazy loading - optimized to only fetch required fields
@@ -231,58 +232,56 @@ export class DatabaseManager {
   }
 
   // Paginated word documents loading - returns full WordDocument objects
-  getWordDocumentsPaginated(offset: number, limit: number, sortOrder: 'asc' | 'desc' = 'desc'): Promise<{ words: WordDocument[], hasMore: boolean, total: number }> {
-    return new Promise(async (resolve, reject) => {
-      if (!this.db) {
-        resolve({ words: [], hasMore: false, total: 0 });
-        return;
-      }
+  async getWordDocumentsPaginated(offset: number, limit: number, sortOrder: 'asc' | 'desc' = 'desc'): Promise<{ words: WordDocument[], hasMore: boolean, total: number }> {
+    if (!this.db) {
+      return { words: [], hasMore: false, total: 0 };
+    }
 
-      try {
-        // Get total count using index (guaranteed optimization)
-        const totalResult = await new Promise<{ total: number }>((resolveCount, rejectCount) => {
-          this.db!.get('SELECT COUNT(*) as total FROM documents WHERE type = ?', ['word'], (err, row: { total: number } | undefined) => {
-            if (err) {
-              rejectCount(err);
-              return;
-            }
-            resolveCount({ total: row?.total || 0 });
-          });
+    try {
+      // Get total count using index (guaranteed optimization)
+      const totalResult = await new Promise<{ total: number }>((resolveCount, rejectCount) => {
+        this.db!.get('SELECT COUNT(*) as total FROM documents WHERE type = ?', ['word'], (err, row: { total: number } | undefined) => {
+          if (err) {
+            rejectCount(err);
+            return;
+          }
+          resolveCount({ total: row?.total || 0 });
         });
+      });
 
-        // Get paginated data - fetch complete document data
-        const dataResult = await new Promise<{ id: string, data: string }[]>((resolveData, rejectData) => {
-          const orderDirection = sortOrder === 'asc' ? 'ASC' : 'DESC';
-          const query = `
-            SELECT id, data
-            FROM documents
-            WHERE type = 'word'
-            ORDER BY created_at ${orderDirection}, updated_at ${orderDirection}
-            LIMIT ${limit} OFFSET ${offset}
-          `;
+      // Get paginated data - fetch complete document data
+      const dataResult = await new Promise<{ id: string, data: string }[]>((resolveData, rejectData) => {
+        const orderDirection = sortOrder === 'asc' ? 'ASC' : 'DESC';
+        const query = `
+          SELECT id, data
+          FROM documents
+          WHERE type = 'word'
+          ORDER BY created_at ${orderDirection}, updated_at ${orderDirection}
+          LIMIT ${limit} OFFSET ${offset}
+        `;
 
-          this.db!.all(query, (err, rows: { id: string, data: string }[]) => {
-            if (err) {
-              rejectData(err);
-              return;
-            }
-            resolveData(rows);
-          });
+        this.db!.all(query, (err, rows: { id: string, data: string }[]) => {
+          if (err) {
+            rejectData(err);
+            return;
+          }
+          resolveData(rows);
         });
+      });
 
-        const words: WordDocument[] = dataResult.map(row => {
-          const wordDoc = JSON.parse(row.data) as WordDocument;
-          return wordDoc;
-        });
+      const words: WordDocument[] = dataResult.map(row => {
+        const wordDoc = JSON.parse(row.data) as WordDocument;
+        return wordDoc;
+      });
 
-        const total = totalResult.total;
-        const hasMore = offset + limit < total;
+      const total = totalResult.total;
+      const hasMore = offset + limit < total;
 
-        resolve({ words, hasMore, total });
-      } catch (err) {
-        reject(err);
-      }
-    });
+      return { words, hasMore, total };
+    } catch (err) {
+      console.error('Error in getWordDocumentsPaginated:', err);
+      return { words: [], hasMore: false, total: 0 };
+    }
   }
 
   // Optimized search method that only returns necessary fields for suggestions
