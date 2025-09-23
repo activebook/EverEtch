@@ -302,12 +302,14 @@ export class SemanticSettingsModalHandler extends ModalHandler {
     }
 
     return {
-      provider: providerSelect.value,
-      model: modelInput.value.trim(),
-      endpoint: endpointInput.value.trim(),
-      api_key: apiKeyInput.value.trim(),
-      batch_size: parseInt(batchSizeInput.value) || 10,
-      similarity_threshold: parseFloat(thresholdSlider.value) || 0.5
+      embedding_config: {
+        provider: providerSelect.value,
+        model: modelInput.value.trim(),
+        endpoint: endpointInput.value.trim(),
+        api_key: apiKeyInput.value.trim(),
+        batch_size: parseInt(batchSizeInput.value) || 10,
+        similarity_threshold: parseFloat(thresholdSlider.value) || 0.5
+      }
     };
   }
 
@@ -426,7 +428,8 @@ export class SemanticSettingsModalHandler extends ModalHandler {
       const updatedProfile = {
         ...currentProfile,
         embedding_config: {
-          ...config,
+          ...currentProfile.embedding_config,
+          ...config.embedding_config,
           enabled: true
         }
       };
@@ -435,7 +438,7 @@ export class SemanticSettingsModalHandler extends ModalHandler {
       this.isProcessing = true;
       this.updateButtonState(ButtonState.PROCESSING);
 
-      const result = await window.electronAPI.startSemanticBatchProcessing(config);
+      const result = await window.electronAPI.startSemanticBatchProcessing(updatedProfile);
 
       if (result.success) {
         this.updateStatusIndicator(true);
