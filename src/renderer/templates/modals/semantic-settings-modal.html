@@ -31,21 +31,26 @@
                 <div class="space-y-4">
                     <h4 class="text-md font-semibold text-slate-800 border-b border-amber-200/60 pb-2">API Configuration</h4>
 
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label for="embedding-provider" class="block text-sm font-medium text-slate-700 mb-1.5">API Provider</label>
+                    <div>
+                        <label for="embedding-provider" class="block text-sm font-medium text-slate-700 mb-1.5">API Provider</label>
+                        <div class="grid grid-cols-2 gap-4">
                             <select id="embedding-provider" disabled
                                 class="w-full px-3 py-2 border border-amber-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-amber-50/80 backdrop-blur-sm text-slate-700 text-sm">
                                 <option value="openai">OpenAI</option>
                                 <option value="google">Google</option>
                             </select>
+                            <div class="flex items-center justify-center">
+                                <div id="provider-info" class="text-xs text-slate-500 italic">
+                                    <!-- Provider info will be populated by JavaScript -->
+                                </div>
+                            </div>
                         </div>
+                    </div>
 
-                        <div>
-                            <label for="embedding-model" class="block text-sm font-medium text-slate-700 mb-1.5">Embedding Model</label>
-                            <input type="text" id="embedding-model" disabled placeholder="text-embedding-ada-002"
-                                class="w-full px-3 py-2 border border-amber-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-amber-50/80 backdrop-blur-sm text-slate-700 placeholder-slate-400 text-sm">
-                        </div>
+                    <div>
+                        <label for="embedding-model" class="block text-sm font-medium text-slate-700 mb-1.5">Embedding Model</label>
+                        <input type="text" id="embedding-model" disabled placeholder="text-embedding-ada-002"
+                            class="w-full px-3 py-2 border border-amber-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-amber-50/80 backdrop-blur-sm text-slate-700 placeholder-slate-400 text-sm">
                     </div>
 
                     <div>
@@ -96,6 +101,15 @@
                                 <span>0%</span>
                                 <span id="threshold-value">50%</span>
                                 <span>100%</span>
+                            </div>
+                            <div class="mt-2 p-3 bg-amber-50/60 rounded-lg border border-amber-200/40">
+                                <div class="text-xs text-slate-600 space-y-1">
+                                    <div class="font-medium text-slate-700 mb-1">How to use:</div>
+                                    <div>• <strong>0-30%:</strong> Very broad search - finds loosely related words</div>
+                                    <div>• <strong>30-70%:</strong> Balanced search - finds moderately related words (recommended)</div>
+                                    <div>• <strong>70-100%:</strong> Strict search - finds very similar words only</div>
+                                    <div class="mt-2 text-slate-500">Higher values return fewer, more relevant results. Lower values return more results with broader relevance.</div>
+                                </div>
                             </div>
                         </div>
                     </div>

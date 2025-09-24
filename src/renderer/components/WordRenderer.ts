@@ -293,15 +293,17 @@ export class WordRenderer {
       });
     });
 
-    // Check if embedding failed
+    // Check if embedding failed (undefined means no embedding generated yet, empty array means failed)
     const hasEmbeddingFailed = Array.isArray(word.embedding) && word.embedding.length === 0;
 
-    // Load action buttons only after word details are complete AND embedding didn't fail
-    if (!isLoadingSummary && !isLoadingTags && !hasEmbeddingFailed) {
-      this.loadActionButtons(word);
-    } else if (hasEmbeddingFailed) {
-      // Show warning message when embedding failed
-      this.showEmbeddingFailureWarning();
+    // Load action buttons after word details are complete
+    if (!isLoadingSummary && !isLoadingTags) {
+      if (hasEmbeddingFailed) {
+        // Show warning message when embedding failed
+        this.showEmbeddingFailureWarning();
+      } else {
+        this.loadActionButtons(word);
+      }
     }
   }
 

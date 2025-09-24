@@ -5,7 +5,7 @@ import { dirname } from 'path';
 import { SysProxy } from './utils/SysProxy.js';
 import { Utils } from './utils/Utils.js';
 import { StoreManager } from './utils/StoreManager.js';
-import { DatabaseManager, WordDocument } from './database/DatabaseManager.js';
+import { DatabaseManager } from './database/DatabaseManager.js';
 import { ProfileManager } from './database/ProfileManager.js';
 import { ModelManager } from './utils/ModelManager.js';
 import { AIModelClient, WORD_DUMMY_METAS } from './ai/AIModelClient.js';
@@ -1047,7 +1047,7 @@ ipcMain.handle('generate-word-embedding', async (event, wordData: { word: string
     } as any, profile);
 
     if ('embedding' in embeddingResult) {
-      console.log('✅ Main process: Embedding generated and stored successfully');
+      console.log(`✅ Main process: Embedding [${embeddingResult.embedding.length}] generated successfully`);
       return {
         success: true,
         embedding: embeddingResult.embedding,

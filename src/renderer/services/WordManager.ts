@@ -248,6 +248,15 @@ export class WordManager {
     }
   }
 
+  private scrollToWordBottom() {
+    setTimeout(() => {
+      const wordDetails = document.getElementById('word-details');
+      if (wordDetails && wordDetails.parentElement) {
+        wordDetails.parentElement.scrollTop = wordDetails.parentElement.scrollHeight;
+      }
+    }, 100);
+  }
+
   async handleGenerate(): Promise<void> {
     const wordInput = document.getElementById('word-input') as HTMLInputElement;
     const word = wordInput.value.trim();
@@ -306,12 +315,8 @@ export class WordManager {
       tempWord.tag_colors = { 'Analyzing word...': '#6b7280' };
       await this.wordRenderer.renderWordDetails(tempWord);
 
-      setTimeout(() => {
-        const wordDetails = document.getElementById('word-details');
-        if (wordDetails && wordDetails.parentElement) {
-          wordDetails.parentElement.scrollTop = wordDetails.parentElement.scrollHeight;
-        }
-      }, 100);
+      // scroll to the bottom
+      this.scrollToWordBottom();
 
       try {
         console.log('Starting generateWordMetas call...');
@@ -358,14 +363,14 @@ export class WordManager {
             if (embeddingResult.success) {
               // Set embedding property
               console.log('✅ Embedding generation successful:', {
-              model_used: embeddingResult.model_used,
-              tokens_used: embeddingResult.tokens_used,
-              dimensions: embeddingResult.embedding.length
-            });
+                model_used: embeddingResult.model_used,
+                tokens_used: embeddingResult.tokens_used,
+                dimensions: embeddingResult.embedding.length
+              });
               this.currentWord.embedding = embeddingResult.embedding;
             } else {
               console.error('❌ Embedding generation failed:', embeddingResult);
-              this.currentWord.embedding = undefined;
+              this.currentWord.embedding = []; // Empty array = failed
             }
 
             // Hide embedding status section
@@ -377,9 +382,10 @@ export class WordManager {
             this.currentWord.embedding = []; // ✅ Empty array = failed
             // Hide embedding status section
             this.showEmbeddingStatus(false);
-
+          
             // Show warning and prevent saving
             this.toastManager.showWarning('Embedding generation failed. Word cannot be saved.');
+            this.wordRenderer.renderWordDetails(this.currentWord);
           }
         } else {
           console.log('ℹ️ Embedding generation skipped (not enabled)');
@@ -412,6 +418,8 @@ export class WordManager {
       console.error('Error generating meaning:', error);
       this.toastManager.showError('Failed to generate meaning. Please check your API configuration.');
     } finally {
+      // scroll to the bottom
+      this.scrollToWordBottom();
       this.isGenerating = false;
       this.wordRenderer.setGenerationState(false);
       generateBtn.disabled = false;
@@ -774,7 +782,7 @@ export class WordManager {
 
       try {
         // Update word in database
-        const updatedWord = await this.wordService.updateWordRemark(word.id,  remarkValue);
+        const updatedWord = await this.wordService.updateWordRemark(word.id, remarkValue);
 
         if (updatedWord) {
           // Update current word

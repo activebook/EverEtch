@@ -1,6 +1,6 @@
 import { VectorDatabaseManager, SemanticWordItem, SemanticEmbedding } from '../database/VectorDatabaseManager.js';
 import { EmbeddingModelClient, EmbeddingResult } from '../ai/EmbeddingModelClient.js';
-import { ProfileConfig, DatabaseManager, WordDocument } from '../database/DatabaseManager.js';
+import { ProfileConfig, DatabaseManager } from '../database/DatabaseManager.js';
 import { ProfileManager } from '../database/ProfileManager.js';
 
 export interface SemanticSearchOptions {

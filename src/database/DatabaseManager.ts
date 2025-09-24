@@ -13,6 +13,7 @@ export interface WordDocument {
   synonyms: string[];
   antonyms: string[];
   remark?: string;
+  embedding?: number[]; // default is undefined
   created_at: string;
   updated_at: string;
 }
@@ -272,7 +273,7 @@ export class DatabaseManager {
 
       try {
         const row = this.db.prepare('SELECT data FROM documents WHERE id = ? AND type = ?').get(wordId, 'word') as { data: string } | undefined;
-        console.debug('Word: ', row?.data);
+        console.debug('Get Word: ', row?.data);
         resolve(row ? JSON.parse(row.data) : null);
       } catch (error) {
         reject(error);
@@ -301,6 +302,9 @@ export class DatabaseManager {
     if (!this.db) {
       throw new Error('Database not initialized');
     }
+
+    // Filter out embedding field to prevent it from being stored in word document
+    wordData.embedding = undefined;
 
     // Check if word already exists (synchronous version)
     const existingRow = this.db.prepare('SELECT data FROM documents WHERE type = ? AND json_extract(data, \'$.word\') = ?').get('word', wordData.word) as { data: string } | undefined;
@@ -358,6 +362,8 @@ export class DatabaseManager {
       }
 
       const existing = JSON.parse(existingRow.data) as WordDocument;
+      // Filter out embedding field to prevent it from being stored in word document
+      wordData.embedding = undefined;
       const updated: WordDocument = {
         ...existing,
         ...wordData,
@@ -809,6 +815,7 @@ export class DatabaseManager {
             embedding: embedding,
             model_used: profile.embedding_config!.model
           });
+          wordDoc.embedding = embedding;
           console.log(`✅ Embedding stored for word: ${wordDoc.word}`);
         }
 
@@ -883,6 +890,7 @@ export class DatabaseManager {
             embedding: embedding,
             model_used: profile.embedding_config!.model
           });
+          wordDoc.embedding = embedding;
           console.log(`✅ Embedding updated for word: ${wordDoc.word}`);
         }
 
