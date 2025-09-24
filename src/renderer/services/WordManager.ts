@@ -357,7 +357,11 @@ export class WordManager {
             });
             if (embeddingResult.success) {
               // Set embedding property
-              console.log('✅ Embedding generation successful:', embeddingResult);
+              console.log('✅ Embedding generation successful:', {
+              model_used: embeddingResult.model_used,
+              tokens_used: embeddingResult.tokens_used,
+              dimensions: embeddingResult.embedding.length
+            });
               this.currentWord.embedding = embeddingResult.embedding;
             } else {
               console.error('❌ Embedding generation failed:', embeddingResult);
@@ -369,14 +373,13 @@ export class WordManager {
 
           } catch (embeddingError) {
             console.error('❌ Error generating embeddings:', embeddingError);
-
-            this.currentWord.embedding = undefined;
+            // don't use undefined, because undefined tells no need embedding
+            this.currentWord.embedding = []; // ✅ Empty array = failed
             // Hide embedding status section
             this.showEmbeddingStatus(false);
 
-            // Show warning but don't fail the entire process
-            this.toastManager.showWarning('Word generated successfully, but embedding generation failed. You can stop embedding and retry.');
-            throw embeddingError;
+            // Show warning and prevent saving
+            this.toastManager.showWarning('Embedding generation failed. Word cannot be saved.');
           }
         } else {
           console.log('ℹ️ Embedding generation skipped (not enabled)');

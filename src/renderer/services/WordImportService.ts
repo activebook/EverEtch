@@ -32,6 +32,7 @@ export class WordImportService {
   private words: string[] = [];
   private currentIndex = 0;
   private updateExisting = false;
+  private embeddingEnabled = false;
   private progress: ImportProgress = {
     current: 0,
     total: 0,
@@ -45,7 +46,18 @@ export class WordImportService {
 
   constructor(wordService: WordService, toastManager: ToastManager) {
     this.wordService = wordService;
-    this.toastManager = toastManager;
+    this.toastManager = toastManager;    
+  }
+
+  private async checkEmbeddingStatus(): Promise<void> {
+    try {
+      const profile = await window.electronAPI.getProfileConfig();
+      this.embeddingEnabled = profile?.embedding_config?.enabled === true;
+      console.log(`WordImportService: Embedding ${this.embeddingEnabled ? 'enabled' : 'disabled'}`);
+    } catch (error) {
+      console.warn('WordImportService: Could not check embedding status:', error);
+      this.embeddingEnabled = false;
+    }
   }
 
   async startImport(fileContent: string, callbacks: ImportCallbacks, updateExisting: boolean = false): Promise<void> {
@@ -78,6 +90,9 @@ export class WordImportService {
     if (this.callbacks?.onProgress) {
       this.callbacks.onProgress(this.progress);
     }
+
+    // Check embedding status
+    this.checkEmbeddingStatus();
 
     // Start processing
     this.processNextWord();
@@ -165,7 +180,7 @@ export class WordImportService {
     }
   }
 
-  private async generateWord(word: string): Promise<void> {
+  private async generateWordData(word: string): Promise<{ meaning: string; metadata: any; embedding?: number[] } | null> {
     try {
       // Generate meaning (this will trigger the streaming and metadata generation)
       const meaning = await this.wordService.generateWordMeaning(word);
@@ -184,68 +199,75 @@ export class WordImportService {
         throw new Error('Failed to generate word metadata');
       }
 
-      // Add the word to database with the generated metadata
-      const addResult = await this.addWordToDatabase(word, meaning, metadata);
+      // Generate embedding if enabled (before saving)
+      let embedding = undefined;
+      if (this.embeddingEnabled) {
+        try {
+          console.log(`🔄 WordImportService: Generating embedding for "${word}"`);
+          const embeddingResult = await window.electronAPI.generateWordEmbedding({
+            word: word,
+            meaning: meaning,
+            summary: metadata.summary || '',
+            tags: metadata.tags || [],
+            synonyms: metadata.synonyms || [],
+            antonyms: metadata.antonyms || []
+          });
 
+          if (embeddingResult.success) {
+            embedding = embeddingResult.embedding;
+            console.log(`✅ WordImportService: Embedding generated for "${word}" (${embeddingResult.embedding.length} dimensions)`);
+          } else {
+            // Set empty array to indicate failure (prevents saving)
+            embedding = [];
+            console.error(`❌ WordImportService: Embedding generation failed for "${word}"`);
+            throw new Error(`Embedding generation failed for "${word}"`);
+          }
+        } catch (embeddingError) {
+          embedding = [];
+          console.error(`❌ WordImportService: Error generating embedding for "${word}":`, embeddingError);
+          throw new Error(`Error generating embedding for "${word}": ${embeddingError instanceof Error ? embeddingError.message : 'Unknown error'}`);
+        }
+      }
+
+      return { meaning, metadata, embedding };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  private async generateWord(word: string): Promise<void> {
+    const result = await this.generateWordData(word);
+    if (result) {
+      const addResult = await this.addWordToDatabase(word, result.meaning, result.metadata, result.embedding);
       if (addResult) {
-        this.progress.success++; // Increment success counter
-        console.log(`Successfully added word "${word}" to database with generated metadata`);
-        // Continue to next word
+        this.progress.success++;
+        console.log(`Successfully added word "${word}" to database with generated metadata${result.embedding && result.embedding.length > 0 ? ' and embedding' : ''}`);
         this.handleWordComplete(word, false);
       } else {
         console.warn(`Failed to add word "${word}" to database (addWord returned falsy)`);
-        // Push error to error array
         this.progress.errors.push(`Failed to add word "${word}" to database`);
-        // Continue to next word as failed
         this.handleWordComplete(word, false);
       }
-
-    } catch (error) {
-      throw error;
     }
   }
 
   private async updateExistingWord(word: string, existingWord: WordDocument): Promise<void> {
-    try {
-      // Generate new meaning (this will trigger the streaming and metadata generation)
-      const meaning = await this.wordService.generateWordMeaning(word);
-
-      if (!meaning || meaning.trim().length === 0) {
-        throw new Error('Generated meaning is empty');
-      }
-
-      // Generate consistent generation ID using utility function
-      const generationId = generateGenerationId();
-
-      // Generate metadata (tags, summary, etc.) - this returns the actual metadata
-      const metadata = await this.wordService.generateWordMetas(word, meaning, generationId);
-
-      if (!metadata) {
-        throw new Error('Failed to generate word metadata');
-      }
-
-      // Update the existing word with new meaning and metadata
-      const updateResult = await this.updateWordInDatabase(existingWord.id, word, meaning, metadata);
-
+    const result = await this.generateWordData(word);
+    if (result) {
+      const updateResult = await this.updateWordInDatabase(existingWord.id, word, result.meaning, result.metadata, result.embedding);
       if (updateResult) {
-        this.progress.success++; // Increment success counter
-        console.log(`Successfully updated word "${word}" in database with new generated metadata`);
-        // Continue to next word
+        this.progress.success++;
+        console.log(`Successfully updated word "${word}" in database with new generated metadata${result.embedding && result.embedding.length > 0 ? ' and embedding' : ''}`);
         this.handleWordComplete(word, false);
       } else {
         console.warn(`Failed to update word "${word}" in database (updateWord returned falsy)`);
-        // Push error to error array
         this.progress.errors.push(`Failed to update word "${word}" in database`);
-        // Continue to next word as failed
         this.handleWordComplete(word, false);
       }
-
-    } catch (error) {
-      throw error;
     }
   }
 
-  private async addWordToDatabase(word: string, meaning: string, metadata: any): Promise<WordDocument> {
+  private async addWordToDatabase(word: string, meaning: string, metadata: any, embedding?: number[]): Promise<WordDocument> {
     try {
       // Create word data using the generated meaning and metadata
       const wordData = {
@@ -255,7 +277,8 @@ export class WordImportService {
         tags: metadata.tags || [],
         tag_colors: metadata.tag_colors || {},
         synonyms: metadata.synonyms || [],
-        antonyms: metadata.antonyms || []
+        antonyms: metadata.antonyms || [],
+        embedding: embedding
       };
 
       const addResult = await this.wordService.addWord(wordData);
@@ -266,7 +289,7 @@ export class WordImportService {
     }
   }
 
-  private async updateWordInDatabase(wordId: string, word: string, meaning: string, metadata: any): Promise<WordDocument | null> {
+  private async updateWordInDatabase(wordId: string, word: string, meaning: string, metadata: any, embedding?: number[]): Promise<WordDocument | null> {
     try {
       // Create word data using the generated meaning and metadata
       const wordData = {
@@ -276,7 +299,8 @@ export class WordImportService {
         tags: metadata.tags || [],
         tag_colors: metadata.tag_colors || {},
         synonyms: metadata.synonyms || [],
-        antonyms: metadata.antonyms || []
+        antonyms: metadata.antonyms || [],
+        embedding: embedding
       };
 
       const updateResult = await this.wordService.updateWord(wordId, wordData);
