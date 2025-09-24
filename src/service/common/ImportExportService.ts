@@ -173,6 +173,32 @@ export class ImportExportService {
   }
 
   /**
+   * Update profile configuration inside the current database
+   */
+  private updateProfileConfigInDatabase(profileName: string, originalName: string): void {
+    if (profileName !== originalName) {
+      console.log(`🔄 Updating profile config inside database: "${originalName}" → "${profileName}"`);
+
+      try {
+        // Get the current profile config from the active database
+        const currentConfig = this.dbManager.getProfileConfig();
+        if (currentConfig) {
+          // Update the profile name in the config
+          currentConfig.name = profileName;
+          currentConfig.last_opened = new Date().toISOString();
+
+          // Save the updated config back to the database
+          this.dbManager.setProfileConfig(currentConfig);
+          console.log(`✅ Profile config updated inside database to: "${profileName}"`);
+        }
+      } catch (error) {
+        console.error('Error updating profile config in database:', error);
+        throw error;
+      }
+    }
+  }
+
+  /**
    * Import profile from a file
    */
   async importProfileFromLocal(sourcePath: string): Promise<ImportResult> {
@@ -203,18 +229,9 @@ export class ImportExportService {
       Utils.ensureDataDirectory();
       fs.copyFileSync(sourcePath, targetPath);
 
-      let success = false;
-
       // Add new profile to profiles
-      success = this.profileManager.importProfile(profileName);
-      if (success) {
-        // Switch to the imported profile to ensure it's properly initialized
-        success = await this.profileManager.switchProfile(profileName);
-      } else {
-        console.error('Failed to import profile, the same profile already exists');
-      }
-
-      if (!success) {
+      const importSuccess = this.profileManager.importProfile(profileName);
+      if (!importSuccess) {
         // Clean up the copied file if profile creation failed
         try {
           fs.unlinkSync(targetPath);
@@ -223,6 +240,22 @@ export class ImportExportService {
         }
         return { success: false, message: 'Failed to create new profile' };
       }
+
+      // Switch to the imported profile to ensure it's properly initialized
+      const switchSuccess = await this.profileManager.switchProfile(profileName);
+      if (!switchSuccess) {
+        // Clean up the copied file if switch failed
+        try {
+          fs.unlinkSync(targetPath);
+        } catch (cleanupError) {
+          console.error('Error cleaning up failed switch:', cleanupError);
+        }
+        return { success: false, message: 'Failed to switch to imported profile' };
+      }
+
+      // Update the profile config inside the database to reflect the new name
+      // (Now this.dbManager is connected to the imported database)
+      this.updateProfileConfigInDatabase(profileName, fileName);
 
       return {
         success: true,
@@ -306,7 +339,7 @@ export class ImportExportService {
         } catch (cleanupError) {
           console.error('Error cleaning up invalid download:', cleanupError);
         }
-        throw new Error('Downloaded file is not a valid EverEtch database');
+        return { success: false, message: 'Downloaded file is not a valid EverEtch database' };
       }
 
       // Import the profile
@@ -318,8 +351,24 @@ export class ImportExportService {
         } catch (cleanupError) {
           console.error('Error cleaning up failed import:', cleanupError);
         }
-        throw new Error('Failed to import profile');
+        return { success: false, message: 'Failed to import profile' };
       }
+
+      // Switch to the imported profile to ensure it's properly initialized
+      const switchSuccess = await this.profileManager.switchProfile(finalProfileName);
+      if (!switchSuccess) {
+        // Clean up if switch failed
+        try {
+          fs.unlinkSync(targetPath);
+        } catch (cleanupError) {
+          console.error('Error cleaning up failed switch:', cleanupError);
+        }
+        return { success: false, message: 'Failed to switch to imported profile' };
+      }
+
+      // Update the profile config inside the database to reflect the new name
+      // (Now this.dbManager is connected to the imported database)
+      this.updateProfileConfigInDatabase(finalProfileName, profileName);
 
       return {
         success: true,
