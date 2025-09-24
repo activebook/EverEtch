@@ -224,8 +224,7 @@ export class VectorDatabaseManager {
 
   /**
    * Delete embedding for a word
-   * PS. we actually don't need to call it,
-   * because foreign key would automatically delete no-use ones
+   * @param wordId
    */
   deleteEmbedding(wordId: string): boolean {
     if (!this.db) {

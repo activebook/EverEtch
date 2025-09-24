@@ -29,10 +29,21 @@ export interface PaginatedWordsResult extends ApiResult {
 
 export interface WordResult extends ApiResult {
     word?: WordDocument;
+    data?: WordDocument; // For addWord/updateWord responses
 }
 
 export interface WordsResult extends ApiResult {
     words: WordListItem[];
+}
+
+// Word operation results with success/error pattern
+export interface WordOperationResult extends ApiResult {
+    data?: WordDocument;
+    error?: string;
+}
+
+export interface WordDeleteResult extends ApiResult {
+    error?: string;
 }
 
 // AI operations
@@ -125,6 +136,7 @@ export interface WordData {
     synonyms: string[];
     antonyms: string[];
     remark?: string;
+    embedding?: number[];
 }
 
 export interface WordDocument {
@@ -137,6 +149,7 @@ export interface WordDocument {
     synonyms: string[];
     antonyms: string[];
     remark?: string;
+    embedding?: number[];
     created_at: string;
     updated_at: string;
 }
@@ -238,14 +251,15 @@ declare global {
             searchWords: (query: string) => Promise<WordListItem[]>;
             getWord: (wordId: string) => Promise<WordDocument | null>;
             getWordByName: (wordName: string) => Promise<WordDocument | null>;
-            addWord: (wordData: WordData) => Promise<WordDocument>;
-            updateWord: (wordId: string, wordData: Partial<WordData>) => Promise<WordDocument | null>;
-            updateWordRemark: (wordId: string, remark: string) => Promise<WordDocument | null>;
-            deleteWord: (wordId: string) => Promise<boolean>;
+            addWord: (wordData: WordData) => Promise<WordOperationResult>;
+            updateWord: (wordId: string, wordData: Partial<WordData>) => Promise<WordOperationResult>;
+            updateWordRemark: (wordId: string, remark: string) => Promise<WordOperationResult>;
+            deleteWord: (wordId: string) => Promise<WordDeleteResult>;
 
             // AI operations
             generateWordMeaning: (word: string) => Promise<string>;
             generateWordMetas: (word: string, meaning: string, generationId: string) => Promise<WordGenerationResult>;
+            generateWordEmbedding: (wordData: { word: string; meaning: string; summary: string; tags: string[]; synonyms: string[]; antonyms: string[]; }) => Promise<{ success: boolean; embedding: number[]; model_used: string; tokens_used: number; }>;
 
             // Associated words
             getRelatedWordsPaginated: (searchTerm: string, offset: number, limit: number) => Promise<{ words: WordListItem[], hasMore: boolean, total: number }>;

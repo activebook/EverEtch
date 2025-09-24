@@ -61,32 +61,6 @@ export class DatabaseManager {
 
   constructor() { }
 
-  // Event callbacks for auto-sync
-  private onWordAdded?: (wordDoc: WordDocument) => void;
-  private onWordUpdated?: (wordDoc: WordDocument) => void;
-  private onWordDeleted?: (wordId: string) => void;
-
-  /**
-   * Set callback for when words are added (for auto-sync)
-   */
-  setWordAddedCallback(callback: (wordDoc: WordDocument) => void): void {
-    this.onWordAdded = callback;
-  }
-
-  /**
-   * Set callback for when words are updated (for auto-sync)
-   */
-  setWordUpdatedCallback(callback: (wordDoc: WordDocument) => void): void {
-    this.onWordUpdated = callback;
-  }
-
-  /**
-   * Set callback for when words are deleted (for auto-sync)
-   */
-  setWordDeletedCallback(callback: (wordId: string) => void): void {
-    this.onWordDeleted = callback;
-  }
-
   initialize(profileName: string): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
@@ -323,112 +297,100 @@ export class DatabaseManager {
     });
   }
 
-  addWord(wordData: Omit<WordDocument, 'id' | 'created_at' | 'updated_at'>): Promise<WordDocument> {
-    return new Promise(async (resolve, reject) => {
-      if (!this.db) {
-        reject(new Error('Database not initialized'));
-        return;
-      }
+  addWord(wordData: Omit<WordDocument, 'id' | 'created_at' | 'updated_at'>): WordDocument {
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
 
-      try {
-        // Check if word already exists
-        const existingWord = await this.getWordByName(wordData.word);
+    // Check if word already exists (synchronous version)
+    const existingRow = this.db.prepare('SELECT data FROM documents WHERE type = ? AND json_extract(data, \'$.word\') = ?').get('word', wordData.word) as { data: string } | undefined;
+    const existingWord = existingRow ? JSON.parse(existingRow.data) as WordDocument : null;
 
-        if (existingWord) {
-          // Update existing word
-          const updatedWord: WordDocument = {
-            ...existingWord,
-            ...wordData,
-            updated_at: Utils.formatDate()
-          };
+    if (existingWord) {
+      // Update existing word
+      const updatedWord: WordDocument = {
+        ...existingWord,
+        ...wordData,
+        updated_at: Utils.formatDate()
+      };
 
-          this.db.prepare('UPDATE documents SET data = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(updatedWord), updatedWord.updated_at, existingWord.id);
+      this.db.prepare('UPDATE documents SET data = ?, updated_at = ? WHERE id = ?').run(
+        JSON.stringify(updatedWord),
+        updatedWord.updated_at,
+        existingWord.id
+      );
 
-          // Trigger word updated callback for auto-sync
-          if (this.onWordUpdated) {
-            this.onWordUpdated(updatedWord);
-          }
-          resolve(updatedWord);
-        } else {
-          // Create new word
-          const id = Utils.generateId('word');
-          const now = Utils.formatDate();
+      return updatedWord;
+    } else {
+      // Create new word
+      const id = Utils.generateId('word');
+      const now = Utils.formatDate();
 
-          const wordDoc: WordDocument = {
-            id,
-            ...wordData,
-            created_at: now,
-            updated_at: now
-          };
+      const wordDoc: WordDocument = {
+        id,
+        ...wordData,
+        created_at: now,
+        updated_at: now
+      };
 
-          this.db.prepare('INSERT INTO documents (id, type, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?)').run(id, 'word', JSON.stringify(wordDoc), now, now);
+      this.db.prepare('INSERT INTO documents (id, type, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?)').run(
+        id,
+        'word',
+        JSON.stringify(wordDoc),
+        now,
+        now
+      );
 
-          // Trigger word added callback for auto-sync
-          if (this.onWordAdded) {
-            this.onWordAdded(wordDoc);
-          }
-          resolve(wordDoc);
-        }
-      } catch (err) {
-        reject(err);
-      }
-    });
+      return wordDoc;
+    }
   }
 
-  updateWord(wordId: string, wordData: Partial<WordDocument>): Promise<WordDocument | null> {
-    return new Promise(async (resolve, reject) => {
-      if (!this.db) {
-        resolve(null);
-        return;
+  updateWord(wordId: string, wordData: Partial<WordDocument>): WordDocument | null {
+    if (!this.db) {
+      return null;
+    }
+
+    try {
+      // Get existing word synchronously
+      const existingRow = this.db.prepare('SELECT data FROM documents WHERE id = ? AND type = ?').get(wordId, 'word') as { data: string } | undefined;
+      if (!existingRow) {
+        return null;
       }
 
-      try {
-        const existing = await this.getWord(wordId);
-        if (!existing) {
-          resolve(null);
-          return;
-        }
+      const existing = JSON.parse(existingRow.data) as WordDocument;
+      const updated: WordDocument = {
+        ...existing,
+        ...wordData,
+        updated_at: Utils.formatDate()
+      };
 
-        const updated: WordDocument = {
-          ...existing,
-          ...wordData,
-          updated_at: new Date().toISOString()
-        };
+      // debug only the changed part:
+      console.debug('Updating word: ', {
+        ...wordData,
+        updated_at: Utils.formatDate()
+      });
 
-        // debug only the changed part:
-        console.debug('Updating word: ', {
-          ...wordData,
-          updated_at: new Date().toISOString()
-        });
+      this.db.prepare('UPDATE documents SET data = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(updated), updated.updated_at, wordId);
 
-        this.db.prepare('UPDATE documents SET data = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(updated), updated.updated_at, wordId);
-
-        // Trigger word updated callback for auto-sync
-        if (this.onWordUpdated) {
-          this.onWordUpdated(updated);
-        }
-        resolve(updated);
-      } catch (err) {
-        reject(err);
-      }
-    });
+      return updated;
+    } catch (err) {
+      console.error('Error updating word:', err);
+      return null;
+    }
   }
 
-  deleteWord(wordId: string): Promise<boolean> {
-    return new Promise((resolve, reject) => {
-      if (!this.db) {
-        resolve(false);
-        return;
-      }
+  deleteWord(wordId: string): boolean {
+    if (!this.db) {
+      return false;
+    }
 
+    try {
       const result = this.db.prepare('DELETE FROM documents WHERE id = ? AND type = ?').run(wordId, 'word');
-
-      // Trigger word deleted callback for auto-sync
-      if (this.onWordDeleted) {
-        this.onWordDeleted(wordId);
-      }
-      resolve(result.changes > 0);
-    });
+      return result.changes > 0;
+    } catch (error) {
+      console.error('Error deleting word:', error);
+      return false;
+    }
   }
 
   // Unified paginated related words search using FTS5 - replaces getAssociatedWordsPaginated
@@ -700,6 +662,240 @@ export class DatabaseManager {
    */
   getDatabase(): Database.Database | null {
     return this.db;
+  }
+
+  /**
+  * Insert or update word embedding in vector database
+  * @param word 
+  * @param profile 
+  * @returns 
+  */
+  async storeWordEmbedding(
+    id: string,
+    embedding: number[],
+    profile: ProfileConfig,
+  ): Promise<void> {
+
+    // Check if we have embedding config
+    if (!profile.embedding_config) {
+      throw new Error('Embedding configuration not found in profile');
+    }
+
+    // Insert or update embedding
+    await this.vectorDb!.storeEmbedding({
+      word_id: id,
+      embedding: embedding,
+      model_used: profile.embedding_config.model
+    });
+
+  }
+
+  /**
+   * Delete word embedding from vector database
+   * @param wordId
+   * @param profile
+   */
+  async deleteWordEmbedding(
+    wordId: string
+  ): Promise<void> {
+
+    // Delete embedding
+    await this.vectorDb!.deleteEmbedding(wordId);
+  }
+
+  /**
+   * Transactional word deletion with embedding cleanup
+   * Ensures atomicity between word deletion and embedding cleanup
+   * @param wordId Word ID to delete
+   * @param profile Profile configuration for embedding validation
+   * @returns boolean True if word was deleted successfully
+   */
+  transactionDeleteWord(
+    wordId: string,
+    profile: ProfileConfig
+  ): boolean {
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
+
+    try {
+      console.log(`🔄 Starting transaction: Delete word "${wordId}"`);
+
+      // Execute transaction
+      const result = this.db.transaction(() => {
+        // Step 1: Delete word document using existing synchronous method
+        console.log(`🔄 Transaction: Deleting word "${wordId}"`);
+
+        const deleteResult = this.deleteWord(wordId);
+        if (!deleteResult) {
+          throw new Error(`Word with ID ${wordId} not found`);
+        }
+
+        console.log(`✅ Word deleted: ${wordId}`);
+
+        // Step 2: Clean up embedding in vector database if enabled
+        if (this.vectorDb) {
+          console.log(`💾 Cleaning up embedding for word: ${wordId}`);
+          // We don't need to check whether embedding exists or not
+          // bacause the word can be added without embedding
+          // so just delete related word if existed
+          this.vectorDb.deleteEmbedding(wordId);
+          console.log(`✅ Embedding cleaned up for word: ${wordId}`);
+        }
+
+        return deleteResult;
+      })();
+
+      console.log(`🎉 Transaction completed successfully for word deletion: ${wordId}`);
+      return result;
+
+    } catch (error) {
+      console.error(`❌ Transaction failed for word deletion "${wordId}":`, error);
+      throw new Error(`Failed to delete word "${wordId}": ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+
+
+  /**
+   * Transactional word addition with embedding storage
+   * Ensures atomicity between word creation/update and embedding storage
+   * @param wordData Word data without id, created_at, updated_at
+   * @param embedding Word embedding vector
+   * @param profile Profile configuration for embedding validation
+   * @returns WordDocument The created or updated word document
+   */
+  transactionAddWord(
+    wordData: Omit<WordDocument, 'id' | 'created_at' | 'updated_at'>,
+    embedding: number[],
+    profile: ProfileConfig
+  ): WordDocument {
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
+
+    // Validate embedding configuration
+    if (!profile || !profile.embedding_config) {
+      throw new Error('Embedding configuration not found in profile');
+    }
+
+    if (!profile.embedding_config.enabled) {
+      throw new Error('Embedding not enabled for current profile');
+    }
+
+    // Validate embedding data
+    if (!embedding || !Array.isArray(embedding) || embedding.length === 0) {
+      throw new Error('Invalid embedding data provided');
+    }
+
+    let wordDoc: WordDocument | null = null;
+
+    try {
+      console.log(`🔄 Starting transaction: Add word "${wordData.word}" with embedding`);
+
+      // Execute transaction
+      const result = this.db.transaction(() => {
+        // Step 1: Use synchronous addWord logic within transaction
+        console.log(`🔄 Transaction: Adding/updating word "${wordData.word}"`);
+
+        // Use the synchronous addWord method (handles both create and update)
+        wordDoc = this.addWord(wordData);
+
+        // Step 2: Store embedding in vector database
+        if (wordDoc && this.vectorDb) {
+          console.log(`💾 Storing embedding for word: ${wordDoc.word}`);
+          this.vectorDb!.storeEmbedding({
+            word_id: wordDoc.id,
+            embedding: embedding,
+            model_used: profile.embedding_config!.model
+          });
+          console.log(`✅ Embedding stored for word: ${wordDoc.word}`);
+        }
+
+        return wordDoc;
+      })();
+
+      console.log(`🎉 Transaction completed successfully for word: ${wordData.word}`);
+      return result;
+
+    } catch (error) {
+      console.error(`❌ Transaction failed for word "${wordData.word}":`, error);
+      throw new Error(`Failed to add word "${wordData.word}": ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Transactional word update with embedding storage
+   * Ensures atomicity between word update and embedding storage
+   * @param wordId Word ID to update
+   * @param wordData Word data to update
+   * @param embedding Word embedding vector
+   * @param profile Profile configuration for embedding validation
+   * @returns WordDocument The updated word document
+   */
+  transactionUpdateWord(
+    wordId: string,
+    wordData: Partial<WordDocument>,
+    embedding: number[],
+    profile: ProfileConfig
+  ): WordDocument {
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
+
+    // Validate embedding configuration (required for transactional update)
+    if (!profile || !profile.embedding_config) {
+      throw new Error('Embedding configuration not found in profile');
+    }
+
+    if (!profile.embedding_config.enabled) {
+      throw new Error('Embedding not enabled for current profile');
+    }
+
+    // Validate embedding data
+    if (!embedding || !Array.isArray(embedding) || embedding.length === 0) {
+      throw new Error('Invalid embedding data provided');
+    }
+
+    let wordDoc: WordDocument | null = null;
+
+    try {
+      console.log(`🔄 Starting transaction: Update word "${wordId}"`);
+
+      // Execute transaction
+      const result = this.db.transaction(() => {
+        // Step 1: Update word document using existing synchronous method
+        console.log(`🔄 Transaction: Updating word "${wordId}"`);
+
+        // Use the synchronous updateWord method
+        wordDoc = this.updateWord(wordId, wordData);
+        if (!wordDoc) {
+          throw new Error(`Word with ID ${wordId} not found`);
+        }
+
+        console.log(`✅ Word updated: ${wordId}`);
+
+        // Step 2: Update embedding in vector database (always done in transaction)
+        if (wordDoc && this.vectorDb) {
+          console.log(`💾 Updating embedding for word: ${wordDoc.word}`);
+          this.vectorDb.storeEmbedding({
+            word_id: wordId,
+            embedding: embedding,
+            model_used: profile.embedding_config!.model
+          });
+          console.log(`✅ Embedding updated for word: ${wordDoc.word}`);
+        }
+
+        return wordDoc;
+      })();
+
+      console.log(`🎉 Transaction completed successfully for word: ${wordId}`);
+      return result;
+
+    } catch (error) {
+      console.error(`❌ Transaction failed for word "${wordId}":`, error);
+      throw new Error(`Failed to update word "${wordId}": ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   /**

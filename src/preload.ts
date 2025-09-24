@@ -17,14 +17,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   searchWords: (query: string) => ipcRenderer.invoke('search-words', query),
   getWord: (wordId: string) => ipcRenderer.invoke('get-word', wordId),
   getWordByName: (wordName: string) => ipcRenderer.invoke('get-word-by-name', wordName),
-  addWord: (wordData: { word: string; one_line_desc: string; details: string; tags: string[]; tag_colors: Record<string, string>; synonyms: string[]; antonyms: string[]; remark?: string }) => ipcRenderer.invoke('add-word', wordData),
-  updateWord: (wordId: string, wordData: Partial<{ word: string; one_line_desc: string; details: string; tags: string[]; tag_colors: Record<string, string>; synonyms: string[]; antonyms: string[]; remark?: string }>) => ipcRenderer.invoke('update-word', wordId, wordData),
+  addWord: (wordData: { word: string; one_line_desc: string; details: string; tags: string[]; tag_colors: Record<string, string>; synonyms: string[]; antonyms: string[]; remark?: string; embedding?: number[] }) => ipcRenderer.invoke('add-word', wordData),
+  updateWord: (wordId: string, wordData: Partial<{ word: string; one_line_desc: string; details: string; tags: string[]; tag_colors: Record<string, string>; synonyms: string[]; antonyms: string[]; remark?: string; embedding?: number[] }>) => ipcRenderer.invoke('update-word', wordId, wordData),
   updateWordRemark: (wordId: string, remark: string) => ipcRenderer.invoke('update-word-remark', wordId, remark),
   deleteWord: (wordId: string) => ipcRenderer.invoke('delete-word', wordId),
 
   // AI operations
   generateWordMeaning: (word: string) => ipcRenderer.invoke('generate-word-meaning', word),
   generateWordMetas: (word: string, meaning: string, generationId: string) => ipcRenderer.invoke('generate-word-metas', word, meaning, generationId),
+  generateWordEmbedding: (wordData: { word: string; meaning: string; summary: string; tags: string[]; synonyms: string[]; antonyms: string[]; }) => ipcRenderer.invoke('generate-word-embedding', wordData),
 
   // Associated words
   getRelatedWordsPaginated: (searchTerm: string, offset: number, limit: number) => ipcRenderer.invoke('get-related-words-paginated', searchTerm, offset, limit),

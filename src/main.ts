@@ -5,10 +5,11 @@ import { dirname } from 'path';
 import { SysProxy } from './utils/SysProxy.js';
 import { Utils } from './utils/Utils.js';
 import { StoreManager } from './utils/StoreManager.js';
-import { DatabaseManager } from './database/DatabaseManager.js';
+import { DatabaseManager, WordDocument } from './database/DatabaseManager.js';
 import { ProfileManager } from './database/ProfileManager.js';
 import { ModelManager } from './utils/ModelManager.js';
 import { AIModelClient, WORD_DUMMY_METAS } from './ai/AIModelClient.js';
+import { EmbeddingModelClient } from './ai/EmbeddingModelClient.js';
 import { GoogleAuthService } from './service/google/GoogleAuthService.js';
 import { GoogleDriveService } from './service/google/GoogleDriveService.js';
 import { ImportExportService } from './service/common/ImportExportService.js';
@@ -27,6 +28,7 @@ let mainWindow: BrowserWindow;
 let dbManager: DatabaseManager;
 let profileManager: ProfileManager;
 let aiClient: AIModelClient;
+let embeddingClient: EmbeddingModelClient;
 let storeManager: StoreManager;
 let googleAuthService: GoogleAuthService;
 let googleDriveService: GoogleDriveService;
@@ -62,6 +64,7 @@ async function createWindow() {
     dbManager = new DatabaseManager();
     profileManager = new ProfileManager(dbManager);
     aiClient = new AIModelClient();
+    embeddingClient = new EmbeddingModelClient();
 
     // Create window with minimal bounds first (invisible), then apply saved bounds
     mainWindow = new BrowserWindow({
@@ -91,8 +94,6 @@ async function createWindow() {
       // Callback function after window is ready
       // Set up proxy environment variables
       SysProxy.apply();
-      // Set up auto-sync vector callbacks
-      setupAutoSyncVectorCallbacks();
     }, () => { });
 
     if (process.env.NODE_ENV === 'development') {
@@ -430,19 +431,111 @@ ipcMain.handle('generate-word-metas', async (event, word: string, meaning: strin
 });
 
 ipcMain.handle('add-word', async (event, wordData: any) => {
-  return await dbManager.addWord(wordData);
+  try {
+    if (wordData.embedding) {
+      // Embedding provided - use transaction
+      const profile = await profileManager.getCurrentProfile();
+      if (!profile?.embedding_config?.enabled) {
+        return {
+          success: false,
+          error: 'Embedding not enabled for current profile'
+        };
+      }
+
+      console.log(`🔄 transaction: Add word && embedding: ${wordData.word}`);
+      const wordDoc = dbManager.transactionAddWord(wordData, wordData.embedding, profile);
+      return { success: true, data: wordDoc };
+
+    } else {
+      // No embedding - use regular add
+      const wordDoc = dbManager.addWord(wordData);
+      if (wordDoc) {
+        return { success: true, data: wordDoc };
+      } else {
+        return { success: false, error: 'Failed to add word' };
+      }
+    }
+  } catch (error) {
+    console.error(`Failed to add word ${wordData.word}:`, error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
+  }
 });
 
 ipcMain.handle('update-word', async (event, wordId: string, wordData: any) => {
-  return await dbManager.updateWord(wordId, wordData);
+  try {
+    const profile = await profileManager.getCurrentProfile();
+
+    if (wordData.embedding) {
+      // Embedding provided - use transaction
+      if (!profile?.embedding_config?.enabled) {
+        return {
+          success: false,
+          error: 'Embedding not enabled for current profile'
+        };
+      }
+
+      console.log(`🔄 Transaction: Update word and embedding: ${wordId}`);
+      const wordDoc = dbManager.transactionUpdateWord(wordId, wordData, wordData.embedding, profile);
+      return { success: true, data: wordDoc };
+
+    } else {
+      // No embedding - use regular update
+      const wordDoc = dbManager.updateWord(wordId, wordData);
+      if (wordDoc) {
+        return { success: true, data: wordDoc };
+      } else {
+        return { success: false, error: 'Word not found' };
+      }
+    }
+  } catch (error) {
+    console.error(`Failed to update word ${wordId}:`, error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
+  }
 });
 
 ipcMain.handle('update-word-remark', async (event, wordId: string, remark: string) => {
-  return await dbManager.updateWord(wordId, { remark });
+  try {
+    const wordDoc = dbManager.updateWord(wordId, { remark });
+    if (wordDoc) {
+      return { success: true, data: wordDoc };
+    } else {
+      return { success: false, error: 'Word not found' };
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
+  }
 });
 
 ipcMain.handle('delete-word', async (event, wordId: string) => {
-  return await dbManager.deleteWord(wordId);
+  try {
+    const profile = await profileManager.getCurrentProfile();
+
+    // Use transactional delete if embedding is enabled
+    if (profile?.embedding_config?.enabled) {
+      console.log(`🔄 Transaction: Delete word and cleanup embedding: ${wordId}`);
+      const result = dbManager.transactionDeleteWord(wordId, profile);
+      return { success: result };
+    } else {
+      // Use regular delete if no embedding
+      const result = dbManager.deleteWord(wordId);
+      return { success: result };
+    }
+  } catch (error) {
+    console.error(`Failed to delete word ${wordId}:`, error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
+  }
 });
 
 ipcMain.handle('get-related-words-paginated', async (event, searchTerm: string, offset: number, limit: number) => {
@@ -787,48 +880,6 @@ ipcMain.handle('mark-model-used', async (event, name: string) => {
 });
 
 // Semantic Search IPC handlers
-// Auto-sync: Set up callbacks for word operations
-function setupAutoSyncVectorCallbacks() {
-  if (!dbManager || !semanticSearchService) return;
-
-  // Set up callbacks for automatic embedding generation
-  dbManager.setWordAddedCallback(async (wordDoc: any) => {
-    try {
-      const profile = await profileManager.getCurrentProfile();
-      if (profile?.embedding_config?.enabled) {
-        console.log(`🔄 Auto-sync: Generating embedding for new word: ${wordDoc.word}`);
-        await semanticBatchService.storeWordEmbedding(wordDoc, profile);
-      }
-    } catch (error) {
-      console.warn(`Failed to auto-generate embedding for word ${wordDoc.word}:`, error);
-    }
-  });
-
-  dbManager.setWordUpdatedCallback(async (wordDoc: any) => {
-    try {
-      const profile = await profileManager.getCurrentProfile();
-      if (profile?.embedding_config?.enabled) {
-        console.log(`🔄 Auto-sync: Updating embedding for word: ${wordDoc.word}`);
-        await semanticBatchService.storeWordEmbedding(wordDoc, profile);
-      }
-    } catch (error) {
-      console.warn(`Failed to auto-update embedding for word ${wordDoc.word}:`, error);
-    }
-  });
-
-  dbManager.setWordDeletedCallback(async (wordId: string) => {
-    try {
-      const profile = await profileManager.getCurrentProfile();
-      if (profile?.embedding_config?.enabled) {
-        // Clean up embedding when word is deleted
-        await semanticBatchService.deleteWordEmbedding(wordId);        
-        console.log(`🗑️ Auto-sync: Cleaned up embedding for deleted word: ${wordId}`);
-      }
-    } catch (error) {
-      console.warn(`Failed to clean up embedding for deleted word ${wordId}:`, error);
-    }
-  });
-}
 
 ipcMain.handle('start-semantic-batch-processing', async (event, config: any) => {
   try {
@@ -940,7 +991,7 @@ ipcMain.handle('perform-semantic-search', async (event, query: string, limit: nu
         results: []
       };
     }
-    
+
     if (!currentProfile.embedding_config.enabled) {
       return {
         success: false,
@@ -948,12 +999,12 @@ ipcMain.handle('perform-semantic-search', async (event, query: string, limit: nu
         results: []
       };
     }
-    
-    const response = await semanticSearchService.search(query, { 
-      limit: 100, 
+
+    const response = await semanticSearchService.search(query, {
+      limit: 100,
       threshold: currentProfile.embedding_config.similarity_threshold,
       includeEmbeddingStats: false
-     });
+    });
 
     return {
       success: true,
@@ -967,5 +1018,48 @@ ipcMain.handle('perform-semantic-search', async (event, query: string, limit: nu
       message: `Search failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
       results: []
     };
+  }
+});
+
+ipcMain.handle('generate-word-embedding', async (event, wordData: { word: string; meaning: string; summary: string; tags: string[]; synonyms: string[]; antonyms: string[]; }) => {
+  try {
+    const profile = await profileManager.getCurrentProfile();
+    if (!profile) {
+      throw new Error('No current profile found');
+    }
+
+    if (!profile.embedding_config?.enabled) {
+      throw new Error('Embedding not enabled for current profile');
+    }
+
+    if (!profile.embedding_config?.api_key) {
+      throw new Error('API key not configured for embedding');
+    }
+
+    // Generate embedding using the detailed meaning and metadata
+    const embeddingResult = await embeddingClient.generateWordEmbedding({
+      word: wordData.word,
+      one_line_desc: wordData.summary,
+      details: wordData.meaning,
+      tags: wordData.tags,
+      synonyms: wordData.synonyms,
+      antonyms: wordData.antonyms
+    } as any, profile);
+
+    if ('embedding' in embeddingResult) {
+      console.log('✅ Main process: Embedding generated and stored successfully');
+      return {
+        success: true,
+        embedding: embeddingResult.embedding,
+        model_used: embeddingResult.model_used,
+        tokens_used: embeddingResult.tokens_used
+      };
+    } else {
+      throw new Error('Unexpected batch result for single embedding');
+    }
+
+  } catch (error) {
+    console.error('❌ Main process: Error generating embedding:', error);
+    throw new Error(`Embedding generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 });
