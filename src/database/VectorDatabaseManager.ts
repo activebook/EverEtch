@@ -29,15 +29,13 @@ export class VectorDatabaseManager {
     }
   }
 
-  initialize(dbPath: string, existingDb?: Database.Database): Promise<void> {
-    return new Promise((resolve, reject) => {
+  initialize(dbPath: string, existingDb?: Database.Database): void {    
       try {
         // If we already have a database connection, use it
         if (existingDb) {
           this.db = existingDb;
           this.loadVectorExtension();
           this.createVectorTables();
-          resolve();
           return;
         }
 
@@ -50,11 +48,9 @@ export class VectorDatabaseManager {
         // Load the sqlite-vec extension
         this.loadVectorExtension();
         this.createVectorTables();
-        resolve();
       } catch (error) {
-        reject(error);
+        throw error;
       }
-    });
   }
 
   /**
@@ -106,11 +102,23 @@ export class VectorDatabaseManager {
   }
 
   /**
+   * Check if database connection is still valid
+   */
+  isConnectionValid(): boolean {
+    try {
+      // better-sqlite3 has an 'open' property that indicates if connection is active
+      return this.db !== null && (this.db as any).open === true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
    * Check if embedding exists for a word and model
    */
   embeddingExists(wordId: string, modelUsed: string): boolean {
-    if (!this.db) {
-      console.log('❌ Database not initialized in embeddingExists');
+    if (!this.db || !this.isConnectionValid()) {
+      console.log('❌ Database not initialized or connection closed in embeddingExists');
       return false;
     }
 
@@ -133,8 +141,8 @@ export class VectorDatabaseManager {
    * Store or update word embedding
    */
   storeEmbedding(se: SemanticEmbedding): void {
-    if (!this.db) {
-      throw new Error('Database not initialized');
+    if (!this.db || !this.isConnectionValid()) {
+      throw new Error('Database not initialized or connection closed');
     }
 
     try {
@@ -168,8 +176,8 @@ export class VectorDatabaseManager {
    * Batch store multiple word embeddings efficiently
    */
   batchStoreEmbeddings(embeddings: Array<SemanticEmbedding>): void {
-    if (!this.db) {
-      throw new Error('Database not initialized');
+    if (!this.db || !this.isConnectionValid()) {
+      throw new Error('Database not initialized or connection closed');
     }
 
     if (embeddings.length === 0) {
@@ -206,7 +214,7 @@ export class VectorDatabaseManager {
    * Get embedding for a word by model
    */
   getEmbedding(se: SemanticEmbedding): number[] | null {
-    if (!this.db) {
+    if (!this.db || !this.isConnectionValid()) {
       return null;
     }
 
@@ -227,7 +235,7 @@ export class VectorDatabaseManager {
    * @param wordId
    */
   deleteEmbedding(wordId: string): boolean {
-    if (!this.db) {
+    if (!this.db || !this.isConnectionValid()) {
       return false;
     }
 
@@ -254,8 +262,8 @@ export class VectorDatabaseManager {
      console.log(`   - Threshold: ${threshold}`);
      console.log(`   - Max distance allowed: ${1-threshold}`);
 
-     if (!this.db) {
-       console.error('❌ Database not initialized, returning empty results');
+     if (!this.db || !this.isConnectionValid()) {
+       console.error('❌ Database not initialized or connection closed, returning empty results');
        return [];
      }
 
@@ -333,7 +341,7 @@ export class VectorDatabaseManager {
     totalEmbeddings: number;
     averageEmbeddingSize: number;
   } {
-    if (!this.db) {
+    if (!this.db || !this.isConnectionValid()) {
       return { totalEmbeddings: 0, averageEmbeddingSize: 0 };
     }
 

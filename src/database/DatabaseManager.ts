@@ -610,10 +610,13 @@ export class DatabaseManager {
         try {
           this.db.close();
           this.db = null;
+          // Reset vector database manager so it gets reinitialized with new connection
+          this.vectorDb = null;
           resolve();
         } catch (error) {
           // Database might already be closed
           this.db = null;
+          this.vectorDb = null; // Reset even on error to ensure clean state
           console.debug('Database close attempted on already closed connection');
           resolve();
         }
@@ -648,10 +651,10 @@ export class DatabaseManager {
   /**
    * Initialize vector database for semantic search
    */
-  private async initializeVectorDatabase(dbPath: string): Promise<void> {
+  private initializeVectorDatabase(dbPath: string): void {
     if (!this.vectorDb) {
       this.vectorDb = new VectorDatabaseManager(this.db!);
-      await this.vectorDb.initialize(dbPath, this.db!);
+      this.vectorDb.initialize(dbPath, this.db!);
       console.log('✅ Vector database initialized with shared connection');
     }
   }
