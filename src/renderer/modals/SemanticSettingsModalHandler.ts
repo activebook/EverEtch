@@ -322,6 +322,7 @@ export class SemanticSettingsModalHandler extends ModalHandler {
     const providerSelect = document.getElementById('embedding-provider') as HTMLSelectElement;
     const modelInput = document.getElementById('embedding-model') as HTMLInputElement;
     const endpointInput = document.getElementById('embedding-endpoint') as HTMLInputElement;
+    const apiKeyInput = document.getElementById('embedding-api-key') as HTMLInputElement;
     const batchSizeInput = document.getElementById('batch-size') as HTMLInputElement;
     const thresholdSlider = document.getElementById('similarity-threshold') as HTMLInputElement;
     const thresholdValue = document.getElementById('threshold-value') as HTMLElement;
@@ -329,6 +330,7 @@ export class SemanticSettingsModalHandler extends ModalHandler {
     if (providerSelect) providerSelect.value = 'openai';
     if (modelInput) modelInput.value = 'text-embedding-ada-002';
     if (endpointInput) endpointInput.value = 'https://api.openai.com/v1';
+    if (apiKeyInput) apiKeyInput.value = ''; // Clear API key in default config
     if (batchSizeInput) batchSizeInput.value = '10';
     if (thresholdSlider) {
       thresholdSlider.value = '0.5';
