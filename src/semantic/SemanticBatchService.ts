@@ -93,31 +93,31 @@ export class SemanticBatchService {
     }
 
     try {
-       console.log(`🔄 Generating embeddings for ${proceedWords.length} words...`);
-       const batchResult = await this.embeddingClient!.generateBatchWordEmbeddings(proceedWords, profile);
-       if (!batchResult.embeddings) {
-         throw new Error('Embedding generation failed');
-       }
+      console.log(`🔄 Generating embeddings for ${proceedWords.length} words...`);
+      const batchResult = await this.embeddingClient!.generateBatchWordEmbeddings(proceedWords, profile);
+      if (!batchResult.embeddings) {
+        throw new Error('Embedding generation failed');
+      }
 
-       console.log(`✅ Generated ${batchResult.embeddings.length} embeddings`);
+      console.log(`✅ Generated ${batchResult.embeddings.length} embeddings`);
 
-       // Create embeddings array for batch storage
-       const batchSE: SemanticEmbedding[] = [];
-       for (let i = 0; i < proceedWords.length; i++) {
-         const wordData = proceedWords[i];
-         const embedding = batchResult.embeddings[i];
-         batchSE.push({
-           word_id: wordData.id,
-           embedding,
-           model_used: batchResult.model_used
-         });
-       }
+      // Create embeddings array for batch storage
+      const batchSE: SemanticEmbedding[] = [];
+      for (let i = 0; i < proceedWords.length; i++) {
+        const wordData = proceedWords[i];
+        const embedding = batchResult.embeddings[i];
+        batchSE.push({
+          word_id: wordData.id,
+          embedding,
+          model_used: batchResult.model_used
+        });
+      }
 
-       console.log(`💾 Storing ${batchSE.length} embeddings...`);
-       console.log(`📋 Word IDs being stored: ${batchSE.map(se => se.word_id).join(', ')}`);
-       this.dbManager.batchStoreEmbeddings(batchSE);
-       result.processed += proceedWords.length;
-       console.log(`✅ Successfully stored ${batchSE.length} embeddings`);
+      console.log(`💾 Storing ${batchSE.length} embeddings...`);
+      console.log(`📋 Word IDs being stored: ${batchSE.map(se => se.word_id).join(', ')}`);
+      this.dbManager.batchStoreEmbeddings(batchSE);
+      result.processed += proceedWords.length;
+      console.log(`✅ Successfully stored ${batchSE.length} embeddings`);
     } catch (error) {
       result.failed += proceedWords.length;
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -169,7 +169,7 @@ export class SemanticBatchService {
 
       if (totalWords === 0) {
         console.log('ℹ️ No words to process');
-        return {
+        const result:BatchProcessingResult = {
           success: true,
           totalWords: 0,
           processed: 0,
@@ -177,6 +177,11 @@ export class SemanticBatchService {
           error: "",
           duration: Date.now() - startTime
         };
+        // Call completion callback
+        if (finalOptions.onComplete) {
+          finalOptions.onComplete(result);
+        }
+        return result;
       }
 
       let totalProcessed = 0;
