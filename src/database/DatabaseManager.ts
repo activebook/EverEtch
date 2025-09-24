@@ -604,24 +604,27 @@ export class DatabaseManager {
   }
 
   /**
-    * Reconnect to an existing database file (used after renaming)
-    * This bypasses the table creation logic and directly opens the existing database
-    */
-  reconnectToDatabase(profileName: string): void {
-    try {
-      // Close any existing connection
-      if (this.db) {
-        this.db.close();
-      }
+     * Reconnect to an existing database file (used after renaming)
+     * This bypasses the table creation logic and directly opens the existing database
+     */
+   reconnectToDatabase(profileName: string): void {
+     try {
+       // Close any existing connection
+       if (this.db) {
+         this.db.close();
+       }
 
-      // Now open the new database
-      this.dbPath = Utils.getDatabasePath(profileName);
-      this.db = new Database(this.dbPath);
-    } catch (error) {
-      console.error('Error reconnecting to database:', error);
-      throw error;
-    }
-  }
+       // Now open the new database
+       this.dbPath = Utils.getDatabasePath(profileName);
+       this.db = new Database(this.dbPath);
+
+       // Reinitialize vector database with the new connection
+       this.initializeVectorDatabase(this.dbPath);
+     } catch (error) {
+       console.error('Error reconnecting to database:', error);
+       throw error;
+     }
+   }
 
   /**
    * Initialize vector database for semantic search

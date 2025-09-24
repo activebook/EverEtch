@@ -990,7 +990,7 @@ ipcMain.handle('perform-semantic-search', async (event, query: string, limit: nu
       };
     }
 
-    const currentProfile = await profileManager.getCurrentProfile();
+    const currentProfile = profileManager.getCurrentProfile();
     if (!currentProfile?.embedding_config) {
       return {
         success: false,

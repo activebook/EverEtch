@@ -89,7 +89,7 @@ export class SemanticSearchService {
       const queryEmbeddingResult = await this.generateQueryEmbedding(query, currentProfile) as EmbeddingResult;
 
       // Perform semantic search
-      const results = await this.vectorManager!.semanticSearch(
+      const results = this.vectorManager!.semanticSearch(
         queryEmbeddingResult.embedding,
         options.limit || 50,
         options.threshold || 0.5
@@ -98,7 +98,7 @@ export class SemanticSearchService {
       // Get embedding statistics if requested
       let embeddingStats;
       if (options.includeEmbeddingStats) {
-        embeddingStats = await this.vectorManager!.getEmbeddingStats();
+        embeddingStats = this.vectorManager!.getEmbeddingStats();
       }
 
       return {
