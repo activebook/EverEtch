@@ -301,10 +301,6 @@ declare global {
             loadSortOrder: () => Promise<'asc' | 'desc'>;
             saveSortOrder: (sortOrder: 'asc' | 'desc') => Promise<void>;
 
-            // Semantic search settings persistence
-            loadSemanticSearchSettings: () => Promise<SemanticSearchSettings | null>;
-            saveSemanticSearchSettings: (settings: SemanticSearchSettings) => Promise<void>;
-
             // Event listeners for streaming
             onWordMeaningStreaming: (callback: (content: string) => void) => void;
             onWordMetadataReady: (callback: (toolData: WordGenerationResult) => void) => void;

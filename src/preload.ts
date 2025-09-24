@@ -42,8 +42,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   savePanelWidths: (widths: { left: number; middle: number; right: number }) => ipcRenderer.invoke('save-panel-widths', widths),
   loadSortOrder: () => ipcRenderer.invoke('load-sort-order'),
   saveSortOrder: (sortOrder: 'asc' | 'desc') => ipcRenderer.invoke('save-sort-order', sortOrder),
-  loadSemanticSearchSettings: () => ipcRenderer.invoke('load-semantic-search-settings'),
-  saveSemanticSearchSettings: (settings: { enabled: boolean; similarity_threshold: number; batch_size: number }) => ipcRenderer.invoke('save-semantic-search-settings', settings),
 
   // Profile import/export
   exportProfile: () => ipcRenderer.invoke('export-profile'),

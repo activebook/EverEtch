@@ -559,14 +559,6 @@ ipcMain.handle('save-sort-order', (event, sortOrder: 'asc' | 'desc') => {
   storeManager.saveSortOrder(sortOrder);
 });
 
-ipcMain.handle('load-semantic-search-settings', () => {
-  return storeManager.loadSemanticSearchSettings();
-});
-
-ipcMain.handle('save-semantic-search-settings', (event, settings: any) => {
-  storeManager.saveSemanticSearchSettings(settings);
-});
-
 // Profile config operations
 ipcMain.handle('get-profile-config', () => {
   return profileManager.getCurrentProfile();

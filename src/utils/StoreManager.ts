@@ -20,16 +20,10 @@ interface GoogleTokens {
   token_type: string;
 }
 
-interface SemanticSearch {
-  enabled: boolean;
-  similarity_threshold: number;
-  batch_size: number;  
-}
 interface StoreSchema {
   windowBounds: WindowBounds | null;
   panelWidths: PanelWidths | null;
   sortOrder: 'asc' | 'desc' | null;
-  semanticSearch: SemanticSearch | null;
   googleTokens: GoogleTokens | null;
 }
 
@@ -60,15 +54,7 @@ export class StoreManager {
         sortOrder: {
           type: ['string', 'null'],
           enum: ['asc', 'desc', null]
-        },
-        semanticSearch: {
-          type: ['object', 'null'],
-          properties: {
-            enabled: { type: 'boolean' },
-            similarity_threshold: { type: 'number' },
-            batch_size: { type: 'number' }
-          }
-        },
+        },        
         googleTokens: {
           type: ['object', 'null'],
           properties: {
@@ -83,7 +69,6 @@ export class StoreManager {
         windowBounds: null,
         panelWidths: null,
         sortOrder: 'desc',
-        semanticSearch: null,
         googleTokens: null
       }
     }) as Store<StoreSchema>;
@@ -129,20 +114,6 @@ export class StoreManager {
    */
   loadSortOrder(): 'asc' | 'desc' {
     return this.store.get('sortOrder') || 'desc';
-  }
-
-  /**
-   * Save semantic search settings
-   */
-  saveSemanticSearchSettings(settings: SemanticSearch): void {
-    this.store.set('semanticSearch', settings);
-  }
-
-  /**
-   * Load semantic search settings
-   */
-  loadSemanticSearchSettings(): SemanticSearch | null {
-    return this.store.get('semanticSearch');
   }
 
   /**
