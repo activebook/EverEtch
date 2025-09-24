@@ -146,9 +146,9 @@ export class ProfileManager {
     return true;
   }
 
-  async getCurrentProfile(): Promise<ProfileConfig | null> {
+  getCurrentProfile(): ProfileConfig | null {
     if (!this.currentProfile) return null;
-    return await this.dbManager.getProfileConfig();
+    return this.dbManager.getProfileConfig();
   }
 
   getLastOpenedProfile(): string | null {
@@ -183,16 +183,16 @@ export class ProfileManager {
     return true;
   }
 
-  async updateProfileConfig(profileName: string, config: Partial<ProfileConfig>): Promise<boolean> {
+  updateProfileConfig(profileName: string, config: Partial<ProfileConfig>): boolean {
     if (this.currentProfile !== profileName) {
       return false; // Can only update current profile
     }
 
-    const existingConfig = await this.dbManager.getProfileConfig();
+    const existingConfig = this.dbManager.getProfileConfig();
     if (!existingConfig) return false;
 
     const updatedConfig = { ...existingConfig, ...config };
-    await this.dbManager.setProfileConfig(updatedConfig);
+    this.dbManager.setProfileConfig(updatedConfig);
     return true;
   }
 

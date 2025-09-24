@@ -339,20 +339,20 @@ ipcMain.handle('delete-profile', async (event, profileName: string) => {
   return await profileManager.deleteProfile(profileName);
 });
 
-ipcMain.handle('get-words-paginated', async (event, offset: number, limit: number, sortOrder?: 'asc' | 'desc') => {
-  return await dbManager.getWordsPaginated(offset, limit, sortOrder);
+ipcMain.handle('get-words-paginated', (event, offset: number, limit: number, sortOrder?: 'asc' | 'desc') => {
+  return dbManager.getWordsPaginated(offset, limit, sortOrder);
 });
 
-ipcMain.handle('search-words', async (event, query: string) => {
-  return await dbManager.searchWords(query);
+ipcMain.handle('search-words', (event, query: string) => {
+  return dbManager.searchWords(query);
 });
 
-ipcMain.handle('get-word', async (event, wordId: string) => {
-  return await dbManager.getWord(wordId);
+ipcMain.handle('get-word', (event, wordId: string) => {
+  return dbManager.getWord(wordId);
 });
 
-ipcMain.handle('get-word-by-name', async (event, wordName: string) => {
-  return await dbManager.getWordByName(wordName);
+ipcMain.handle('get-word-by-name', (event, wordName: string) => {
+  return dbManager.getWordByName(wordName);
 });
 
 ipcMain.handle('generate-word-meaning', async (event, word: string) => {
@@ -538,8 +538,8 @@ ipcMain.handle('delete-word', async (event, wordId: string) => {
   }
 });
 
-ipcMain.handle('get-related-words-paginated', async (event, searchTerm: string, offset: number, limit: number) => {
-  return await dbManager.getRelatedWordsPaginated(searchTerm, offset, limit);
+ipcMain.handle('get-related-words-paginated', (event, searchTerm: string, offset: number, limit: number) => {
+  return dbManager.getRelatedWordsPaginated(searchTerm, offset, limit);
 });
 
 // Store operations
@@ -568,14 +568,14 @@ ipcMain.handle('save-semantic-search-settings', (event, settings: any) => {
 });
 
 // Profile config operations
-ipcMain.handle('get-profile-config', async () => {
-  return await profileManager.getCurrentProfile();
+ipcMain.handle('get-profile-config', () => {
+  return profileManager.getCurrentProfile();
 });
 
-ipcMain.handle('update-profile-config', async (event, config: any) => {
+ipcMain.handle('update-profile-config', (event, config: any) => {
   const currentProfile = profileManager.getLastOpenedProfile();
   if (!currentProfile) return false;
-  return await profileManager.updateProfileConfig(currentProfile, config);
+  return profileManager.updateProfileConfig(currentProfile, config);
 });
 
 

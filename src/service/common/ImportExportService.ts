@@ -180,7 +180,7 @@ export class ImportExportService {
       const fileName = path.basename(sourcePath, '.db');
 
       // Validate the database format
-      const isValid = await DatabaseManager.validateDatabaseFormat(sourcePath);
+      const isValid = DatabaseManager.validateDatabaseFormat(sourcePath);
       if (!isValid) {
         return {
           success: false,
@@ -298,7 +298,7 @@ export class ImportExportService {
       await this.writeDatabaseFile(targetPath, fileBuffer);
 
       // Validate the downloaded database
-      const isValid = await DatabaseManager.validateDatabaseFormat(targetPath);
+      const isValid = DatabaseManager.validateDatabaseFormat(targetPath);
       if (!isValid) {
         // Clean up invalid file
         try {

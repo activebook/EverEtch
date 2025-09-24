@@ -140,7 +140,7 @@ export class SemanticSearchManager {
 
         // Set results in SemanticWordsManager
         this.semanticWordsManager.setSearchResults(query, searchResults);
-        this.toastManager.showSuccess(`Found ${result.results.length} similar words for "${query}"`);
+        // this.toastManager.showSuccess(`Found ${result.results.length} similar words for "${query}"`);
       } else {
         this.toastManager.showInfo(`No similar words found for "${query}"`);
         this.semanticWordsManager.clearResults();

@@ -70,8 +70,8 @@ export class SemanticBatchService {
   }
 
   /**
-   * Process a batch of words for embedding generation
-   */
+    * Process a batch of words for embedding generation
+    */
   private async processBatch(
     words: WordDocument[],
     profile: ProfileConfig,
@@ -94,7 +94,7 @@ export class SemanticBatchService {
       }
 
       // Check if word needs processing (more efficient than getEmbedding)
-      const exists = await this.vectorManager!.embeddingExists(wordData.id, profile.embedding_config!.model);
+      const exists = this.vectorManager!.embeddingExists(wordData.id, profile.embedding_config!.model);
       if (exists) {
         console.log(`⏭️ Skipping word ${wordData.id} - embedding already exists`);
         result.processed++;
@@ -131,7 +131,7 @@ export class SemanticBatchService {
 
        console.log(`💾 Storing ${batchSE.length} embeddings...`);
        console.log(`📋 Word IDs being stored: ${batchSE.map(se => se.word_id).join(', ')}`);
-       await this.vectorManager!.batchStoreEmbeddings(batchSE);
+       this.vectorManager!.batchStoreEmbeddings(batchSE);
        result.processed += proceedWords.length;
        console.log(`✅ Successfully stored ${batchSE.length} embeddings`);
     } catch (error) {
@@ -145,8 +145,8 @@ export class SemanticBatchService {
   }
 
   /**
-   * Start batch processing of all words for semantic search
-   */
+    * Start batch processing of all words for semantic search
+    */
   async startBatchProcessing(
     options: BatchProcessingOptions = {}
   ): Promise<BatchProcessingResult> {
@@ -184,7 +184,7 @@ export class SemanticBatchService {
 
       // Check words count
       console.log('🔍 Counting words...');
-      const totalWords = await this.dbManager.getWordsCount();
+      const totalWords = this.dbManager.getWordsCount();
       console.log(`📊 Total words: ${totalWords}`);
 
       if (totalWords === 0) {
@@ -218,7 +218,7 @@ export class SemanticBatchService {
         const startIndex = batchIndex * batchSize;
         console.log(`🔄 Processing batch ${batchIndex + 1}/${totalBatches} (words ${startIndex + 1}-${Math.min(startIndex + batchSize, totalWords)})`);
 
-        const batch = await this.dbManager.getWordDocumentsPaginated(startIndex, batchSize);
+        const batch = this.dbManager.getWordDocumentsPaginated(startIndex, batchSize);
         console.log(`📋 Batch contains ${batch.words.length} words`);
 
         // Process this batch
