@@ -416,7 +416,7 @@ export class SemanticSettingsModalHandler extends ModalHandler {
   private updateButtonState(newState: ButtonState): void {
     const startBtn = document.getElementById('semantic-batch-start-btn') as HTMLButtonElement;
     const stopBtn = document.getElementById('semantic-batch-stop-btn') as HTMLButtonElement;
-    const formElements = document.querySelectorAll('#semantic-settings-modal input, #semantic-settings-modal select');
+    const formElements = document.querySelectorAll('#semantic-settings-modal input, #semantic-settings-modal select, #semantic-settings-modal #embedding-model-dropdown-btn');
 
     // Remove all existing classes first
     if (startBtn) {
@@ -468,7 +468,7 @@ export class SemanticSettingsModalHandler extends ModalHandler {
         }
         // Enable form elements
         formElements.forEach((element: any) => {
-          element.disabled = false;
+          element.disabled = true;
         });
         break;
 
