@@ -19,7 +19,7 @@ export class ProfileSetModalHandler extends ModalHandler {
     super(uiUtils, toastManager);
     this.profileService = profileService;
     this.modelMemoService = modelMemoService;
-    this.modelDropdown = new CustomModelDropdown();
+    this.modelDropdown = new CustomModelDropdown('chat-model-dropdown');
   }
 
   // Settings Modal methods

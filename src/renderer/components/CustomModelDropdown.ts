@@ -5,11 +5,14 @@ export class CustomModelDropdown {
   //private static instance: CustomModelDropdown | null = null;
   private dropdownElement: HTMLElement | null = null;
   private anchorElement: HTMLElement | null = null;
+  private dropdownId: string;
   private onModelSelected?: (modelName: string) => Promise<boolean>;
   private onModelDeleted?: (modelName: string) => Promise<boolean>;
   private onModelSaved?: () => Promise<boolean>;
 
-  constructor() { }
+  constructor(dropdownId: string = 'custom-model-dropdown') {
+    this.dropdownId = dropdownId;
+  }
 
   // static getInstance(): CustomModelDropdown {
   //   if (!CustomModelDropdown.instance) {
@@ -59,7 +62,7 @@ export class CustomModelDropdown {
 
       // Create dropdown container
       this.dropdownElement = document.createElement('div');
-      this.dropdownElement.id = 'custom-model-dropdown';
+      this.dropdownElement.id = this.dropdownId;
       this.dropdownElement.className = 'absolute z-50 mt-1 w-full bg-white border border-amber-200 rounded-lg shadow-lg max-h-60 overflow-y-auto';
 
       // Add model items

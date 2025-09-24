@@ -1,6 +1,7 @@
 import { ModalHandler } from './ModalHandler.js';
 import { ToastManager } from '../components/ToastManager.js';
 import { ProfileService } from '../services/ProfileService.js';
+import { ModelMemoService } from '../services/ModelMemoService.js';
 import { CustomModelDropdown } from '../components/CustomModelDropdown.js';
 import { UIUtils } from '../utils/UIUtils.js';
 import { ProfileConfig } from '../types.js';
@@ -19,17 +20,20 @@ const START_BTN_TEXT_PROCESSING = "In Processing...";
 export class SemanticSettingsModalHandler extends ModalHandler {
   private isProcessing: boolean = false;
   private profileService: ProfileService;
+  private modelMemoService: ModelMemoService;
   private modelDropdown: CustomModelDropdown;
   private batchEventsRegistered: boolean = false;
 
   constructor(
     uiUtils: UIUtils,
     toastManager: ToastManager,
-    profileService: ProfileService
+    profileService: ProfileService,
+    modelMemoService: ModelMemoService
   ) {
     super(uiUtils, toastManager);
     this.profileService = profileService;
-    this.modelDropdown = new CustomModelDropdown();
+    this.modelMemoService = modelMemoService;
+    this.modelDropdown = new CustomModelDropdown('embedding-model-dropdown');
   }
 
   /**
@@ -91,6 +95,7 @@ export class SemanticSettingsModalHandler extends ModalHandler {
     const apiKeyInput = document.getElementById('embedding-api-key') as HTMLInputElement;
 
     if (toggleApiKeyBtn && !toggleApiKeyBtn._listenerAdded) {
+      toggleApiKeyBtn.disabled = false; // Enable the button
       toggleApiKeyBtn._listenerAdded = true;
       toggleApiKeyBtn.addEventListener('click', () => this.toggleApiKeyVisibility(apiKeyInput, toggleApiKeyBtn));
     }
@@ -107,7 +112,8 @@ export class SemanticSettingsModalHandler extends ModalHandler {
       });
     }
 
-    // Set up model dropdown
+    // Set up embedding model dropdown
+    this.setupEmbeddingModelDropdown();
 
     // Set up batch events
     this.setupBatchEvents();
@@ -162,10 +168,12 @@ export class SemanticSettingsModalHandler extends ModalHandler {
 
     if (result.success) {
       this.updateButtonState(ButtonState.COMPLETED);
-      this.showSuccess(`Semantic search completed successfully. Total words: ${result.totalWords}, Processed: ${result.processed}, Failed: ${result.failed}`);
+      this.updateStatusIndicator(true);
+      this.showSuccess(`Semantic batch completed successfully. Total words: ${result.totalWords}, Processed: ${result.processed}, Failed: ${result.failed}`);
     } else {
       this.updateButtonState(ButtonState.ERROR);
-      this.showError(`Semantic search failed: ${result.error}. Total words: ${result.totalWords}, Processed: ${result.processed}, Failed: ${result.failed}`);
+      this.updateStatusIndicator(false);
+      this.showError(`Semantic batch failed: ${result.error}. Total words: ${result.totalWords}, Processed: ${result.processed}, Failed: ${result.failed}`);
     }
   }
 
@@ -441,7 +449,7 @@ export class SemanticSettingsModalHandler extends ModalHandler {
       const result = await window.electronAPI.startSemanticBatchProcessing(updatedProfile);
 
       if (result.success) {
-        this.updateStatusIndicator(true);
+        // do nothing because handle complete func will deal with it
       } else {
         // Force stop
         this.handleStopBatch();
@@ -492,7 +500,7 @@ export class SemanticSettingsModalHandler extends ModalHandler {
     try {
       const result = await window.electronAPI.cancelSemanticBatchProcessing();
       if (result.success) {
-        this.showSuccess('Semantic search processing stopped');
+        this.showInfo('Semantic search processing stopped');
       } else {
         this.showError(result.message || 'Stop processing failed');
       }
@@ -523,5 +531,150 @@ export class SemanticSettingsModalHandler extends ModalHandler {
       if (eyeIcon) eyeIcon.classList.remove('hidden');
       if (eyeOffIcon) eyeOffIcon.classList.add('hidden');
     }
+  }
+
+  /**
+   * Set up embedding model dropdown event listeners
+   */
+  private setupEmbeddingModelDropdown(): void {
+    const embeddingModelDropdownBtn = document.getElementById('embedding-model-dropdown-btn') as HTMLButtonElement;
+    if (embeddingModelDropdownBtn && !embeddingModelDropdownBtn._listenerAdded) {
+      embeddingModelDropdownBtn._listenerAdded = true;
+      embeddingModelDropdownBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.showEmbeddingModelDropdown();
+      });
+      embeddingModelDropdownBtn.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          this.showEmbeddingModelDropdown();
+        }
+      });
+    }
+  }
+
+  /**
+   * Show embedding model dropdown
+   */
+  private async showEmbeddingModelDropdown(): Promise<void> {
+    const embeddingModelDropdownBtn = document.getElementById('embedding-model-dropdown-btn') as HTMLButtonElement;
+    const models = await this.modelMemoService.loadEmbeddingModelMemos();
+    this.modelDropdown.show(models, embeddingModelDropdownBtn, {
+      onModelSelected: (modelName) => this.handleEmbeddingModelSelection(modelName),
+      onModelDeleted: (modelName) => this.handleEmbeddingModelDeletion(modelName),
+      onModelSaved: () => this.handleEmbeddingModelSave()
+    });
+  }
+
+  /**
+   * Handle embedding model selection
+   */
+  private async handleEmbeddingModelSelection(modelName: string): Promise<boolean> {
+    try {
+      const result = await this.modelMemoService.getModelMemo(modelName);
+
+      if (result.success && result.model) {
+        const model = result.model;
+
+        // Populate embedding form fields
+        (document.getElementById('embedding-provider') as HTMLSelectElement).value = model.provider;
+        (document.getElementById('embedding-model') as HTMLInputElement).value = model.model;
+        (document.getElementById('embedding-endpoint') as HTMLInputElement).value = model.endpoint;
+        (document.getElementById('embedding-api-key') as HTMLInputElement).value = model.apiKey;
+
+        // Mark model as used
+        await this.modelMemoService.markModelUsed(modelName);
+
+        this.showSuccess(`Embedding model "${model.name}" loaded successfully`);
+        return true;
+      } else {
+        this.showError(result.message || 'Failed to load embedding model');
+      }
+    } catch (error) {
+      console.error('Error selecting embedding model from dropdown:', error);
+      this.showError('Failed to load embedding model configuration');
+    }
+    return false;
+  }
+
+  /**
+   * Handle embedding model deletion
+   */
+  private async handleEmbeddingModelDeletion(modelName: string): Promise<boolean> {
+    const confirmed = confirm(`Are you sure you want to delete the embedding model "${modelName}"?`);
+    if (!confirmed) {
+      return false;
+    }
+
+    try {
+      const deleteResult = await this.modelMemoService.deleteModelMemo(modelName);
+
+      if (deleteResult.success) {
+        this.showSuccess(`Embedding model "${modelName}" deleted successfully`);
+        // Hide the dropdown
+        this.modelDropdown.hide();
+        // Reload model list
+        this.showEmbeddingModelDropdown();
+        return true;
+      } else {
+        this.showError(deleteResult.message || 'Failed to delete embedding model');
+      }
+    } catch (error) {
+      console.error('Error deleting embedding model from dropdown:', error);
+      this.showError('Failed to delete embedding model configuration');
+    }
+    return false;
+  }
+
+  /**
+   * Handle embedding model save
+   */
+  private async handleEmbeddingModelSave(): Promise<boolean> {
+    const providerElement = document.getElementById('embedding-provider') as HTMLSelectElement;
+    const modelElement = document.getElementById('embedding-model') as HTMLInputElement;
+    const endpointElement = document.getElementById('embedding-endpoint') as HTMLInputElement;
+    const apiKeyElement = document.getElementById('embedding-api-key') as HTMLInputElement;
+
+    if (!providerElement || !modelElement || !endpointElement || !apiKeyElement) {
+      this.showError('Form elements not found');
+      return false;
+    }
+
+    const provider = providerElement.value as 'openai' | 'google';
+    const model = modelElement.value.trim();
+    const endpoint = endpointElement.value.trim();
+    const apiKey = apiKeyElement.value.trim();
+
+    if (!model) {
+      this.showError('Model name cannot be empty');
+      return false;
+    }
+
+    try {
+      const result = await this.modelMemoService.addModelMemo({
+        name: "",
+        provider,
+        model,
+        endpoint,
+        apiKey,
+        type: 'embedding',
+      });
+
+      if (result.success) {
+        const memoName = result.model?.name;
+        this.showSuccess(`Embedding model "${memoName}" saved successfully`);
+        // Hide the dropdown
+        this.modelDropdown.hide();
+        // Reload model list
+        this.showEmbeddingModelDropdown();
+        return true;
+      } else {
+        this.showError(result.message || 'Failed to save embedding model');
+      }
+    } catch (error) {
+      console.error('Error saving embedding model from dropdown:', error);
+      this.showError('Failed to save embedding model configuration');
+    }
+    return false;
   }
 }

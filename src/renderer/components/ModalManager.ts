@@ -107,8 +107,9 @@ export class ModalManager {
     // Initialize semantic search settings modal handler
     this.semanticSettingsModalHandler = new SemanticSettingsModalHandler(
       this.uiUtils,
-      this.toastManager,
-      this.profileService
+      this.toastManager,      
+      this.profileService,
+      this.modelMemoService
     );
   }
 

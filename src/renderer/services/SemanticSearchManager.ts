@@ -101,9 +101,6 @@ export class SemanticSearchManager {
     // Update search input state
     if (this.searchInput) {
       this.searchInput.disabled = !enabled;
-      this.searchInput.placeholder = enabled
-        ? 'Search by meaning...'
-        : 'Semantic search disabled';
     }
 
     // Clear results if disabled

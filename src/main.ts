@@ -918,8 +918,8 @@ ipcMain.handle('start-semantic-batch-processing', async (event, config: any) => 
       }
     );
     return {
-      success: true,
-      message: `Start batch processing`,
+      success: result.success,
+      message: result.error,
     };
   } catch (error) {
     console.error('Failed to start semantic search processing:', error);
