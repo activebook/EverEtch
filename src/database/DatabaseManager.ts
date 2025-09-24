@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { Utils } from '../utils/Utils.js';
 import { DatabaseRecovery } from './DatabaseRecovery.js';
-import { VectorDatabaseManager } from './VectorDatabaseManager.js';
+import { VectorDatabaseManager, SemanticWordItem, SemanticEmbedding } from './VectorDatabaseManager.js';
 
 export interface WordDocument {
   id: string;
@@ -607,24 +607,22 @@ export class DatabaseManager {
      * Reconnect to an existing database file (used after renaming)
      * This bypasses the table creation logic and directly opens the existing database
      */
-   reconnectToDatabase(profileName: string): void {
-     try {
-       // Close any existing connection
-       if (this.db) {
-         this.db.close();
-       }
+  reconnectToDatabase(profileName: string): void {
+    try {
+      // Close any existing connection
+      this.close();
 
-       // Now open the new database
-       this.dbPath = Utils.getDatabasePath(profileName);
-       this.db = new Database(this.dbPath);
+      // Now open the new database
+      this.dbPath = Utils.getDatabasePath(profileName);
+      this.db = new Database(this.dbPath);
 
-       // Reinitialize vector database with the new connection
-       this.initializeVectorDatabase(this.dbPath);
-     } catch (error) {
-       console.error('Error reconnecting to database:', error);
-       throw error;
-     }
-   }
+      // Reinitialize vector database with the new connection
+      this.initializeVectorDatabase(this.dbPath);
+    } catch (error) {
+      console.error('Error reconnecting to database:', error);
+      throw error;
+    }
+  }
 
   /**
    * Initialize vector database for semantic search
@@ -720,15 +718,13 @@ export class DatabaseManager {
 
         console.log(`✅ Word deleted: ${wordId}`);
 
-        // Step 2: Clean up embedding in vector database if enabled
-        if (this.vectorDb) {
-          console.log(`💾 Cleaning up embedding for word: ${wordId}`);
-          // We don't need to check whether embedding exists or not
-          // bacause the word can be added without embedding
-          // so just delete related word if existed
-          this.vectorDb.deleteEmbedding(wordId);
-          console.log(`✅ Embedding cleaned up for word: ${wordId}`);
-        }
+        // Step 2: Clean up embedding in vector database if enabled        
+        console.log(`💾 Cleaning up embedding for word: ${wordId}`);
+        // We don't need to check whether embedding exists or not
+        // bacause the word can be added without embedding
+        // so just delete related word if existed
+        this.vectorDb!.deleteEmbedding(wordId);
+        console.log(`✅ Embedding cleaned up for word: ${wordId}`);
 
         return deleteResult;
       })();
@@ -789,7 +785,7 @@ export class DatabaseManager {
         wordDoc = this.addWord(wordData);
 
         // Step 2: Store embedding in vector database
-        if (wordDoc && this.vectorDb) {
+        if (wordDoc) {
           console.log(`💾 Storing embedding for word: ${wordDoc.word}`);
           this.vectorDb!.storeEmbedding({
             word_id: wordDoc.id,
@@ -864,9 +860,9 @@ export class DatabaseManager {
         console.log(`✅ Word updated: ${wordId}`);
 
         // Step 2: Update embedding in vector database (always done in transaction)
-        if (wordDoc && this.vectorDb) {
+        if (wordDoc) {
           console.log(`💾 Updating embedding for word: ${wordDoc.word}`);
-          this.vectorDb.storeEmbedding({
+          this.vectorDb!.storeEmbedding({
             word_id: wordId,
             embedding: embedding,
             model_used: profile.embedding_config!.model
@@ -885,6 +881,49 @@ export class DatabaseManager {
       console.error(`❌ Transaction failed for word "${wordId}":`, error);
       throw new Error(`Failed to update word "${wordId}": ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  /**
+   * Semantic search using vector database
+   * @param queryEmbedding Query embedding vector
+   * @param limit Number of results to return
+   * @param threshold Minimum similarity score
+   * @returns SemanticWordItem[] Array of semantic word items
+   */
+  semanticSearch(queryEmbedding: number[], limit: number = 50, threshold: number = 0.5): SemanticWordItem[] {
+    return this.vectorDb!.semanticSearch(queryEmbedding, limit, threshold);
+  }
+
+  /**
+   * Batch store embeddings in vector database
+   * @param embeddings Array of semantic embeddings
+   */
+  batchStoreEmbeddings(embeddings: Array<SemanticEmbedding>): void {
+    this.vectorDb!.batchStoreEmbeddings(embeddings);
+  }
+
+  /**
+   * Check if an embedding exists in vector database
+   * @param wordId Word ID
+   * @param modelUsed Model used for embedding
+   * @returns boolean True if exists, false otherwise
+   */
+  embeddingExists(wordId: string, modelUsed: string): boolean {
+    return this.vectorDb!.embeddingExists(wordId, modelUsed);
+  }
+
+  /**
+   * Get embedding stats from vector database
+   * @returns {
+   *   totalEmbeddings: number;
+   *   averageEmbeddingSize: number;
+   * }
+   */
+  getEmbeddingStats(): {
+    totalEmbeddings: number;
+    averageEmbeddingSize: number;
+  } {
+    return this.vectorDb!.getEmbeddingStats();
   }
 
   /**

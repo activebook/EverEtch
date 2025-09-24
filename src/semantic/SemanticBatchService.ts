@@ -1,5 +1,5 @@
 import { DatabaseManager, ProfileConfig, WordDocument } from '../database/DatabaseManager.js';
-import { VectorDatabaseManager, SemanticEmbedding } from '../database/VectorDatabaseManager.js';
+import { SemanticEmbedding } from '../database/VectorDatabaseManager.js';
 import { ProfileManager } from '../database/ProfileManager.js';
 import { EmbeddingModelClient, EmbeddingResult } from '../ai/EmbeddingModelClient.js';
 
@@ -25,7 +25,6 @@ export interface BatchProcessingResult {
 export class SemanticBatchService {
   private dbManager: DatabaseManager;
   private profileManager: ProfileManager;
-  private vectorManager: VectorDatabaseManager | null = null;
   private embeddingClient: EmbeddingModelClient | null = null;
   private isProcessing: boolean = false;
   private abortController: AbortController | null = null;
@@ -33,6 +32,7 @@ export class SemanticBatchService {
   constructor(dbManager: DatabaseManager, profileManager: ProfileManager) {
     this.dbManager = dbManager;
     this.profileManager = profileManager;
+    this.embeddingClient = new EmbeddingModelClient();
   }
 
   /**
@@ -51,22 +51,6 @@ export class SemanticBatchService {
       this.abortController = null;
     }
     this.isProcessing = false;
-  }
-
-  /**
-   * Initialize services
-   * We must initialize services before starting batch processing
-   * but after constructor, because in constructor
-   * the db manager is not initialized yet,
-   * so the vector database must wait to be initialized
-   */
-  private initialize(): void {
-    if (!this.vectorManager) {
-      this.vectorManager = this.dbManager.getVectorDatabase()!;
-    }
-    if (!this.embeddingClient) {
-      this.embeddingClient = new EmbeddingModelClient();
-    }
   }
 
   /**
@@ -94,7 +78,7 @@ export class SemanticBatchService {
       }
 
       // Check if word needs processing (more efficient than getEmbedding)
-      const exists = this.vectorManager!.embeddingExists(wordData.id, profile.embedding_config!.model);
+      const exists = this.dbManager.embeddingExists(wordData.id, profile.embedding_config!.model);
       if (exists) {
         console.log(`⏭️ Skipping word ${wordData.id} - embedding already exists`);
         result.processed++;
@@ -131,7 +115,7 @@ export class SemanticBatchService {
 
        console.log(`💾 Storing ${batchSE.length} embeddings...`);
        console.log(`📋 Word IDs being stored: ${batchSE.map(se => se.word_id).join(', ')}`);
-       this.vectorManager!.batchStoreEmbeddings(batchSE);
+       this.dbManager.batchStoreEmbeddings(batchSE);
        result.processed += proceedWords.length;
        console.log(`✅ Successfully stored ${batchSE.length} embeddings`);
     } catch (error) {
@@ -156,10 +140,6 @@ export class SemanticBatchService {
       console.error('❌ Batch processing already in progress');
       throw new Error('Batch processing already in progress');
     }
-
-    // Initialize services
-    this.initialize();
-    console.log('✅ Services initialized');
 
     this.isProcessing = true;
     this.abortController = new AbortController();

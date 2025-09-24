@@ -1,4 +1,4 @@
-import { VectorDatabaseManager, SemanticWordItem, SemanticEmbedding } from '../database/VectorDatabaseManager.js';
+import { SemanticWordItem, SemanticEmbedding } from '../database/VectorDatabaseManager.js';
 import { EmbeddingModelClient, EmbeddingResult } from '../ai/EmbeddingModelClient.js';
 import { ProfileConfig, DatabaseManager } from '../database/DatabaseManager.js';
 import { ProfileManager } from '../database/ProfileManager.js';
@@ -35,28 +35,12 @@ export interface EmbeddingGenerationResult {
 export class SemanticSearchService {
   private dbManager: DatabaseManager;  
   private profileManager: ProfileManager;
-  private vectorManager: VectorDatabaseManager| null = null;
   private embeddingClient: EmbeddingModelClient | null = null;
 
   constructor(dbManager: DatabaseManager, profileManager: ProfileManager) {
     this.dbManager = dbManager;
     this.profileManager = profileManager;
-  }
-
-  /**
-   * Initialize services
-   * We must initialize services before starting batch processing
-   * but after constructor, because in constructor
-   * the db manager is not initialized yet,
-   * so the vector database must wait to be initialized
-   */
-  private initialize(): void {
-    if (!this.vectorManager) {
-      this.vectorManager = this.dbManager.getVectorDatabase()!;
-    }
-    if (!this.embeddingClient) {
-      this.embeddingClient = new EmbeddingModelClient();
-    }
+    this.embeddingClient = new EmbeddingModelClient();
   }
 
   /**
@@ -76,9 +60,6 @@ export class SemanticSearchService {
       };
     }
 
-    // Initialize services
-    this.initialize();
-
     try {
       // Generate embedding for the search query
       const currentProfile = await this.profileManager.getCurrentProfile();
@@ -89,7 +70,7 @@ export class SemanticSearchService {
       const queryEmbeddingResult = await this.generateQueryEmbedding(query, currentProfile) as EmbeddingResult;
 
       // Perform semantic search
-      const results = this.vectorManager!.semanticSearch(
+      const results = this.dbManager.semanticSearch(
         queryEmbeddingResult.embedding,
         options.limit || 50,
         options.threshold || 0.5
@@ -98,7 +79,7 @@ export class SemanticSearchService {
       // Get embedding statistics if requested
       let embeddingStats;
       if (options.includeEmbeddingStats) {
-        embeddingStats = this.vectorManager!.getEmbeddingStats();
+        embeddingStats = this.dbManager.getEmbeddingStats();
       }
 
       return {
