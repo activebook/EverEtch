@@ -25,6 +25,35 @@
                     </div>
                 </div>
 
+                <!-- Compact Progress Section -->
+                <div id="embedding-batch-progress-section" class="hidden space-y-3">
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-xs">
+                            <span id="embedding-batch-progress-text" class="text-slate-700">Preparing to process embeddings...</span>
+                            <span id="embedding-batch-progress-percentage" class="text-slate-600">0%</span>
+                        </div>
+
+                        <div class="w-full bg-amber-200 rounded-full h-1.5">
+                            <div id="embedding-batch-progress-bar" class="bg-blue-600 h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-2 text-xs">
+                            <div class="text-center">
+                                <div id="embedding-batch-processed-count" class="font-semibold text-blue-600">0</div>
+                                <div class="text-slate-500">Processed</div>
+                            </div>
+                            <div class="text-center">
+                                <div id="embedding-batch-skipped-count" class="font-semibold text-green-600">0</div>
+                                <div class="text-slate-500">Skipped</div>
+                            </div>
+                            <div class="text-center">
+                                <div id="embedding-batch-failed-count" class="font-semibold text-red-600">0</div>
+                                <div class="text-slate-500">Failed</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Compact API Configuration -->
                 <div class="space-y-3">
                     <h4 class="text-sm font-semibold text-slate-800 border-b border-amber-200/60 pb-1">API Configuration</h4>
@@ -88,8 +117,6 @@
 
                 <!-- Compact Processing Settings -->
                 <div class="space-y-3">
-                    <h4 class="text-sm font-semibold text-slate-800 border-b border-amber-200/60 pb-1">Processing Settings</h4>
-
                     <div class="grid grid-cols-2 gap-3">
                         <div>
                             <label for="batch-size" class="block text-xs font-medium text-slate-700 mb-1">Batch Size</label>
@@ -117,37 +144,7 @@
                         </div>
                     </div>
                 </div>
-
-                <!-- Compact Progress Section -->
-                <div id="embedding-batch-progress-section" class="hidden space-y-3">
-                    <h4 class="text-sm font-semibold text-slate-800 border-b border-amber-200/60 pb-1">Processing Progress</h4>
-
-                    <div class="space-y-2">
-                        <div class="flex justify-between text-xs">
-                            <span id="embedding-batch-progress-text" class="text-slate-700">Preparing to process words...</span>
-                            <span id="embedding-batch-progress-percentage" class="text-slate-600">0%</span>
-                        </div>
-
-                        <div class="w-full bg-amber-200 rounded-full h-1.5">
-                            <div id="embedding-batch-progress-bar" class="bg-blue-600 h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
-                        </div>
-
-                        <div class="grid grid-cols-3 gap-2 text-xs">
-                            <div class="text-center">
-                                <div id="embedding-batch-processed-count" class="font-semibold text-blue-600">0</div>
-                                <div class="text-slate-500">Processed</div>
-                            </div>
-                            <div class="text-center">
-                                <div id="embedding-batch-skipped-count" class="font-semibold text-green-600">0</div>
-                                <div class="text-slate-500">Skipped</div>
-                            </div>
-                            <div class="text-center">
-                                <div id="embedding-batch-failed-count" class="font-semibold text-red-600">0</div>
-                                <div class="text-slate-500">Failed</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                                
             </div>
 
             <div class="p-3 border-t border-amber-200/60 flex justify-between items-center bg-amber-50/50 rounded-b-2xl">

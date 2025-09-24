@@ -898,7 +898,14 @@ ipcMain.handle('start-semantic-batch-processing', async (event, config: any) => 
       };
     }
 
-    await profileManager.updateProfileConfig(currentProfile!.name, updatedProfile);
+    const updateResult = await profileManager.updateProfileConfig(currentProfile!.name, updatedProfile);
+    if (!updateResult) {
+      console.error('Failed to update profile config');
+      return {
+        success: false,
+        message: 'Failed to update profile configuration'
+      };
+    }
 
     // Start batch processing
     const result = await semanticBatchService.startBatchProcessing(

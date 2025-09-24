@@ -146,14 +146,78 @@ export class SemanticSettingsModalHandler extends ModalHandler {
   }
 
   private handleSemanticBatchProgress(progress: { processed: number; total: number; }): void {
-    const progressBar = document.getElementById('progress-bar') as HTMLProgressElement;
-    const progressText = document.getElementById('progress-text') as HTMLElement;
+    this.updateProgressElements(progress);
+  }
 
-    if (progressBar && progressText) {
-      progressBar.value = progress.processed;
-      progressBar.max = progress.total;
-      progressText.textContent = `${progress.processed} / ${progress.total}`
+  private showProgressSection(): void {
+    // Reset progress elements to initial state
+    this.resetProgressElements();
+
+    const progressSection = document.getElementById('embedding-batch-progress-section') as HTMLElement;
+    if (progressSection) {
+      progressSection.classList.remove('hidden');
     }
+  }
+
+  private hideProgressSection(): void {
+    const progressSection = document.getElementById('embedding-batch-progress-section') as HTMLElement;
+    if (progressSection) {
+      progressSection.classList.add('hidden');
+    }
+  }
+
+  private showStatusIndicator(): void {
+    const statusSection = document.getElementById('semantic-search-status') as HTMLElement;
+    if (statusSection) {
+      statusSection.classList.remove('hidden');
+    }
+  }
+
+  private hideStatusIndicator(): void {
+    const statusSection = document.getElementById('semantic-search-status') as HTMLElement;
+    if (statusSection) {
+      statusSection.classList.add('hidden');
+    }
+  }
+
+  private resetProgressElements(): void {
+    // Reset progress elements to initial state
+    const progressBar = document.getElementById('embedding-batch-progress-bar') as HTMLElement;
+    const progressText = document.getElementById('embedding-batch-progress-text') as HTMLElement;
+    const progressPercentage = document.getElementById('embedding-batch-progress-percentage') as HTMLElement;
+    const processedCount = document.getElementById('embedding-batch-processed-count') as HTMLElement;
+    const skippedCount = document.getElementById('embedding-batch-skipped-count') as HTMLElement;
+    const failedCount = document.getElementById('embedding-batch-failed-count') as HTMLElement;
+
+    if (progressBar) progressBar.style.width = '0%';
+    if (progressText) progressText.textContent = 'Preparing to process embeddings...';
+    if (progressPercentage) progressPercentage.textContent = '0%';
+    if (processedCount) processedCount.textContent = '0';
+    if (skippedCount) skippedCount.textContent = '0';
+    if (failedCount) failedCount.textContent = '0';
+  }
+
+  private updateProgressElements(progress: { processed: number; total: number; }): void {
+    // Update progress elements
+    const progressBar = document.getElementById('embedding-batch-progress-bar') as HTMLElement;
+    const progressText = document.getElementById('embedding-batch-progress-text') as HTMLElement;
+    const progressPercentage = document.getElementById('embedding-batch-progress-percentage') as HTMLElement;
+
+    if (progressBar && progressText && progressPercentage) {
+      const percentage = progress.total > 0 ? Math.round((progress.processed / progress.total) * 100) : 0;
+      progressBar.style.width = `${percentage}%`;
+      progressText.textContent = `Processing embeddings... (${progress.processed} / ${progress.total})`;
+      progressPercentage.textContent = `${percentage}%`;
+    }
+
+    // Update counters
+    const processedCount = document.getElementById('embedding-batch-processed-count') as HTMLElement;
+    const skippedCount = document.getElementById('embedding-batch-skipped-count') as HTMLElement;
+    const failedCount = document.getElementById('embedding-batch-failed-count') as HTMLElement;
+
+    if (processedCount) processedCount.textContent = progress.processed.toString();
+    if (skippedCount) skippedCount.textContent = '0'; // Will be updated when we have this data
+    if (failedCount) failedCount.textContent = '0'; // Will be updated when we have this data
   }
 
   private handleSemanticBatchComplete(result: {
@@ -166,14 +230,37 @@ export class SemanticSettingsModalHandler extends ModalHandler {
   }): void {
     this.isProcessing = false;
 
+    // Update final progress values before hiding
+    this.updateProgressElements({
+      processed: result.processed,
+      total: result.totalWords
+    });
+
+    // Update final status in progress section
+    const progressText = document.getElementById('embedding-batch-progress-text') as HTMLElement;
+    const processedCount = document.getElementById('embedding-batch-processed-count') as HTMLElement;
+    const failedCount = document.getElementById('embedding-batch-failed-count') as HTMLElement;
+
+    if (progressText && processedCount && failedCount) {
+      progressText.textContent = result.success ? 'Processing completed!' : 'Processing failed!';
+      processedCount.textContent = result.processed.toString();
+      failedCount.textContent = result.failed.toString();
+    }
+
+    // Hide the progress section and show status indicator
+    setTimeout(() => {
+      this.hideProgressSection();
+      this.showStatusIndicator();
+    }, 1000);
+
     if (result.success) {
       this.updateButtonState(ButtonState.COMPLETED);
       this.updateStatusIndicator(true);
-      this.showSuccess(`Semantic batch completed successfully. Total words: ${result.totalWords}, Processed: ${result.processed}, Failed: ${result.failed}`);
     } else {
       this.updateButtonState(ButtonState.ERROR);
       this.updateStatusIndicator(false);
-      this.showError(`Semantic batch failed: ${result.error}. Total words: ${result.totalWords}, Processed: ${result.processed}, Failed: ${result.failed}`);
+      // Show error toast since progress section shows limited error info
+      this.showError(`Failed: ${result.error}`);
     }
   }
 
@@ -446,6 +533,10 @@ export class SemanticSettingsModalHandler extends ModalHandler {
       this.isProcessing = true;
       this.updateButtonState(ButtonState.PROCESSING);
 
+      // Show progress section when processing starts
+      this.hideStatusIndicator();
+      this.showProgressSection();
+
       const result = await window.electronAPI.startSemanticBatchProcessing(updatedProfile);
 
       if (result.success) {
@@ -509,6 +600,9 @@ export class SemanticSettingsModalHandler extends ModalHandler {
       this.showError('Failed to stop semantic search');
     } finally {
       this.isProcessing = false;
+      // Hide progress section and show status indicator when stopping
+      this.hideProgressSection();
+      this.showStatusIndicator();
       // Update status indicator to disabled when stopping
       this.updateStatusIndicator(false);
       this.updateButtonState(ButtonState.IDLE);
