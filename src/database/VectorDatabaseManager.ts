@@ -99,6 +99,7 @@ export class VectorDatabaseManager {
   /**
    * Find the sqlite-vec dylib file in various possible locations
    * Uses the same pattern as GoogleAuthService for consistency
+   * Note: Only searches unpacked locations since dylib files cannot be loaded from ASAR
    */
   private findDylibFile(filename: string): string | null {
     // Return cached path if available
@@ -110,19 +111,18 @@ export class VectorDatabaseManager {
     const appPath = app.getAppPath();
     const possiblePaths: string[] = [];
 
-    // 1. ASAR location (files array) - most common for current setup
-    possiblePaths.push(path.join(appPath, 'node_modules', 'sqlite-vec-darwin-x64', filename));
-
-    // 2. Resources directory (extraResources) - fallback for older setups
+    // 1. Resources directory (asarUnpack location) - primary location for dylib files
     if (appPath.includes('.asar')) {
       const resourcesPath = path.dirname(appPath);
       possiblePaths.push(path.join(resourcesPath, 'app.asar.unpacked', 'node_modules', 'sqlite-vec-darwin-x64', filename));
     }
 
-    // 3. Direct app directory (development fallback)
+    // 2. Direct app directory (development fallback)
     if (!appPath.includes('.asar')) {
       possiblePaths.push(path.join(appPath, 'node_modules', 'sqlite-vec-darwin-x64', filename));
     }
+
+    // Note: Skip ASAR location entirely for dylib files since they cannot be loaded from ASAR
 
     console.log(`🔍 Searching for ${filename} in: ${possiblePaths.join(', ')}`);
 

@@ -68,7 +68,6 @@
       "assets/**/*",
       "lib/**/*",
       "node_modules/**/*",
-      "!node_modules/sqlite-vec-darwin-x64/**/*",
       "package.json",
       "credentials.enc"
     ],
