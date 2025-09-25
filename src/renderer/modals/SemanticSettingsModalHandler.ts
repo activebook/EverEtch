@@ -61,7 +61,9 @@ export class SemanticSettingsModalHandler extends ModalHandler {
    */
   hide(): void {
     if (this.isProcessing) {
-      this.showError('Cannot close modal while processing is in progress');
+      const actionBtn = document.getElementById('semantic-batch-action-btn') as HTMLButtonElement;
+      actionBtn.click();
+      this.showInfo('Progress canceled.');
       return;
     }
     this.hideModal('semantic-settings-modal');

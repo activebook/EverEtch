@@ -46,7 +46,8 @@ Just enter any word and get instant meanings, examples, and related words all po
 - Works with your existing word collections
 - Enable in settings to start using this AI-powered feature
 
-![UI Screenshot](screenshots/UI_SEMANTIC.png)
+![UI Screenshot](screenshots/UI_SEMANTIC_EN.png)
+![UI Screenshot](screenshots/UI_SEMANTIC_JP.png)
 ![UI Screenshot](screenshots/UI_SEMANTIC_SET.png)
 
 ### Importing Words
