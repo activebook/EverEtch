@@ -2,6 +2,9 @@ import Database from 'better-sqlite3';
 import * as sqliteVec from 'sqlite-vec';
 import { Utils } from '../utils/Utils.js';
 import { WordListItem } from "../database/DatabaseManager.js";
+import * as fs from 'fs';
+import * as path from 'path';
+import { app } from 'electron';
 
 export interface WordEmbedding {
   word_id: string;
@@ -22,6 +25,7 @@ export interface SemanticWordItem {
 
 export class VectorDatabaseManager {
   private db: Database.Database | null = null;
+  private cachedDylibPath: string | null = null;
 
   constructor(db?: Database.Database) {
     if (db) {
@@ -62,13 +66,77 @@ export class VectorDatabaseManager {
     }
 
     try {
-      // Load the sqlite-vec extension using the sqlite-vec package
+      const dylibName = 'vec0.dylib';
+      const dylibPath = this.findDylibFile(dylibName);
+
+      if (!dylibPath) {
+        console.log('⚠️ sqlite-vec dylib not found in standard locations, trying sqlite-vec package method...');
+        sqliteVec.load(this.db);
+        console.log('✅ sqlite-vec extension loaded successfully using package method');
+        return;
+      }
+
+      console.log(`📋 Loading sqlite-vec extension from: ${dylibPath}`);
+
+      // Try to load using better-sqlite3's loadExtension method with full path
+      try {
+        (this.db as any).loadExtension(dylibPath);
+        console.log('✅ sqlite-vec extension loaded successfully using loadExtension');
+        return;
+      } catch (loadExtError) {
+        console.log('⚠️ loadExtension failed, trying sqlite-vec package method:', loadExtError);
+      }
+
+      // Fallback to sqlite-vec package method
       sqliteVec.load(this.db);
-      console.log('✅ sqlite-vec extension loaded successfully');
+      console.log('✅ sqlite-vec extension loaded successfully using package method');
     } catch (error) {
       console.error('❌ Error loading sqlite-vec extension:', error);
       throw error;
     }
+  }
+
+  /**
+   * Find the sqlite-vec dylib file in various possible locations
+   * Uses the same pattern as GoogleAuthService for consistency
+   */
+  private findDylibFile(filename: string): string | null {
+    // Return cached path if available
+    if (this.cachedDylibPath) {
+      console.log(`📋 Using cached dylib path: ${this.cachedDylibPath}`);
+      return this.cachedDylibPath;
+    }
+
+    const appPath = app.getAppPath();
+    const possiblePaths: string[] = [];
+
+    // 1. ASAR location (files array) - most common for current setup
+    possiblePaths.push(path.join(appPath, 'node_modules', 'sqlite-vec-darwin-x64', filename));
+
+    // 2. Resources directory (extraResources) - fallback for older setups
+    if (appPath.includes('.asar')) {
+      const resourcesPath = path.dirname(appPath);
+      possiblePaths.push(path.join(resourcesPath, 'app.asar.unpacked', 'node_modules', 'sqlite-vec-darwin-x64', filename));
+    }
+
+    // 3. Direct app directory (development fallback)
+    if (!appPath.includes('.asar')) {
+      possiblePaths.push(path.join(appPath, 'node_modules', 'sqlite-vec-darwin-x64', filename));
+    }
+
+    console.log(`🔍 Searching for ${filename} in: ${possiblePaths.join(', ')}`);
+
+    // Try each path
+    for (const filePath of possiblePaths) {
+      if (fs.existsSync(filePath)) {
+        console.log(`✅ Found ${filename} at: ${filePath}`);
+        this.cachedDylibPath = filePath; // Cache the found path
+        return filePath;
+      }
+    }
+
+    console.log(`❌ ${filename} not found in any location`);
+    return null;
   }
 
   private createVectorTables(): void {

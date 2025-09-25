@@ -55,7 +55,9 @@
   },
   "build": {
     "asar": true,
-    "asarUnpack": [],
+    "asarUnpack": [
+      "node_modules/sqlite-vec-darwin-x64/**/*"
+    ],
     "appId": "com.activebook.everetch",
     "productName": "EverEtch",
     "directories": {
