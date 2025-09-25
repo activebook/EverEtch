@@ -79,7 +79,7 @@ export class EmbeddingModelClient {
       if (Array.isArray(text)) {
         const embeddings = response.data.map(item => item.embedding);
         // Normalize embeddings for accurate cosine similarity
-        const normalizedEmbeddings = embeddings.map(emb => EmbeddingModelClient.normalizeEmbeddingOptimized(emb));
+        const normalizedEmbeddings = embeddings.map(emb => EmbeddingModelClient.normalizeEmbeddingFast(emb));
         return {
           embeddings: normalizedEmbeddings,
           model_used: profile.embedding_config!.model,
@@ -88,7 +88,7 @@ export class EmbeddingModelClient {
       } else {
         const embedding = response.data[0].embedding;
         // Normalize embedding for accurate cosine similarity
-        const normalizedEmbedding = EmbeddingModelClient.normalizeEmbeddingOptimized(embedding);
+        const normalizedEmbedding = EmbeddingModelClient.normalizeEmbeddingFast(embedding);
         return {
           embedding: normalizedEmbedding,
           model_used: profile.embedding_config!.model,
@@ -144,7 +144,7 @@ export class EmbeddingModelClient {
       if (Array.isArray(text)) {
         const embeddings = response.embeddings.map(item => item.values!);
         // Normalize embeddings for accurate cosine similarity
-        const normalizedEmbeddings = embeddings.map(emb => EmbeddingModelClient.normalizeEmbeddingOptimized(emb));
+        const normalizedEmbeddings = embeddings.map(emb => EmbeddingModelClient.normalizeEmbeddingFast(emb));
         return {
           embeddings: normalizedEmbeddings,
           model_used: profile.embedding_config!.model,
@@ -156,7 +156,7 @@ export class EmbeddingModelClient {
           throw new Error('Embedding values are undefined');
         }
         // Normalize embedding for accurate cosine similarity
-        const normalizedEmbedding = EmbeddingModelClient.normalizeEmbeddingOptimized(embedding);
+        const normalizedEmbedding = EmbeddingModelClient.normalizeEmbeddingFast(embedding);
         return {
           embedding: normalizedEmbedding,
           model_used: profile.embedding_config!.model,
@@ -319,6 +319,54 @@ export class EmbeddingModelClient {
 
     return embedding.map(val => val / magnitude);
   }
+
+  /**
+   * Normalize an embedding vector to unit length (Fast version)
+   * Always use this method for large embeddings
+   * @param embedding 
+   */
+  static normalizeEmbeddingFast(embedding: number[]): number[] {
+    const n = embedding.length;
+    if (n === 0) return embedding;
+
+    // accumulate sum of squares with 8x unrolling
+    let sum = 0;
+    let i = 0;
+    const unroll = 8;
+    const limit = n - (n % unroll);
+
+    for (; i < limit; i += unroll) {
+      const a0 = embedding[i]; const a1 = embedding[i + 1];
+      const a2 = embedding[i + 2]; const a3 = embedding[i + 3];
+      const a4 = embedding[i + 4]; const a5 = embedding[i + 5];
+      const a6 = embedding[i + 6]; const a7 = embedding[i + 7];
+      sum += a0 * a0 + a1 * a1 + a2 * a2 + a3 * a3 + a4 * a4 + a5 * a5 + a6 * a6 + a7 * a7;
+    }
+    for (; i < n; i++) {
+      const v = embedding[i];
+      sum += v * v;
+    }
+
+    if (sum === 0) return embedding;
+    const inv = 1 / Math.sqrt(sum);
+
+    // normalize in-place, unrolled
+    i = 0;
+    for (; i < limit; i += unroll) {
+      embedding[i] *= inv;
+      embedding[i + 1] *= inv;
+      embedding[i + 2] *= inv;
+      embedding[i + 3] *= inv;
+      embedding[i + 4] *= inv;
+      embedding[i + 5] *= inv;
+      embedding[i + 6] *= inv;
+      embedding[i + 7] *= inv;
+    }
+    for (; i < n; i++) embedding[i] *= inv;
+
+    return embedding;
+  }
+
 
   /**
    * Normalize an embedding vector to unit length (Optimized version)
