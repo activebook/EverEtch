@@ -248,6 +248,15 @@ export class WordManager {
     }
   }
 
+  private scrollToWordBottom() {
+    setTimeout(() => {
+      const wordDetails = document.getElementById('word-details');
+      if (wordDetails && wordDetails.parentElement) {
+        wordDetails.parentElement.scrollTop = wordDetails.parentElement.scrollHeight;
+      }
+    }, 100);
+  }
+
   async handleGenerate(): Promise<void> {
     const wordInput = document.getElementById('word-input') as HTMLInputElement;
     const word = wordInput.value.trim();
@@ -306,17 +315,81 @@ export class WordManager {
       tempWord.tag_colors = { 'Analyzing word...': '#6b7280' };
       await this.wordRenderer.renderWordDetails(tempWord);
 
-      setTimeout(() => {
-        const wordDetails = document.getElementById('word-details');
-        if (wordDetails && wordDetails.parentElement) {
-          wordDetails.parentElement.scrollTop = wordDetails.parentElement.scrollHeight;
-        }
-      }, 100);
+      // scroll to the bottom
+      this.scrollToWordBottom();
 
       try {
         console.log('Starting generateWordMetas call...');
         const tagsResult = await this.wordService.generateWordMetas(word, meaning, generationId);
         console.log('generateWordMetas completed:', tagsResult);
+
+        // Update UI with metadata results
+        if (this.currentGenerationId === generationId && this.currentWord) {
+          if (tagsResult.summary) {
+            this.currentWord.one_line_desc = tagsResult.summary;
+          }
+          if (tagsResult.tags) {
+            this.currentWord.tags = tagsResult.tags;
+          }
+          if (tagsResult.tag_colors) {
+            this.currentWord.tag_colors = tagsResult.tag_colors;
+          }
+          if (tagsResult.synonyms) {
+            this.currentWord.synonyms = tagsResult.synonyms;
+          }
+          if (tagsResult.antonyms) {
+            this.currentWord.antonyms = tagsResult.antonyms;
+          }
+          await this.wordRenderer.renderWordDetails(this.currentWord);
+        }
+
+        // Generate embeddings if enabled
+        const embeddingEnabled = await this.isEmbeddingEnabled();
+        if (embeddingEnabled) {
+          try {
+            console.log('🔄 Starting embedding generation...');
+            // Show embedding status section
+            this.showEmbeddingStatus(true);
+
+            // Generate embeddings using the detailed meaning and metadata
+            const embeddingResult = await window.electronAPI.generateWordEmbedding({
+              word: word,
+              meaning: meaning,
+              summary: this.currentWord?.one_line_desc || '',
+              tags: this.currentWord?.tags || [],
+              synonyms: this.currentWord?.synonyms || [],
+              antonyms: this.currentWord?.antonyms || []
+            });
+            if (embeddingResult.success) {
+              // Set embedding property
+              console.log('✅ Embedding generation successful:', {
+                model_used: embeddingResult.model_used,
+                tokens_used: embeddingResult.tokens_used,
+                dimensions: embeddingResult.embedding.length
+              });
+              this.currentWord.embedding = embeddingResult.embedding;
+            } else {
+              console.error('❌ Embedding generation failed:', embeddingResult);
+              this.currentWord.embedding = []; // Empty array = failed
+            }
+
+            // Hide embedding status section
+            this.showEmbeddingStatus(false);
+
+          } catch (embeddingError) {
+            console.error('❌ Error generating embeddings:', embeddingError);
+            // don't use undefined, because undefined tells no need embedding
+            this.currentWord.embedding = []; // ✅ Empty array = failed
+            // Hide embedding status section
+            this.showEmbeddingStatus(false);
+          
+            // Show warning and prevent saving
+            this.toastManager.showWarning('Embedding generation failed. Word cannot be saved.');
+            this.wordRenderer.renderWordDetails(this.currentWord);
+          }
+        } else {
+          console.log('ℹ️ Embedding generation skipped (not enabled)');
+        }
 
         setTimeout(() => {
           if (this.currentGenerationId === generationId &&
@@ -345,6 +418,8 @@ export class WordManager {
       console.error('Error generating meaning:', error);
       this.toastManager.showError('Failed to generate meaning. Please check your API configuration.');
     } finally {
+      // scroll to the bottom
+      this.scrollToWordBottom();
       this.isGenerating = false;
       this.wordRenderer.setGenerationState(false);
       generateBtn.disabled = false;
@@ -367,7 +442,8 @@ export class WordManager {
         tags: this.currentWord.tags,
         tag_colors: this.currentWord.tag_colors,
         synonyms: this.currentWord.synonyms || [],
-        antonyms: this.currentWord.antonyms || []
+        antonyms: this.currentWord.antonyms || [],
+        embedding: this.currentWord.embedding || undefined,
       };
 
       const addedWord = await this.wordService.addWord(wordData);
@@ -424,7 +500,8 @@ export class WordManager {
             tags: this.currentWord.tags,
             tag_colors: this.currentWord.tag_colors,
             synonyms: this.currentWord.synonyms || [],
-            antonyms: this.currentWord.antonyms || []
+            antonyms: this.currentWord.antonyms || [],
+            embedding: this.currentWord.embedding || undefined,
           };
 
           const updatedWord = await this.wordService.updateWord(originalWordId, updatedWordData);
@@ -705,7 +782,7 @@ export class WordManager {
 
       try {
         // Update word in database
-        const updatedWord = await this.wordService.updateWord(word.id, { remark: remarkValue });
+        const updatedWord = await this.wordService.updateWordRemark(word.id, remarkValue);
 
         if (updatedWord) {
           // Update current word
@@ -868,6 +945,33 @@ export class WordManager {
       await window.electronAPI.saveSortOrder(this.sortOrder);
     } catch (error) {
       console.error('Error saving sort order:', error);
+    }
+  }
+
+  /**
+   * Check if embedding is enabled for the current profile
+   */
+  private async isEmbeddingEnabled(): Promise<boolean> {
+    try {
+      const profile = await window.electronAPI.getProfileConfig();
+      return profile?.embedding_config?.enabled === true;
+    } catch (error) {
+      console.error('Error checking embedding status:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Show or hide the embedding status section
+   */
+  private showEmbeddingStatus(show: boolean): void {
+    const embeddingStatus = document.getElementById('embedding-status');
+    if (embeddingStatus) {
+      if (show) {
+        embeddingStatus.classList.remove('hidden');
+      } else {
+        embeddingStatus.classList.add('hidden');
+      }
     }
   }
 

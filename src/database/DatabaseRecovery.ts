@@ -1,52 +1,36 @@
-import sqlite3 from 'sqlite3';
+import Database from 'better-sqlite3';
 
 export class DatabaseRecovery {
-  private db: sqlite3.Database | null = null;
+  private db: Database.Database;
 
-  constructor(db: sqlite3.Database) {
+  constructor(db: Database.Database) {
     this.db = db;
   }
 
   /**
    * Create or update FTS table with intelligent migration handling
    */
-  async createOrUpdateFTSTable(): Promise<void> {
+  createOrUpdateFTSTable(): void {
     if (!this.db) {
       throw new Error('Database not initialized');
     }
 
     try {
       // Check if FTS table exists and get its schema
-      const tableResult = await new Promise<{ sql: string } | undefined>((resolveTable, rejectTable) => {
-        this.db!.get(`
-          SELECT sql FROM sqlite_master
-          WHERE type='table' AND name='words_fts'
-        `, (err, row: { sql: string } | undefined) => {
-          if (err) {
-            rejectTable(err);
-            return;
-          }
-          resolveTable(row);
-        });
-      });
+      const tableResult = this.db.prepare(`
+        SELECT sql FROM sqlite_master
+        WHERE type='table' AND name='words_fts'
+      `).get() as { sql: string } | undefined;
 
       // Check if all required triggers exist and have correct schemas
-      const triggerResults = await new Promise<{ [key: string]: string }>((resolveTriggers, rejectTriggers) => {
-        this.db!.all(`
-          SELECT name, sql FROM sqlite_master
-          WHERE type='trigger' AND name IN ('words_fts_insert', 'words_fts_update', 'words_fts_delete')
-        `, (err, rows: { name: string, sql: string }[]) => {
-          if (err) {
-            rejectTriggers(err);
-            return;
-          }
+      const triggerRows = this.db.prepare(`
+        SELECT name, sql FROM sqlite_master
+        WHERE type='trigger' AND name IN ('words_fts_insert', 'words_fts_update', 'words_fts_delete')
+      `).all() as { name: string, sql: string }[];
 
-          const triggers: { [key: string]: string } = {};
-          rows.forEach(row => {
-            triggers[row.name] = row.sql;
-          });
-          resolveTriggers(triggers);
-        });
+      const triggerResults: { [key: string]: string } = {};
+      triggerRows.forEach(row => {
+        triggerResults[row.name] = row.sql;
       });
 
       const expectedTableSchema = 'CREATE VIRTUAL TABLE words_fts USING fts5(id UNINDEXED, word, one_line_desc, tags, synonyms, antonyms, remark, tokenize = \'porter unicode61\')';
@@ -98,14 +82,14 @@ export class DatabaseRecovery {
       // Handle different migration scenarios intelligently
       if (!tableResult || !tableSchemaValid) {
         // Table exists but schema is incorrect - clean everything and recreate
-        await this.recreateFTSTableAndTriggers(); // ✅ Already handles trigger cleanup
-        await this.populateFTSTable();
+        this.recreateFTSTableAndTriggers(); // ✅ Already handles trigger cleanup
+        this.populateFTSTable();
       } else if (Object.keys(triggerResults).length === 0 || !triggersValid) {
         // Triggers exist but have incorrect schemas - fix them
-        await this.recreateFTSTriggers();
+        this.recreateFTSTriggers();
       } else {
         console.debug('FTS table and trigger schemas are correct, no migration needed');
-        await this.populateFTSTable();
+        this.populateFTSTable();
       }
 
     } catch (error) {
@@ -117,28 +101,25 @@ export class DatabaseRecovery {
   /**
    * Drop all FTS triggers (safe cleanup)
    */
-  private async dropFTSTriggers(): Promise<void> {
+  private dropFTSTriggers(): void {
     const dropSql = `
       DROP TRIGGER IF EXISTS words_fts_insert;
       DROP TRIGGER IF EXISTS words_fts_update;
       DROP TRIGGER IF EXISTS words_fts_delete;
     `;
 
-    await new Promise<void>((resolveDrop, rejectDrop) => {
-      this.db!.exec(dropSql, (dropErr) => {
-        if (dropErr) {
-          console.error('Error dropping FTS triggers:', dropErr);
-          // Continue anyway - triggers might not exist
-        }
-        resolveDrop();
-      });
-    });
+    try {
+      this.db.exec(dropSql);
+    } catch (error) {
+      console.error('Error dropping FTS triggers:', error);
+      // Continue anyway - triggers might not exist
+    }
   }
 
   /**
    * Recreate FTS table and triggers when table schema is invalid
    */
-  private async recreateFTSTableAndTriggers(): Promise<void> {
+  private recreateFTSTableAndTriggers(): void {
     console.debug('FTS table schema mismatch detected, recreating table and triggers...');
 
     const dropSql = `
@@ -148,15 +129,12 @@ export class DatabaseRecovery {
       DROP TABLE IF EXISTS words_fts;
     `;
 
-    await new Promise<void>((resolveDrop, rejectDrop) => {
-      this.db!.exec(dropSql, (dropErr) => {
-        if (dropErr) {
-          console.error('Error dropping old FTS table/triggers:', dropErr);
-          // Continue anyway - triggers might not exist
-        }
-        resolveDrop();
-      });
-    });
+    try {
+      this.db.exec(dropSql);
+    } catch (error) {
+      console.error('Error dropping old FTS table/triggers:', error);
+      // Continue anyway - triggers might not exist
+    }
 
     const createSql = `
       CREATE VIRTUAL TABLE words_fts USING fts5(
@@ -206,23 +184,19 @@ export class DatabaseRecovery {
       END;
     `;
 
-    await new Promise<void>((resolveCreate, rejectCreate) => {
-      this.db!.exec(createSql, (createErr) => {
-        if (createErr) {
-          console.error('Error recreating FTS table:', createErr);
-          rejectCreate(createErr);
-        } else {
-          console.debug('FTS table and triggers recreated successfully');
-          resolveCreate();
-        }
-      });
-    });
+    try {
+      this.db.exec(createSql);
+      console.debug('FTS table and triggers recreated successfully');
+    } catch (error) {
+      console.error('Error recreating FTS table:', error);
+      throw error;
+    }
   }
 
   /**
    * Recreate only triggers when table is valid but triggers are invalid
    */
-  private async recreateFTSTriggers(): Promise<void> {
+  private recreateFTSTriggers(): void {
     console.debug('FTS triggers schema mismatch detected, recreating only triggers...');
 
     // Drop only the triggers
@@ -232,15 +206,12 @@ export class DatabaseRecovery {
       DROP TRIGGER IF EXISTS words_fts_delete;
     `;
 
-    await new Promise<void>((resolveDrop, rejectDrop) => {
-      this.db!.exec(dropTriggersSql, (dropErr) => {
-        if (dropErr) {
-          console.error('Error dropping old triggers:', dropErr);
-          // Continue anyway - triggers might not exist
-        }
-        resolveDrop();
-      });
-    });
+    try {
+      this.db.exec(dropTriggersSql);
+    } catch (error) {
+      console.error('Error dropping old triggers:', error);
+      // Continue anyway - triggers might not exist
+    }
 
     // Recreate only the triggers
     const createTriggersSql = `
@@ -280,17 +251,13 @@ export class DatabaseRecovery {
       END;
     `;
 
-    await new Promise<void>((resolveCreate, rejectCreate) => {
-      this.db!.exec(createTriggersSql, (createErr) => {
-        if (createErr) {
-          console.error('Error recreating triggers:', createErr);
-          rejectCreate(createErr);
-        } else {
-          console.debug('FTS triggers recreated successfully');
-          resolveCreate();
-        }
-      });
-    });
+    try {
+      this.db.exec(createTriggersSql);
+      console.debug('FTS triggers recreated successfully');
+    } catch (error) {
+      console.error('Error recreating triggers:', error);
+      throw error;
+    }
 
     // No need to repopulate - table data is already there
     console.debug('FTS triggers fixed, table data preserved');
@@ -299,43 +266,37 @@ export class DatabaseRecovery {
   /**
    * Populate FTS table with existing words (for migration)
    */
-  private async populateFTSTable(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (!this.db) {
-        resolve();
-        return;
-      }
+  private populateFTSTable(): void {
+    if (!this.db) {
+      return;
+    }
 
-      // Check if FTS table is empty
-      this.db.get('SELECT COUNT(*) as count FROM words_fts', (err, row: { count: number } | undefined) => {
-        if (err || (row && row.count > 0)) {
-          resolve();
-          return;
-        }
+    // Check if FTS table is empty
+    const countResult = this.db.prepare('SELECT COUNT(*) as count FROM words_fts').get() as { count: number } | undefined;
+    if (!countResult || countResult.count > 0) {
+      return;
+    }
 
-        // Populate FTS table with existing words
-        const sql = `
-          INSERT INTO words_fts(id, word, one_line_desc, tags, synonyms, antonyms, remark)
-          SELECT
-            id,
-            json_extract(data, '$.word'),
-            json_extract(data, '$.one_line_desc'),
-            json_extract(data, '$.tags'),
-            json_extract(data, '$.synonyms'),
-            json_extract(data, '$.antonyms'),
-            json_extract(data, '$.remark')
-          FROM documents
-          WHERE type = 'word'
-        `;
+    // Populate FTS table with existing words
+    const sql = `
+      INSERT INTO words_fts(id, word, one_line_desc, tags, synonyms, antonyms, remark)
+      SELECT
+        id,
+        json_extract(data, '$.word'),
+        json_extract(data, '$.one_line_desc'),
+        json_extract(data, '$.tags'),
+        json_extract(data, '$.synonyms'),
+        json_extract(data, '$.antonyms'),
+        json_extract(data, '$.remark')
+      FROM documents
+      WHERE type = 'word'
+    `;
 
-        this.db!.run(sql, (err) => {
-          if (err) {
-            console.error('Error populating FTS table:', err);
-          }
-          resolve();
-        });
-      });
-    });
+    try {
+      this.db.exec(sql);
+    } catch (error) {
+      console.error('Error populating FTS table:', error);
+    }
   }
 
   /**

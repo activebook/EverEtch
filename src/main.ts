@@ -7,12 +7,16 @@ import { Utils } from './utils/Utils.js';
 import { StoreManager } from './utils/StoreManager.js';
 import { DatabaseManager } from './database/DatabaseManager.js';
 import { ProfileManager } from './database/ProfileManager.js';
+import { ModelManager } from './utils/ModelManager.js';
 import { AIModelClient, WORD_DUMMY_METAS } from './ai/AIModelClient.js';
+import { EmbeddingModelClient } from './ai/EmbeddingModelClient.js';
 import { GoogleAuthService } from './service/google/GoogleAuthService.js';
 import { GoogleDriveService } from './service/google/GoogleDriveService.js';
 import { ImportExportService } from './service/common/ImportExportService.js';
-import { ModelManager } from './utils/ModelManager.js';
+import { SemanticBatchService } from './semantic/SemanticBatchService.js';
+import { SemanticSearchService } from './semantic/SemanticSearchService.js';
 import { marked } from 'marked';
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -24,10 +28,13 @@ let mainWindow: BrowserWindow;
 let dbManager: DatabaseManager;
 let profileManager: ProfileManager;
 let aiClient: AIModelClient;
+let embeddingClient: EmbeddingModelClient;
 let storeManager: StoreManager;
 let googleAuthService: GoogleAuthService;
 let googleDriveService: GoogleDriveService;
 let importExportService: ImportExportService;
+let semanticBatchService: SemanticBatchService;
+let semanticSearchService: SemanticSearchService;
 let queuedProtocolAction: { type: string, data: any } | null = null; // Store queued protocol actions
 
 // Configure marked for proper line break handling
@@ -57,6 +64,7 @@ async function createWindow() {
     dbManager = new DatabaseManager();
     profileManager = new ProfileManager(dbManager);
     aiClient = new AIModelClient();
+    embeddingClient = new EmbeddingModelClient();
 
     // Create window with minimal bounds first (invisible), then apply saved bounds
     mainWindow = new BrowserWindow({
@@ -76,6 +84,8 @@ async function createWindow() {
     googleAuthService = new GoogleAuthService(mainWindow, storeManager);
     googleDriveService = new GoogleDriveService(googleAuthService);
     importExportService = new ImportExportService(dbManager, profileManager);
+    semanticBatchService = new SemanticBatchService(dbManager, profileManager);
+    semanticSearchService = new SemanticSearchService(dbManager, profileManager);
 
     mainWindow.loadFile(path.join(__dirname, 'renderer/index.html'));
 
@@ -329,20 +339,20 @@ ipcMain.handle('delete-profile', async (event, profileName: string) => {
   return await profileManager.deleteProfile(profileName);
 });
 
-ipcMain.handle('get-words-paginated', async (event, offset: number, limit: number, sortOrder?: 'asc' | 'desc') => {
-  return await dbManager.getWordsPaginated(offset, limit, sortOrder);
+ipcMain.handle('get-words-paginated', (event, offset: number, limit: number, sortOrder?: 'asc' | 'desc') => {
+  return dbManager.getWordsPaginated(offset, limit, sortOrder);
 });
 
-ipcMain.handle('search-words', async (event, query: string) => {
-  return await dbManager.searchWords(query);
+ipcMain.handle('search-words', (event, query: string) => {
+  return dbManager.searchWords(query);
 });
 
-ipcMain.handle('get-word', async (event, wordId: string) => {
-  return await dbManager.getWord(wordId);
+ipcMain.handle('get-word', (event, wordId: string) => {
+  return dbManager.getWord(wordId);
 });
 
-ipcMain.handle('get-word-by-name', async (event, wordName: string) => {
-  return await dbManager.getWordByName(wordName);
+ipcMain.handle('get-word-by-name', (event, wordName: string) => {
+  return dbManager.getWordByName(wordName);
 });
 
 ipcMain.handle('generate-word-meaning', async (event, word: string) => {
@@ -421,23 +431,115 @@ ipcMain.handle('generate-word-metas', async (event, word: string, meaning: strin
 });
 
 ipcMain.handle('add-word', async (event, wordData: any) => {
-  return await dbManager.addWord(wordData);
+  try {
+    if (wordData.embedding) {
+      // Embedding provided - use transaction
+      const profile = await profileManager.getCurrentProfile();
+      if (!profile?.embedding_config?.enabled) {
+        return {
+          success: false,
+          error: 'Embedding not enabled for current profile'
+        };
+      }
+
+      console.log(`🔄 transaction: Add word && embedding: ${wordData.word}`);
+      const wordDoc = dbManager.transactionAddWord(wordData, wordData.embedding, profile);
+      return { success: true, data: wordDoc };
+
+    } else {
+      // No embedding - use regular add
+      const wordDoc = dbManager.addWord(wordData);
+      if (wordDoc) {
+        return { success: true, data: wordDoc };
+      } else {
+        return { success: false, error: 'Failed to add word' };
+      }
+    }
+  } catch (error) {
+    console.error(`Failed to add word ${wordData.word}:`, error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
+  }
 });
 
 ipcMain.handle('update-word', async (event, wordId: string, wordData: any) => {
-  return await dbManager.updateWord(wordId, wordData);
+  try {
+    const profile = await profileManager.getCurrentProfile();
+
+    if (wordData.embedding) {
+      // Embedding provided - use transaction
+      if (!profile?.embedding_config?.enabled) {
+        return {
+          success: false,
+          error: 'Embedding not enabled for current profile'
+        };
+      }
+
+      console.log(`🔄 Transaction: Update word and embedding: ${wordId}`);
+      const wordDoc = dbManager.transactionUpdateWord(wordId, wordData, wordData.embedding, profile);
+      return { success: true, data: wordDoc };
+
+    } else {
+      // No embedding - use regular update
+      const wordDoc = dbManager.updateWord(wordId, wordData);
+      if (wordDoc) {
+        return { success: true, data: wordDoc };
+      } else {
+        return { success: false, error: 'Word not found' };
+      }
+    }
+  } catch (error) {
+    console.error(`Failed to update word ${wordId}:`, error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
+  }
 });
 
 ipcMain.handle('update-word-remark', async (event, wordId: string, remark: string) => {
-  return await dbManager.updateWord(wordId, { remark });
+  try {
+    const wordDoc = dbManager.updateWord(wordId, { remark });
+    if (wordDoc) {
+      return { success: true, data: wordDoc };
+    } else {
+      return { success: false, error: 'Word not found' };
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
+  }
 });
 
 ipcMain.handle('delete-word', async (event, wordId: string) => {
-  return await dbManager.deleteWord(wordId);
+  try {
+    const profile = await profileManager.getCurrentProfile();
+
+    // Use transactional delete if embedding is enabled
+    if (profile?.embedding_config?.enabled) {
+      console.log(`🔄 Transaction: Delete word and cleanup embedding: ${wordId}`);
+      const result = dbManager.transactionDeleteWord(wordId, profile);
+      return { success: result };
+    } else {
+      // Use regular delete if no embedding
+      const result = dbManager.deleteWord(wordId);
+      return { success: result };
+    }
+  } catch (error) {
+    console.error(`Failed to delete word ${wordId}:`, error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
+  }
 });
 
-ipcMain.handle('get-related-words-paginated', async (event, searchTerm: string, offset: number, limit: number) => {
-  return await dbManager.getRelatedWordsPaginated(searchTerm, offset, limit);
+ipcMain.handle('get-related-words-paginated', (event, searchTerm: string, offset: number, limit: number) => {
+  return dbManager.getRelatedWordsPaginated(searchTerm, offset, limit);
 });
 
 // Store operations
@@ -458,14 +560,14 @@ ipcMain.handle('save-sort-order', (event, sortOrder: 'asc' | 'desc') => {
 });
 
 // Profile config operations
-ipcMain.handle('get-profile-config', async () => {
-  return await profileManager.getCurrentProfile();
+ipcMain.handle('get-profile-config', () => {
+  return profileManager.getCurrentProfile();
 });
 
-ipcMain.handle('update-profile-config', async (event, config: any) => {
+ipcMain.handle('update-profile-config', (event, config: any) => {
   const currentProfile = profileManager.getLastOpenedProfile();
   if (!currentProfile) return false;
-  return await profileManager.updateProfileConfig(currentProfile, config);
+  return profileManager.updateProfileConfig(currentProfile, config);
 });
 
 
@@ -504,7 +606,7 @@ ipcMain.handle('export-profile', async () => {
     }
 
     // Use the import/export service to handle the export
-    return await importExportService.exportProfileToLocal(result.filePath);
+    return importExportService.exportProfileToLocal(result.filePath);
 
   } catch (error) {
     console.error('Error exporting profile:', error);
@@ -699,6 +801,26 @@ ipcMain.handle('load-model-memos', async () => {
   }
 });
 
+ipcMain.handle('load-chat-model-memos', async () => {
+  try {
+    const models = ModelManager.loadChatModels();
+    return models;
+  } catch (error) {
+    console.error('Failed to load chat model memos:', error);
+    return [];
+  }
+});
+
+ipcMain.handle('load-embedding-model-memos', async () => {
+  try {
+    const models = ModelManager.loadEmbeddingModels();
+    return models;
+  } catch (error) {
+    console.error('Failed to load embedding model memos:', error);
+    return [];
+  }
+});
+
 ipcMain.handle('add-model-memo', async (event, memoData: any) => {
   try {
     const newModel = ModelManager.addModel(memoData);
@@ -746,5 +868,201 @@ ipcMain.handle('mark-model-used', async (event, name: string) => {
   } catch (error) {
     console.error('Failed to mark model as used:', error);
     return false;
+  }
+});
+
+// Semantic Search IPC handlers
+
+ipcMain.handle('start-semantic-batch-processing', async (event, config: any) => {
+  try {
+    // Update profile with embedding configuration
+    const currentProfile = await profileManager.getCurrentProfile();
+
+    console.debug('🔧 Starting semantic batch processing...');
+
+    // Properly merge embedding_config to preserve existing structure
+    const updatedProfile = { ...currentProfile };
+
+    if (config.embedding_config) {
+      updatedProfile.embedding_config = {
+        ...currentProfile?.embedding_config,
+        ...config.embedding_config,
+        enabled: true // Always enable when starting batch processing
+      };
+    }
+
+    const updateResult = await profileManager.updateProfileConfig(currentProfile!.name, updatedProfile);
+    if (!updateResult) {
+      console.error('❌ Failed to update profile config');
+      return {
+        success: false,
+        message: 'Failed to update profile configuration'
+      };
+    }
+
+    // Start batch processing
+    const result = await semanticBatchService.startBatchProcessing(
+      {
+        batchSize: config.batch_size || 10,
+        onProgress: (processed, total) => {
+          //console.debug(`📊 Progress update: ${processed}/${total}`);
+          // Send progress updates to renderer
+          mainWindow.webContents.send('semantic-batch-progress', {
+            processed,
+            total,
+          });
+        },
+        onComplete: (result) => {
+          console.debug('📋 Batch processing complete');
+          // Send completion updates to renderer
+          mainWindow.webContents.send('semantic-batch-complete', result);
+        }
+      }
+    );
+
+    return {
+      success: result.success,
+      message: result.error,
+    };
+  } catch (error) {
+    console.error('❌ Failed to start semantic search processing:', error);
+    return {
+      success: false,
+      message: `Processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+});
+
+ipcMain.handle('cancel-semantic-batch-processing', async () => {
+  try {
+    semanticBatchService.cancelProcessing();
+
+    // Update profile with embedding configuration
+    const currentProfile = await profileManager.getCurrentProfile();
+    const updatedProfile = { ...currentProfile };
+    if (updatedProfile.embedding_config) {
+      updatedProfile.embedding_config.enabled = false;
+      await profileManager.updateProfileConfig(currentProfile!.name, updatedProfile);
+    }
+    return {
+      success: true,
+      message: 'Cancelled semantic batch processing'
+    };
+  } catch (error) {
+    console.error('Failed to cancel semantic search processing:', error);
+    return {
+      success: false,
+      message: `Cancellation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+});
+
+ipcMain.handle('update-semantic-config', async (event, config: any) => {
+
+  const currentProfile = await profileManager.getCurrentProfile();
+  const updatedProfile = { ...currentProfile };
+  updatedProfile.embedding_config = config.embedding_config;
+  const result = await profileManager.updateProfileConfig(currentProfile!.name, updatedProfile);
+  if (!result) {
+    return {
+      success: false,
+      message: 'Failed to update semantic batch config',
+    }
+  } else {
+    return {
+      success: true,
+      message: 'Semantic batch config updated',
+    }
+  }
+})
+
+ipcMain.handle('perform-semantic-search', async (event, query: string, limit: number = 10) => {
+  try {
+    if (!semanticSearchService) {
+      return {
+        success: false,
+        message: 'Semantic search not initialized',
+        results: []
+      };
+    }
+
+    const currentProfile = profileManager.getCurrentProfile();
+    if (!currentProfile?.embedding_config) {
+      return {
+        success: false,
+        message: 'No current profile embedding configured',
+        results: []
+      };
+    }
+
+    if (!currentProfile.embedding_config.enabled) {
+      return {
+        success: false,
+        message: 'Embedding not enabled for current profile',
+        results: []
+      };
+    }
+
+    const response = await semanticSearchService.search(query, {
+      limit: 100,
+      threshold: currentProfile.embedding_config.similarity_threshold,
+      includeEmbeddingStats: false
+    });
+
+    return {
+      success: true,
+      message: `Found ${response.words.length} results`,
+      results: response.words
+    };
+  } catch (error) {
+    console.error('Failed to perform semantic search:', error);
+    return {
+      success: false,
+      message: `Search failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      results: []
+    };
+  }
+});
+
+ipcMain.handle('generate-word-embedding', async (event, wordData: { word: string; meaning: string; summary: string; tags: string[]; synonyms: string[]; antonyms: string[]; }) => {
+  try {
+    const profile = await profileManager.getCurrentProfile();
+    if (!profile) {
+      throw new Error('No current profile found');
+    }
+
+    if (!profile.embedding_config?.enabled) {
+      throw new Error('Embedding not enabled for current profile');
+    }
+
+    if (!profile.embedding_config?.api_key) {
+      throw new Error('API key not configured for embedding');
+    }
+
+    // Generate embedding using the detailed meaning and metadata
+    const embeddingResult = await embeddingClient.generateWordEmbedding({
+      word: wordData.word,
+      one_line_desc: wordData.summary,
+      details: wordData.meaning,
+      tags: wordData.tags,
+      synonyms: wordData.synonyms,
+      antonyms: wordData.antonyms
+    } as any, profile);
+
+    if ('embedding' in embeddingResult) {
+      console.log(`✅ Main process: Embedding [${embeddingResult.embedding.length}] generated successfully`);
+      return {
+        success: true,
+        embedding: embeddingResult.embedding,
+        model_used: embeddingResult.model_used,
+        tokens_used: embeddingResult.tokens_used
+      };
+    } else {
+      throw new Error('Unexpected batch result for single embedding');
+    }
+
+  } catch (error) {
+    console.error('❌ Main process: Error generating embedding:', error);
+    throw new Error(`Embedding generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 });

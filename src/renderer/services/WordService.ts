@@ -1,4 +1,4 @@
-import { WordDocument, WordListItem } from '../types.js';
+import { WordData, WordDocument, WordListItem } from '../types.js';
 
 export class WordService {
   async searchWords(query: string): Promise<WordListItem[]> {
@@ -19,27 +19,59 @@ export class WordService {
     }
   }
 
-  async addWord(wordData: any): Promise<WordDocument> {
+  async addWord(wordData: WordData): Promise<WordDocument> {
     try {
-      return await window.electronAPI.addWord(wordData);
+      const result = await window.electronAPI.addWord(wordData);
+      if (result.success && result.data) {
+        return result.data;
+      } else {
+        throw new Error(result.error || 'Failed to add word');
+      }
     } catch (error) {
       console.error('Error adding word:', error);
       throw error;
     }
   }
 
-  async updateWord(wordId: string, wordData: any): Promise<WordDocument | null> {
+  async updateWord(wordId: string, wordData: WordData): Promise<WordDocument | null> {
     try {
-      return await window.electronAPI.updateWord(wordId, wordData);
+      const result = await window.electronAPI.updateWord(wordId, wordData);
+      if (result.success && result.data) {
+        return result.data;
+      } else {
+        console.error('Error updating word:', result.error || 'Failed to update word');
+        return null;
+      }
     } catch (error) {
       console.error('Error updating word:', error);
       return null;
     }
   }
 
+  async updateWordRemark(wordId: string, remark: string): Promise<WordDocument | null> {
+    try {
+      const result = await window.electronAPI.updateWordRemark(wordId, remark);
+      if (result.success && result.data) {
+        return result.data;
+      } else {
+        console.error('Error updating word remark:', result.error || 'Failed to update word remark');
+        return null;
+      }
+    } catch (error) {
+      console.error('Error updating word remark:', error);
+      return null;
+    }
+  }
+
   async deleteWord(wordId: string): Promise<boolean> {
     try {
-      return await window.electronAPI.deleteWord(wordId);
+      const result = await window.electronAPI.deleteWord(wordId);
+      if (result.success) {
+        return true;
+      } else {
+        console.error('Error deleting word:', result.error || 'Failed to delete word');
+        return false;
+      }
     } catch (error) {
       console.error('Error deleting word:', error);
       return false;

@@ -1,6 +1,6 @@
 {
   "name": "everetch",
-  "version": "1.4.12",
+  "version": "1.5.5",
   "type": "module",
   "description": "A slim word memo application",
   "main": "lib/main.js",
@@ -29,13 +29,13 @@
   "author": "",
   "license": "GPL-3.0-only",
   "devDependencies": {
+    "@electron/rebuild": "^4.0.1",
     "@tailwindcss/postcss": "^4.1.13",
     "@types/better-sqlite3": "^7.6.9",
     "@types/node": "^20.19.13",
     "@types/showdown": "^2.0.6",
     "electron": "^37.4.0",
     "electron-builder": "^26.0.12",
-    "electron-rebuild": "^3.2.9",
     "eslint": "^9.35.0",
     "postcss": "^8.5.6",
     "postcss-cli": "^11.0.1",
@@ -44,16 +44,20 @@
   },
   "dependencies": {
     "@google/genai": "^1.19.0",
+    "better-sqlite3": "^12.4.1",
     "electron-store": "^10.1.0",
     "googleapis": "^159.0.0",
     "marked": "^16.2.1",
     "openai": "^5.20.0",
+    "sqlite-vec": "^0.1.7-alpha.2",
     "sqlite3": "^5.1.6",
     "undici": "^7.15.0"
   },
   "build": {
     "asar": true,
-    "asarUnpack": [],
+    "asarUnpack": [
+      "node_modules/sqlite-vec-darwin-x64/**/*"
+    ],
     "appId": "com.activebook.everetch",
     "productName": "EverEtch",
     "directories": {

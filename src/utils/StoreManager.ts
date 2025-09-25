@@ -54,7 +54,7 @@ export class StoreManager {
         sortOrder: {
           type: ['string', 'null'],
           enum: ['asc', 'desc', null]
-        },
+        },        
         googleTokens: {
           type: ['object', 'null'],
           properties: {
@@ -123,6 +123,7 @@ export class StoreManager {
     this.store.set('windowBounds', null);
     this.store.set('panelWidths', null);
     this.store.set('sortOrder', 'desc');
+    this.store.set('semanticSearch', null);
   }
 
   /**

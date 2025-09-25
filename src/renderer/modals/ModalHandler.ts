@@ -109,6 +109,10 @@ export abstract class ModalHandler extends ModalEventHanlder implements ModalHan
         this.toastManager.showSuccess(message);
     }
 
+    protected showInfo(message: string): void {
+        this.toastManager.showInfo(message);
+    }
+
     /**
      * Setup event handlers for a modal
      */

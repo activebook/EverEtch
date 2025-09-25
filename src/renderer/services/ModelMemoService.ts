@@ -15,6 +15,32 @@ export class ModelMemoService {
     }
 
     /**
+     * Load only chat model memos from the main process
+     */
+    async loadChatModelMemos(): Promise<ModelMemo[]> {
+        try {
+            const result = await window.electronAPI.loadChatModelMemos();
+            return result || [];
+        } catch (error) {
+            console.error('Error loading chat model memos:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Load only embedding model memos from the main process
+     */
+    async loadEmbeddingModelMemos(): Promise<ModelMemo[]> {
+        try {
+            const result = await window.electronAPI.loadEmbeddingModelMemos();
+            return result || [];
+        } catch (error) {
+            console.error('Error loading embedding model memos:', error);
+            return [];
+        }
+    }
+
+    /**
      * Add a new model memo
      */
     async addModelMemo(memo: Omit<ModelMemo, 'createdAt'>): Promise<{ success: boolean; message?: string; model?: ModelMemo }> {

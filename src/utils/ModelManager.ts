@@ -8,6 +8,7 @@ export interface ModelMemo {
   model: string;
   endpoint: string;
   apiKey: string;
+  type: 'chat' | 'embedding';
   createdAt: string;
   lastUsed?: string;
 }
@@ -20,7 +21,7 @@ export class ModelManager {
   /**
    * Load all model memos from the models.json file
    */
-  static loadModels(): ModelMemo[] {
+  static loadModels(type?: 'chat' | 'embedding'): ModelMemo[] {
     try {
       Utils.ensureDataDirectory();
 
@@ -33,7 +34,14 @@ export class ModelManager {
 
       const data = fs.readFileSync(modelsFile, 'utf-8');
       const modelsData = JSON.parse(data);
-      return modelsData.models || [];
+      const allModels = modelsData.models || [];
+
+      // Filter by type if specified
+      if (type) {
+        return allModels.filter((model: ModelMemo) => model.type === type);
+      }
+
+      return allModels;
     } catch (error) {
       console.error('Error loading models:', error);
       return [];
@@ -145,12 +153,40 @@ export class ModelManager {
   /**
    * Get all model memos sorted by last used (most recent first)
    */
-  static getModelsSorted(): ModelMemo[] {
-    const models = this.loadModels();
+  static getModelsSorted(type?: 'chat' | 'embedding'): ModelMemo[] {
+    const models = this.loadModels(type);
     return models.sort((a, b) => {
       const aTime = a.lastUsed ? new Date(a.lastUsed).getTime() : 0;
       const bTime = b.lastUsed ? new Date(b.lastUsed).getTime() : 0;
       return bTime - aTime; // Most recent first
     });
+  }
+
+  /**
+   * Load only chat models
+   */
+  static loadChatModels(): ModelMemo[] {
+    return this.loadModels('chat');
+  }
+
+  /**
+   * Load only embedding models
+   */
+  static loadEmbeddingModels(): ModelMemo[] {
+    return this.loadModels('embedding');
+  }
+
+  /**
+   * Get chat models sorted by last used
+   */
+  static getChatModelsSorted(): ModelMemo[] {
+    return this.getModelsSorted('chat');
+  }
+
+  /**
+   * Get embedding models sorted by last used
+   */
+  static getEmbeddingModelsSorted(): ModelMemo[] {
+    return this.getModelsSorted('embedding');
   }
 }

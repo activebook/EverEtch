@@ -104,13 +104,20 @@
                                         fill="#212121" />
                                 </svg>
                             </button>
+                            <button id="semantic-settings-btn" title="Semantic Search Settings"
+                                class="p-2 bg-amber-50/60 hover:bg-amber-100/70 text-slate-600 hover:text-slate-700 rounded-lg transition-all duration-200 hover:shadow-md group">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                </svg>
+                            </button>
                             <button id="howto-btn" title="How to Use Guide"
                                 class="p-2 bg-amber-50/60 hover:bg-amber-100/70 text-slate-600 hover:text-slate-700 rounded-lg transition-all duration-200 hover:shadow-md group">
                                 <svg class="w-4 h-4" viewBox="0 0 1.4 1.4" xmlns="http://www.w3.org/2000/svg">
                                     <path
                                         d="M.672.938C.712.938.731.91.731.872v-.02C.732.775.76.742.854.678c.1-.068.164-.147.164-.26C1.018.242.875.141.697.141.565.141.448.204.398.317A.2.2 0 0 0 .38.394c0 .033.019.057.055.057.03 0 .05-.018.059-.046C.524.294.598.252.693.252c.114 0 .203.064.203.166 0 .084-.052.131-.127.183C.677.665.61.733.61.837v.037c0 .038.021.064.061.064m0 .321a.083.083 0 0 0 .083-.083.083.083 0 0 0-.083-.083.084.084 0 0 0-.084.083c0 .046.038.083.084.083" />
                                 </svg>
-                            </button>
+                            </button>                            
                         </div>
                     </div>
                 </div>
@@ -173,6 +180,14 @@
                     </div>
                 </div>
 
+                <!-- Embedding Status Section -->
+                <div id="embedding-status" class="hidden p-3 bg-amber-50/50 border-b border-amber-200/40">
+                    <div class="flex items-center justify-center space-x-3 text-sm text-amber-700">
+                        <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-amber-500"></div>
+                        <span class="font-medium">Generating embeddings...</span>
+                    </div>
+                </div>
+
                 <!-- Lower Panel: Input/Search -->
                 <div class="p-4 flex-shrink-0 bg-amber-50/70 relative">
                     <!-- Floating Search Suggestions (positioned above input) -->
@@ -221,19 +236,33 @@
                             class="text-xs font-medium text-slate-600 bg-amber-100/70 px-2 py-0.5 rounded-full">0</span>
                     </h2>
                 </div>
+
                 <div id="associated-list" class="flex-1 overflow-y-auto scrollbar-thin p-3">
                     <!-- Associated words will be populated here -->
                 </div>
+
+                <!-- Semantic Search Input (hidden by default) -->
+                <div id="semantic-search-container" class="hidden p-3 border-b border-amber-200/40 bg-amber-50/50">
+                    <div class="relative">
+                        <input type="text" id="semantic-search-input" placeholder="Semantic search by meaning..."
+                            class="w-full pr-12 pl-4 py-2 border border-amber-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-amber-50/80 backdrop-blur-sm text-slate-700 placeholder-slate-400">
+                        <button id="semantic-search-btn" title="Search"
+                            class="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 text-blue-500 hover:text-blue-600 hover:bg-amber-100/70 rounded-lg transition-all duration-200 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed group">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="mt-1 text-[10px] text-slate-400 text-center">
+                        <svg class="w-3 h-3 inline mr-1 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        Search by meaning and context
+                    </div>
+                </div>
+                </div>
             </div>
         </div>
-
-
-
-
-
-
-
-
     </div>
 
     <!-- Toast Notification Container -->

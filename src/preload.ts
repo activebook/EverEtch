@@ -17,14 +17,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   searchWords: (query: string) => ipcRenderer.invoke('search-words', query),
   getWord: (wordId: string) => ipcRenderer.invoke('get-word', wordId),
   getWordByName: (wordName: string) => ipcRenderer.invoke('get-word-by-name', wordName),
-  addWord: (wordData: { word: string; one_line_desc: string; details: string; tags: string[]; tag_colors: Record<string, string>; synonyms: string[]; antonyms: string[]; remark?: string }) => ipcRenderer.invoke('add-word', wordData),
-  updateWord: (wordId: string, wordData: Partial<{ word: string; one_line_desc: string; details: string; tags: string[]; tag_colors: Record<string, string>; synonyms: string[]; antonyms: string[]; remark?: string }>) => ipcRenderer.invoke('update-word', wordId, wordData),
+  addWord: (wordData: { word: string; one_line_desc: string; details: string; tags: string[]; tag_colors: Record<string, string>; synonyms: string[]; antonyms: string[]; remark?: string; embedding?: number[] }) => ipcRenderer.invoke('add-word', wordData),
+  updateWord: (wordId: string, wordData: Partial<{ word: string; one_line_desc: string; details: string; tags: string[]; tag_colors: Record<string, string>; synonyms: string[]; antonyms: string[]; remark?: string; embedding?: number[] }>) => ipcRenderer.invoke('update-word', wordId, wordData),
   updateWordRemark: (wordId: string, remark: string) => ipcRenderer.invoke('update-word-remark', wordId, remark),
   deleteWord: (wordId: string) => ipcRenderer.invoke('delete-word', wordId),
 
   // AI operations
   generateWordMeaning: (word: string) => ipcRenderer.invoke('generate-word-meaning', word),
   generateWordMetas: (word: string, meaning: string, generationId: string) => ipcRenderer.invoke('generate-word-metas', word, meaning, generationId),
+  generateWordEmbedding: (wordData: { word: string; meaning: string; summary: string; tags: string[]; synonyms: string[]; antonyms: string[]; }) => ipcRenderer.invoke('generate-word-embedding', wordData),
 
   // Associated words
   getRelatedWordsPaginated: (searchTerm: string, offset: number, limit: number) => ipcRenderer.invoke('get-related-words-paginated', searchTerm, offset, limit),
@@ -48,7 +49,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Model memo operations
   loadModelMemos: () => ipcRenderer.invoke('load-model-memos'),
-  addModelMemo: (memo: { provider: 'openai' | 'google'; model: string; endpoint: string; apiKey: string }) => ipcRenderer.invoke('add-model-memo', memo),
+  loadChatModelMemos: () => ipcRenderer.invoke('load-chat-model-memos'),
+  loadEmbeddingModelMemos: () => ipcRenderer.invoke('load-embedding-model-memos'),
+  addModelMemo: (memo: { provider: 'openai' | 'google'; model: string; endpoint: string; apiKey: string; type: 'chat' | 'embedding' }) => ipcRenderer.invoke('add-model-memo', memo),
   getModelMemo: (name: string) => ipcRenderer.invoke('get-model-memo', name),
   deleteModelMemo: (name: string) => ipcRenderer.invoke('delete-model-memo', name),
   markModelUsed: (name: string) => ipcRenderer.invoke('mark-model-used', name),
@@ -88,5 +91,34 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   removeAllListeners: (event: string) => {
     ipcRenderer.removeAllListeners(event);
-  }
+  },
+
+  // Semantic Batch&Search operations
+  startSemanticBatchProcessing: (config: any) => ipcRenderer.invoke('start-semantic-batch-processing', config),
+  cancelSemanticBatchProcessing: () => ipcRenderer.invoke('cancel-semantic-batch-processing'),
+  updateSemanticConfig: (config: { id: string; name: string; embedding_config: { 
+    provider: string; model: string; endpoint: string; api_key: string; batch_size: number; similarity_threshold: number; }; }) => ipcRenderer.invoke('update-semantic-config', config),
+  performSemanticSearch: (query: string, limit?: number) => ipcRenderer.invoke('perform-semantic-search', query, limit),
+
+  // Semantic Batch event listeners
+  onSemanticBatchProgress: (callback: (progress: { processed: number; total: number; }) => void) => {
+    ipcRenderer.on('semantic-batch-progress', (_event: Electron.IpcRendererEvent, progress: { processed: number; total: number; }) => callback(progress));
+  },
+  onSemanticBatchComplete: (callback: (result: {
+    success: boolean;
+    totalWords: number;
+    processed: number;
+    failed: number;
+    error: string;
+    duration: number;
+  }) => void) => {
+    ipcRenderer.on('semantic-batch-complete', (_event: Electron.IpcRendererEvent, result: {
+      success: boolean;
+      totalWords: number;
+      processed: number;
+      failed: number;
+      error: string;
+      duration: number;
+    }) => callback(result));
+  },
 });

@@ -1,11 +1,9 @@
-import { WordManager } from '../services/WordManager.js';
 import { ToastManager } from './ToastManager.js';
 import { ProfileService } from '../services/ProfileService.js';
 import { GoogleDriveManager } from '../services/GoogleDriveManager.js';
 import { WordImportService } from '../services/WordImportService.js';
 import { UIUtils } from '../utils/UIUtils.js';
 import { ModelMemoService } from '../services/ModelMemoService.js';
-import { CustomModelDropdown } from './CustomModelDropdown.js';
 import { HelpModalHandler } from '../modals/HelpModalHandler.js';
 import { ProfileAddModalHandler } from '../modals/ProfileAddModalHandler.js';
 import { ProfileSetModalHandler } from '../modals/ProfileSetModalHandler.js';
@@ -16,6 +14,7 @@ import { WordsImportCompleteModalHandler } from '../modals/WordsImportCompleteMo
 import { WordsImportProgressModalHandler } from '../modals/WordsImportProgressModalHandler.js';
 import { GoogleDriveDownloadModalHandler } from '../modals/GoogleDriveDownloadModalHandler.js';
 import { GoogleDriveUploadModalHandler } from '../modals/GoogleDriveUploadModalHandler.js';
+import { SemanticSettingsModalHandler } from '../modals/SemanticSettingsModalHandler.js';
 
 export class ModalManager {
   private toastManager: ToastManager;
@@ -37,6 +36,7 @@ export class ModalManager {
   private wordsImportProgress: WordsImportProgressModalHandler;
   private googleDriveDownloadModalHandler: GoogleDriveDownloadModalHandler;
   private googleDriveUploadModalHandler: GoogleDriveUploadModalHandler;
+  private semanticSettingsModalHandler: SemanticSettingsModalHandler;
 
   constructor(
     toastManager: ToastManager,
@@ -64,8 +64,7 @@ export class ModalManager {
       this.uiUtils,
       this.toastManager,
       this.profileService,
-      this.modelMemoService,
-      new CustomModelDropdown());
+      this.modelMemoService);
 
     this.googleDriveDownloadModalHandler = new GoogleDriveDownloadModalHandler(
       this.uiUtils,
@@ -103,6 +102,14 @@ export class ModalManager {
       this.wordImportService,
       this.wordsImportComplete,
       this.wordsImportProgress
+    );
+
+    // Initialize semantic search settings modal handler
+    this.semanticSettingsModalHandler = new SemanticSettingsModalHandler(
+      this.uiUtils,
+      this.toastManager,      
+      this.profileService,
+      this.modelMemoService
     );
   }
 
@@ -153,5 +160,14 @@ export class ModalManager {
 
   hideImportWordsModal(): void {
     this.wordsImportModalHandler.hide();
+  }
+
+  // Semantic search settings modal methods
+  async showSemanticSettingsModal(): Promise<void> {
+    await this.semanticSettingsModalHandler.show();
+  }
+
+  hideSemanticSettingsModal(): void {
+    this.semanticSettingsModalHandler.hide();
   }
 }

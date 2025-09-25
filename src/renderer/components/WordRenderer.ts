@@ -293,9 +293,17 @@ export class WordRenderer {
       });
     });
 
-    // Load action buttons only after word details are complete
+    // Check if embedding failed (undefined means no embedding generated yet, empty array means failed)
+    const hasEmbeddingFailed = Array.isArray(word.embedding) && word.embedding.length === 0;
+
+    // Load action buttons after word details are complete
     if (!isLoadingSummary && !isLoadingTags) {
-      this.loadActionButtons(word);
+      if (hasEmbeddingFailed) {
+        // Show warning message when embedding failed
+        this.showEmbeddingFailureWarning();
+      } else {
+        this.loadActionButtons(word);
+      }
     }
   }
 
@@ -611,5 +619,19 @@ export class WordRenderer {
   private hideSuggestions(): void {
     const suggestionsDiv = document.getElementById('suggestions')!;
     suggestionsDiv.classList.add('hidden');
+  }
+
+  private showEmbeddingFailureWarning(): void {
+    const actionButtonsContainer = document.getElementById('action-buttons-container')!;
+    actionButtonsContainer.innerHTML = `
+      <div class="bg-red-50 border border-red-200 rounded-md p-3 mb-4">
+        <div class="flex items-center">
+          <svg class="w-4 h-4 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <span class="text-sm text-red-800">Embedding generation failed. Please try again.</span>
+        </div>
+      </div>
+    `;
   }
 }

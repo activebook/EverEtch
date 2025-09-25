@@ -11,6 +11,8 @@ import { ModalManager } from './components/ModalManager.js';
 import { GoogleDriveManager } from './services/GoogleDriveManager.js';
 import { ProtocolManager } from './services/ProtocolManager.js';
 import { EventManager } from './services/EventManager.js';
+import { SemanticWordsManager } from './services/SemanticWordsManager.js';
+import { SemanticSearchManager } from './services/SemanticSearchManager.js';
 
 // Constants for pagination
 const WORDS_PAGE_SIZE = 10; // For release builds, set to 10, debug 5
@@ -33,6 +35,8 @@ export class EverEtchApp {
   private googleDriveManager!: GoogleDriveManager;
   private protocolManager!: ProtocolManager;
   private eventManager!: EventManager;
+  private semanticWordsManager!: SemanticWordsManager;
+  private semanticSearchManager!: SemanticSearchManager;
 
   // Minimal app-level state (managers handle their own state)
 
@@ -75,6 +79,19 @@ export class EverEtchApp {
     this.googleDriveManager = new GoogleDriveManager(this.toastManager, this.profileService);
     this.protocolManager = new ProtocolManager(this.toastManager, this.wordManager);
 
+    // Create semantic words manager (needed by semantic search manager)
+    this.semanticWordsManager = new SemanticWordsManager(
+      this.wordRenderer,
+      this.toastManager,
+      this.uiUtils
+    );
+
+    // Create semantic search manager (needed by event manager)
+    this.semanticSearchManager = new SemanticSearchManager(
+      this.toastManager,
+      this.semanticWordsManager
+    );
+
     // Create modal manager
     this.modalManager = new ModalManager(
       this.toastManager,
@@ -84,13 +101,14 @@ export class EverEtchApp {
       this.modelMemoService,
       this.uiUtils);
 
-    // Create event manager (depends on all other managers)
+    // Create event manager (depends on all other managers, including semantic search manager)
     this.eventManager = new EventManager(
       this.wordManager,
       this.modalManager,
       this.profileService,
       this.uiUtils,
-      this.toastManager
+      this.toastManager,
+      this.semanticSearchManager
     );
   }
 
@@ -140,7 +158,10 @@ export class EverEtchApp {
       }
 
       // Set up event listeners
-      this.eventManager.setupEventListeners();
+      this.eventManager.setupEventListeners();  
+      
+      // Check if semantic search is enabled
+      await this.semanticSearchManager.checkSemanticSearchStatus();
 
       // Load saved panel widths
       await this.uiUtils.loadPanelWidths();

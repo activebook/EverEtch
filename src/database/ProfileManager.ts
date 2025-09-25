@@ -72,18 +72,27 @@ export class ProfileManager {
     // Initialize database for new profile
     await this.dbManager.initialize(profileName);
 
-    // Create default profile config
-    const defaultConfig: Omit<ProfileConfig, 'id'> = {
-      name: profileName,
-      system_prompt: `You are a helpful assistant.`,
-      model_config: {
-        provider: 'openai',
-        model: 'gpt-4',
-        endpoint: 'https://api.openai.com/v1',
-        api_key: '' // To be set by user
-      },
-      last_opened: new Date().toISOString()
-    };
+      // Create default profile config
+      const defaultConfig: Omit<ProfileConfig, 'id'> = {
+        name: profileName,
+        system_prompt: `You are a helpful assistant.`,
+        model_config: {
+          provider: 'openai',
+          model: 'gpt-4',
+          endpoint: 'https://api.openai.com/v1',
+          api_key: '' // To be set by user
+        },
+        embedding_config: {
+          provider: 'openai',
+          model: 'text-embedding-ada-002',
+          endpoint: 'https://api.openai.com/v1',
+          api_key: '', // To be set by user
+          batch_size: 10,
+          similarity_threshold: 0.5,
+          enabled: false
+        },
+        last_opened: new Date().toISOString()
+      };
 
     await this.dbManager.setProfileConfig(defaultConfig);
 
@@ -115,6 +124,15 @@ export class ProfileManager {
           endpoint: 'https://api.openai.com/v1',
           api_key: '' // To be set by user
         },
+        embedding_config: {
+          provider: 'openai',
+          model: 'text-embedding-ada-002',
+          endpoint: 'https://api.openai.com/v1',
+          api_key: '', // To be set by user
+          batch_size: 10,
+          similarity_threshold: 0.5,
+          enabled: false
+        },
         last_opened: new Date().toISOString()
       };
       config = await this.dbManager.setProfileConfig(defaultConfig);
@@ -128,9 +146,9 @@ export class ProfileManager {
     return true;
   }
 
-  async getCurrentProfile(): Promise<ProfileConfig | null> {
+  getCurrentProfile(): ProfileConfig | null {
     if (!this.currentProfile) return null;
-    return await this.dbManager.getProfileConfig();
+    return this.dbManager.getProfileConfig();
   }
 
   getLastOpenedProfile(): string | null {
@@ -165,16 +183,16 @@ export class ProfileManager {
     return true;
   }
 
-  async updateProfileConfig(profileName: string, config: Partial<ProfileConfig>): Promise<boolean> {
+  updateProfileConfig(profileName: string, config: Partial<ProfileConfig>): boolean {
     if (this.currentProfile !== profileName) {
       return false; // Can only update current profile
     }
 
-    const existingConfig = await this.dbManager.getProfileConfig();
+    const existingConfig = this.dbManager.getProfileConfig();
     if (!existingConfig) return false;
 
     const updatedConfig = { ...existingConfig, ...config };
-    await this.dbManager.setProfileConfig(updatedConfig);
+    this.dbManager.setProfileConfig(updatedConfig);
     return true;
   }
 

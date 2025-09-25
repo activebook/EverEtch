@@ -29,10 +29,21 @@ export interface PaginatedWordsResult extends ApiResult {
 
 export interface WordResult extends ApiResult {
     word?: WordDocument;
+    data?: WordDocument; // For addWord/updateWord responses
 }
 
 export interface WordsResult extends ApiResult {
     words: WordListItem[];
+}
+
+// Word operation results with success/error pattern
+export interface WordOperationResult extends ApiResult {
+    data?: WordDocument;
+    error?: string;
+}
+
+export interface WordDeleteResult extends ApiResult {
+    error?: string;
 }
 
 // AI operations
@@ -125,6 +136,7 @@ export interface WordData {
     synonyms: string[];
     antonyms: string[];
     remark?: string;
+    embedding?: number[];
 }
 
 export interface WordDocument {
@@ -137,6 +149,7 @@ export interface WordDocument {
     synonyms: string[];
     antonyms: string[];
     remark?: string;
+    embedding?: number[];
     created_at: string;
     updated_at: string;
 }
@@ -157,6 +170,15 @@ export interface ProfileConfig {
         model: string;
         endpoint: string;
         api_key: string;
+    };
+    embedding_config?: {
+        provider: string;
+        model: string;
+        endpoint: string;
+        api_key: string;
+        batch_size: number;
+        similarity_threshold: number;
+        enabled?: boolean;
     };
     last_opened: string;
 }
@@ -201,8 +223,15 @@ export interface ModelMemo {
     model: string;
     endpoint: string;
     apiKey: string;
+    type: 'chat' | 'embedding';
     createdAt: string;
     lastUsed?: string;
+}
+
+export interface SemanticSearchSettings {
+    enabled: boolean;
+    similarity_threshold: number;
+    batch_size: number;
 }
 
 declare global {
@@ -222,14 +251,15 @@ declare global {
             searchWords: (query: string) => Promise<WordListItem[]>;
             getWord: (wordId: string) => Promise<WordDocument | null>;
             getWordByName: (wordName: string) => Promise<WordDocument | null>;
-            addWord: (wordData: WordData) => Promise<WordDocument>;
-            updateWord: (wordId: string, wordData: Partial<WordData>) => Promise<WordDocument | null>;
-            updateWordRemark: (wordId: string, remark: string) => Promise<WordDocument | null>;
-            deleteWord: (wordId: string) => Promise<boolean>;
+            addWord: (wordData: WordData) => Promise<WordOperationResult>;
+            updateWord: (wordId: string, wordData: Partial<WordData>) => Promise<WordOperationResult>;
+            updateWordRemark: (wordId: string, remark: string) => Promise<WordOperationResult>;
+            deleteWord: (wordId: string) => Promise<WordDeleteResult>;
 
             // AI operations
             generateWordMeaning: (word: string) => Promise<string>;
             generateWordMetas: (word: string, meaning: string, generationId: string) => Promise<WordGenerationResult>;
+            generateWordEmbedding: (wordData: { word: string; meaning: string; summary: string; tags: string[]; synonyms: string[]; antonyms: string[]; }) => Promise<{ success: boolean; embedding: number[]; model_used: string; tokens_used: number; }>;
 
             // Associated words
             getRelatedWordsPaginated: (searchTerm: string, offset: number, limit: number) => Promise<{ words: WordListItem[], hasMore: boolean, total: number }>;
@@ -250,7 +280,9 @@ declare global {
 
             // Model memo operations
             loadModelMemos: () => Promise<ModelMemo[]>;
-            addModelMemo: (memo: Omit<ModelMemo, 'name'|'createdAt'>) => Promise<ModelResult>;
+            loadChatModelMemos: () => Promise<ModelMemo[]>;
+            loadEmbeddingModelMemos: () => Promise<ModelMemo[]>;
+            addModelMemo: (memo: Omit<ModelMemo, 'name'|'createdAt'|'type'>) => Promise<ModelResult>;
             getModelMemo: (name: string) => Promise<ModelResult>;
             deleteModelMemo: (name: string) => Promise<ModelDeleteResult>;
             markModelUsed: (name: string) => Promise<boolean>;
@@ -276,6 +308,24 @@ declare global {
             // Protocol handlers for custom URL scheme
             onProtocolNavigateWord: (callback: (wordName: string) => void) => void;
             onProtocolSwitchProfile: (callback: (profileName: string) => void) => void;
+
+            // Semantic Search operations
+            startSemanticBatchProcessing: (config: any) => Promise<{ success: boolean; message: string; }>;
+            cancelSemanticBatchProcessing: () => Promise<{ success: boolean; message: string; }>;
+            updateSemanticConfig: (config: { id: string; name: string; embedding_config: {
+              provider: string; model: string; endpoint: string; api_key: string; batch_size: number; similarity_threshold: number; }; }) => Promise<{ success: boolean; message: string; }>;
+            performSemanticSearch: (query: string, limit?: number) => Promise<{ success: boolean; message: string; results: any[] }>;
+
+            // Semantic Search event listeners
+            onSemanticBatchProgress: (callback: (progress: { processed: number; total: number; }) => void) => void;
+            onSemanticBatchComplete: (callback: (result: {
+              success: boolean;
+              totalWords: number;
+              processed: number;
+              failed: number;
+              error: string;
+              duration: number;
+            }) => void) => void;
 
             removeAllListeners: (event: string) => void;
         };

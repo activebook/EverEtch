@@ -3,6 +3,7 @@ import { ModalManager } from '../components/ModalManager.js';
 import { ProfileService } from './ProfileService.js';
 import { UIUtils } from '../utils/UIUtils.js';
 import { ToastManager } from '../components/ToastManager.js';
+import { SemanticSearchManager } from './SemanticSearchManager.js';
 
 export class EventManager {
   private wordManager: WordManager;
@@ -10,19 +11,22 @@ export class EventManager {
   private profileService: ProfileService;
   private uiUtils: UIUtils;
   private toastManager: ToastManager;
+  private semanticSearchManager: SemanticSearchManager;
 
   constructor(
     wordManager: WordManager,
     modalManager: ModalManager,
     profileService: ProfileService,
     uiUtils: UIUtils,
-    toastManager: ToastManager
+    toastManager: ToastManager,
+    semanticSearchManager: SemanticSearchManager
   ) {
     this.wordManager = wordManager;
     this.modalManager = modalManager;
     this.profileService = profileService;
     this.uiUtils = uiUtils;
     this.toastManager = toastManager;
+    this.semanticSearchManager = semanticSearchManager;
 
     // Event listeners will be set up by EverEtchApp after initialization
   }
@@ -33,6 +37,7 @@ export class EventManager {
     this.setupProfileEvents();
     this.setupUIEvents();
     this.setupStreamingEvents();
+    this.setupSemanticSearchEvents();    
   }
 
   private setupWordInputEvents(): void {
@@ -169,6 +174,14 @@ export class EventManager {
       });
     }
 
+    // Semantic search button
+    const semanticSettingsBtn = document.getElementById('semantic-settings-btn') as HTMLButtonElement;
+    if (semanticSettingsBtn) {
+      semanticSettingsBtn.addEventListener('click', () => {
+        this.modalManager.showSemanticSettingsModal();
+      });
+    }
+
     // Howto button
     const howtoBtn = document.getElementById('howto-btn') as HTMLButtonElement;
     if (howtoBtn) {
@@ -225,7 +238,7 @@ export class EventManager {
 
     window.electronAPI.onProtocolSwitchProfile(async (profileName: string) => {
       await this.handleProtocolSwitchProfile(profileName);
-    });
+    });    
   }
 
   // Event handler implementations
@@ -280,6 +293,8 @@ export class EventManager {
         // Successful switch - reset UI and load words
         await this.resetUIForProfileSwitch();
         await this.wordManager.loadWords();
+        // Update semantic search UI
+        await this.updateSemanticSearchUI();
       } else {
         // Failed switch - but still switch UI to failed profile so user can delete it
         this.profileService.setCurrentProfile(newProfile); // Update UI state
@@ -470,5 +485,31 @@ export class EventManager {
 
     // Reload panel widths
     await this.uiUtils.loadPanelWidths();
+  }
+
+  private async updateSemanticSearchUI(): Promise<void> {
+    await this.semanticSearchManager.checkSemanticSearchStatus();
+  }
+
+  private setupSemanticSearchEvents(): void { 
+    // Set up semantic search status change listener
+    document.addEventListener('semantic-search-status-changed', (event: any) => {
+      this.handleSemanticSearchStatusChange(event.detail.enabled);
+    });
+
+    // Listen for word selection from semantic search results
+    document.addEventListener('select-word-from-search', ((event: any) => {
+      const word = event.detail?.word;
+      this.wordManager.selectWord(word);
+    }) as EventListener);
+  }
+
+  private handleSemanticSearchStatusChange(enabled: boolean): void {
+    console.log(`🔍 EventManager: Semantic search status changed to: ${enabled ? 'enabled' : 'disabled'}`);
+
+    this.semanticSearchManager.setEnabled(enabled);
+
+    // Log the status change for debugging
+    console.log(`📊 Semantic search UI updated: ${enabled ? 'enabled' : 'disabled'}`);
   }
 }
