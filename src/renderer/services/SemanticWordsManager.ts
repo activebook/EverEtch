@@ -75,8 +75,8 @@ export class SemanticWordsManager {
   }
 
   /**
-   * Display incremental results using virtual scrolling
-   */
+    * Display incremental results using virtual scrolling
+    */
   private displayIncrementalResults(): void {
     // Calculate how many results to show
     const endIndex = Math.min(this.semanticWordsState.displayOffset + this.semanticWordsState.incrementSize, this.semanticWordsState.allResults.length);
@@ -88,6 +88,7 @@ export class SemanticWordsManager {
 
     // Check if there are more results to show
     this.semanticWordsState.hasMoreToShow = this.semanticWordsState.displayOffset < this.semanticWordsState.allResults.length;
+
 
     // Convert to WordListItem format for rendering
     const wordListItems: WordListItem[] = newResults.map((result) => result.word);
@@ -108,9 +109,14 @@ export class SemanticWordsManager {
   }
 
   /**
-   * Set up scroll observer for progressive loading
-   */
+    * Set up scroll observer for progressive loading
+    */
   private setupScrollObserver(): void {
+    // Don't set up observer if there are no more results to show
+    if (!this.semanticWordsState.hasMoreToShow) {
+      return;
+    }
+
     const loadingIndicator = document.getElementById('semantic-loading-indicator');
     if (!loadingIndicator) {
       this.addLoadingIndicator();
@@ -153,13 +159,17 @@ export class SemanticWordsManager {
   }
 
   /**
-   * Fallback scroll handler when IntersectionObserver doesn't work
-   */
+    * Fallback scroll handler when IntersectionObserver doesn't work
+    */
   private handleScrollFallback(): void {
     const associatedList = document.getElementById('associated-list');
     const loadingIndicator = document.getElementById('semantic-loading-indicator');
 
     if (!associatedList || !loadingIndicator || this.semanticWordsState.isLoading || !this.semanticWordsState.hasMoreToShow) {
+      // Clean up if no more results
+      if (!this.semanticWordsState.hasMoreToShow && loadingIndicator) {
+        loadingIndicator.remove();
+      }
       return;
     }
 
@@ -175,10 +185,19 @@ export class SemanticWordsManager {
   }
 
   /**
-   * Load more results when user scrolls to the loading indicator
-   */
+    * Load more results when user scrolls to the loading indicator
+    */
   private async loadMoreResults(): Promise<void> {
     if (this.semanticWordsState.isLoading || !this.semanticWordsState.hasMoreToShow) {
+      // Clean up observer if no more results
+      if (!this.semanticWordsState.hasMoreToShow && this.semanticWordsState.scrollObserver) {
+        this.semanticWordsState.scrollObserver.disconnect();
+        this.semanticWordsState.scrollObserver = null;
+        const indicator = document.getElementById('semantic-loading-indicator');
+        if (indicator) {
+          indicator.remove();
+        }
+      }
       return;
     }
 
@@ -222,11 +241,13 @@ export class SemanticWordsManager {
   }
 
   /**
-   * Update loading indicator based on current state
-   */
+    * Update loading indicator based on current state
+    */
   private updateLoadingIndicator(): void {
     const loadingIndicator = document.getElementById('semantic-loading-indicator');
-    if (!loadingIndicator) return;
+    if (!loadingIndicator) {
+      return;
+    }
 
     if (this.semanticWordsState.isLoading) {
       loadingIndicator.innerHTML = `
@@ -330,7 +351,6 @@ export class SemanticWordsManager {
    * Manual trigger for loading more results (fallback if IntersectionObserver fails)
    */
   public triggerLoadMore(): void {
-    console.log('🔧 Manual trigger for load more results');
     if (this.semanticWordsState.hasMoreToShow && !this.semanticWordsState.isLoading) {
       this.loadMoreResults();
     }
