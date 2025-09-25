@@ -78,15 +78,19 @@ export class EmbeddingModelClient {
       // Handle both single and batch inputs
       if (Array.isArray(text)) {
         const embeddings = response.data.map(item => item.embedding);
+        // Normalize embeddings for accurate cosine similarity
+        const normalizedEmbeddings = embeddings.map(emb => EmbeddingModelClient.normalizeEmbeddingOptimized(emb));
         return {
-          embeddings,
+          embeddings: normalizedEmbeddings,
           model_used: profile.embedding_config!.model,
           tokens_used
         };
       } else {
         const embedding = response.data[0].embedding;
+        // Normalize embedding for accurate cosine similarity
+        const normalizedEmbedding = EmbeddingModelClient.normalizeEmbeddingOptimized(embedding);
         return {
-          embedding,
+          embedding: normalizedEmbedding,
           model_used: profile.embedding_config!.model,
           tokens_used
         };
@@ -139,8 +143,10 @@ export class EmbeddingModelClient {
       // Handle both single and batch inputs
       if (Array.isArray(text)) {
         const embeddings = response.embeddings.map(item => item.values!);
+        // Normalize embeddings for accurate cosine similarity
+        const normalizedEmbeddings = embeddings.map(emb => EmbeddingModelClient.normalizeEmbeddingOptimized(emb));
         return {
-          embeddings,
+          embeddings: normalizedEmbeddings,
           model_used: profile.embedding_config!.model,
           tokens_used
         };
@@ -149,8 +155,10 @@ export class EmbeddingModelClient {
         if (!embedding) {
           throw new Error('Embedding values are undefined');
         }
+        // Normalize embedding for accurate cosine similarity
+        const normalizedEmbedding = EmbeddingModelClient.normalizeEmbeddingOptimized(embedding);
         return {
-          embedding,
+          embedding: normalizedEmbedding,
           model_used: profile.embedding_config!.model,
           tokens_used
         };
@@ -310,6 +318,32 @@ export class EmbeddingModelClient {
     }
 
     return embedding.map(val => val / magnitude);
+  }
+
+  /**
+   * Normalize an embedding vector to unit length (Optimized version)
+   * More efficient for 2048-dimensional vectors with manual loops
+   */
+  static normalizeEmbeddingOptimized(embedding: number[]): number[] {
+    // Use more efficient magnitude calculation
+    let sumOfSquares = 0;
+    for (let i = 0; i < embedding.length; i++) {
+      sumOfSquares += embedding[i] * embedding[i];
+    }
+
+    const magnitude = Math.sqrt(sumOfSquares);
+
+    if (magnitude === 0) {
+      return embedding;
+    }
+
+    // Pre-create result array for better performance
+    const normalized: number[] = new Array(embedding.length);
+    for (let i = 0; i < embedding.length; i++) {
+      normalized[i] = embedding[i] / magnitude;
+    }
+
+    return normalized;
   }
 
   /**
