@@ -229,7 +229,7 @@ export class ProfileSetModalHandler extends ModalHandler {
         // Mark model as used
         await this.modelMemoService.markModelUsed(modelName);
 
-        this.showSuccess(`Model "${model.name}" loaded successfully`);
+        //this.showSuccess(`Model "${model.name}" loaded successfully`);
         return true;
       } else {
         this.showError(result.message || 'Failed to load model');
@@ -251,7 +251,7 @@ export class ProfileSetModalHandler extends ModalHandler {
       const deleteResult = await this.modelMemoService.deleteModelMemo(modelName);
 
       if (deleteResult.success) {
-        this.showSuccess(`Model "${modelName}" deleted successfully`);
+        // this.showSuccess(`Model "${modelName}" deleted successfully`);
         // Hide the dropdown
         this.modelDropdown.hide();
         // Reload model list
@@ -300,7 +300,7 @@ export class ProfileSetModalHandler extends ModalHandler {
 
       if (result.success) {
         const memoName = result.model?.name;
-        this.showSuccess(`Model "${memoName}" saved successfully`);
+        // this.showSuccess(`Model "${memoName}" saved successfully`);
         // Hide the dropdown
         this.modelDropdown.hide();
         // Reload model list

@@ -682,7 +682,7 @@ export class SemanticSettingsModalHandler extends ModalHandler {
         // Mark model as used
         await this.modelMemoService.markModelUsed(modelName);
 
-        this.showSuccess(`Embedding model "${model.name}" loaded successfully`);
+        //this.showSuccess(`Embedding model "${model.name}" loaded successfully`);
         return true;
       } else {
         this.showError(result.message || 'Failed to load embedding model');
@@ -707,7 +707,7 @@ export class SemanticSettingsModalHandler extends ModalHandler {
       const deleteResult = await this.modelMemoService.deleteModelMemo(modelName);
 
       if (deleteResult.success) {
-        this.showSuccess(`Embedding model "${modelName}" deleted successfully`);
+        // this.showSuccess(`Embedding model "${modelName}" deleted successfully`);
         // Hide the dropdown
         this.modelDropdown.hide();
         // Reload model list
@@ -759,7 +759,7 @@ export class SemanticSettingsModalHandler extends ModalHandler {
 
       if (result.success) {
         const memoName = result.model?.name;
-        this.showSuccess(`Embedding model "${memoName}" saved successfully`);
+        // this.showSuccess(`Embedding model "${memoName}" saved successfully`);
         // Hide the dropdown
         this.modelDropdown.hide();
         // Reload model list
