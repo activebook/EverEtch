@@ -3,8 +3,8 @@ import { WordRenderer } from '../components/WordRenderer.js';
 import { ToastManager } from '../components/ToastManager.js';
 import { UIUtils } from '../utils/UIUtils.js';
 
-// Constants for pagination
-const SEMANTIC_WORDS_PAGE_SIZE = 10;
+// Constants for virtual scrolling
+const SEMANTIC_WORDS_INCREMENT_SIZE = 10;
 
 export interface SemanticSearchResult {
   word: WordListItem;
@@ -12,13 +12,14 @@ export interface SemanticSearchResult {
 }
 
 export interface SemanticWordsState {
-  results: SemanticSearchResult[];
-  currentPage: number;
-  pageSize: number;
-  totalPages: number;
-  isLoading: boolean;
-  hasMore: boolean;
-  searchQuery: string;
+  allResults: SemanticSearchResult[];      // All loaded results
+  displayedResults: SemanticSearchResult[]; // Currently visible results
+  displayOffset: number;                    // How many results to show
+  incrementSize: number;                    // How many to add on scroll
+  isLoading: boolean;                       // Loading state for UI
+  hasMoreToShow: boolean;                   // Whether more results exist to display
+  searchQuery: string;                      // Current search query
+  scrollObserver: IntersectionObserver | null; // For scroll detection
 }
 
 export class SemanticWordsManager {
@@ -28,13 +29,14 @@ export class SemanticWordsManager {
 
   // Semantic words state
   private semanticWordsState: SemanticWordsState = {
-    results: [],
-    currentPage: 0,
-    pageSize: SEMANTIC_WORDS_PAGE_SIZE,
-    totalPages: 0,
+    allResults: [],
+    displayedResults: [],
+    displayOffset: 0,
+    incrementSize: SEMANTIC_WORDS_INCREMENT_SIZE,
     isLoading: false,
-    hasMore: false,
-    searchQuery: ''
+    hasMoreToShow: false,
+    searchQuery: '',
+    scrollObserver: null
   };
 
   constructor(wordRenderer: WordRenderer, toastManager: ToastManager, uiUtils: UIUtils) {
@@ -44,116 +46,214 @@ export class SemanticWordsManager {
   }
 
   /**
-   * Set semantic search results and initialize pagination
+   * Set semantic search results and initialize virtual scrolling
    */
   public setSearchResults(query: string, results: SemanticSearchResult[]): void {
-    
-    // Record all search results && Update state
+    // Clean up existing observer
+    if (this.semanticWordsState.scrollObserver) {
+      this.semanticWordsState.scrollObserver.disconnect();
+      this.semanticWordsState.scrollObserver = null;
+    }
+
+    // Record all search results and initialize virtual scrolling state
     this.semanticWordsState = {
-      results,
-      currentPage: 0,
-      pageSize: SEMANTIC_WORDS_PAGE_SIZE,
-      totalPages: Math.ceil(results.length / SEMANTIC_WORDS_PAGE_SIZE),
+      allResults: results,
+      displayedResults: [],
+      displayOffset: 0,
+      incrementSize: SEMANTIC_WORDS_INCREMENT_SIZE,
       isLoading: false,
-      hasMore: results.length > SEMANTIC_WORDS_PAGE_SIZE,
-      searchQuery: query
+      hasMoreToShow: results.length > 0,
+      searchQuery: query,
+      scrollObserver: null
     };
 
-    // Clear associated words list and display semantic search results
+    // Clear associated words list and display initial results
     this.clearAssociatedWordsList();
-    this.displayCurrentPage();
+    this.displayIncrementalResults();
     this.updateAssociatedCount(results.length);
+    this.setupScrollObserver();
   }
 
   /**
-   * Display current page of semantic search results
+   * Display incremental results using virtual scrolling
    */
-  private displayCurrentPage(): void {
-    const startIndex = this.semanticWordsState.currentPage * this.semanticWordsState.pageSize;
-    const endIndex = startIndex + this.semanticWordsState.pageSize;
-    const currentPageResults = this.semanticWordsState.results.slice(startIndex, endIndex);
+  private displayIncrementalResults(): void {
+    // Calculate how many results to show
+    const endIndex = Math.min(this.semanticWordsState.displayOffset + this.semanticWordsState.incrementSize, this.semanticWordsState.allResults.length);
+    const newResults = this.semanticWordsState.allResults.slice(this.semanticWordsState.displayOffset, endIndex);
+
+    // Update displayed results
+    this.semanticWordsState.displayedResults = this.semanticWordsState.allResults.slice(0, endIndex);
+    this.semanticWordsState.displayOffset = endIndex;
+
+    // Check if there are more results to show
+    this.semanticWordsState.hasMoreToShow = this.semanticWordsState.displayOffset < this.semanticWordsState.allResults.length;
 
     // Convert to WordListItem format for rendering
-    const wordListItems: WordListItem[] = currentPageResults.map((result, index) => (
-      result.word
-    ));
+    const wordListItems: WordListItem[] = newResults.map((result) => result.word);
 
-    // Render the current page
+    // Render the new results
     this.wordRenderer.renderAssociatedWordListIncremental(wordListItems);
 
-    // Add pagination controls if needed
-    this.addPaginationControls();
+    // Add loading indicator if there are more results
+    if (this.semanticWordsState.hasMoreToShow) {
+      this.addLoadingIndicator();
+    } else {
+      // Remove loading indicator if no more results
+      const existingIndicator = document.getElementById('semantic-loading-indicator');
+      if (existingIndicator) {
+        existingIndicator.remove();
+      }
+    }
   }
 
   /**
-   * Add pagination controls to the associated words list
+   * Set up scroll observer for progressive loading
    */
-  private addPaginationControls(): void {
+  private setupScrollObserver(): void {
+    const loadingIndicator = document.getElementById('semantic-loading-indicator');
+    if (!loadingIndicator) {
+      this.addLoadingIndicator();
+    }
+
+    const indicator = document.getElementById('semantic-loading-indicator')!;
+    let isTriggering = false;
+
+    // Use the same approach as AssociatedWordsManager
+    const associatedList = document.getElementById('associated-list');
+    const scrollRoot = associatedList || null;
+
+    this.semanticWordsState.scrollObserver = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+
+        if (entry.isIntersecting && !isTriggering && this.semanticWordsState.hasMoreToShow && !this.semanticWordsState.isLoading) {
+          isTriggering = true;
+          this.loadMoreResults().finally(() => {
+            isTriggering = false;
+          });
+        }
+      },
+      {
+        root: scrollRoot,
+        rootMargin: '0px 0px 0px 0px',
+        threshold: 0.1
+      }
+    );
+
+    this.semanticWordsState.scrollObserver.observe(indicator);
+
+    // Add scroll event listener as fallback
+    if (associatedList && !associatedList._listenerAdded) {
+      associatedList._listenerAdded = true;
+      associatedList.addEventListener('scroll', () => {
+        this.handleScrollFallback();
+      });
+    }
+  }
+
+  /**
+   * Fallback scroll handler when IntersectionObserver doesn't work
+   */
+  private handleScrollFallback(): void {
+    const associatedList = document.getElementById('associated-list');
+    const loadingIndicator = document.getElementById('semantic-loading-indicator');
+
+    if (!associatedList || !loadingIndicator || this.semanticWordsState.isLoading || !this.semanticWordsState.hasMoreToShow) {
+      return;
+    }
+
+    const listRect = associatedList.getBoundingClientRect();
+    const indicatorRect = loadingIndicator.getBoundingClientRect();
+
+    // Check if loading indicator is near the bottom of the visible area
+    const isNearBottom = indicatorRect.top <= listRect.bottom + 100;
+
+    if (isNearBottom) {
+      this.loadMoreResults();
+    }
+  }
+
+  /**
+   * Load more results when user scrolls to the loading indicator
+   */
+  private async loadMoreResults(): Promise<void> {
+    if (this.semanticWordsState.isLoading || !this.semanticWordsState.hasMoreToShow) {
+      return;
+    }
+
+    this.semanticWordsState.isLoading = true;
+    this.updateLoadingIndicator();
+
+    // Use setTimeout to simulate async loading (in real implementation, this would be an API call)
+    setTimeout(() => {
+      this.displayIncrementalResults();
+      this.semanticWordsState.isLoading = false;
+      this.updateLoadingIndicator();
+    }, 100);
+  }
+
+  /**
+   * Add loading indicator at the bottom of results
+   */
+  private addLoadingIndicator(): void {
     const associatedList = document.getElementById('associated-list');
     if (!associatedList) return;
 
-    // Remove existing pagination controls
-    const existingControls = associatedList.querySelector('.semantic-pagination-controls');
-    if (existingControls) {
-      existingControls.remove();
+    // Remove existing loading indicator
+    const existingIndicator = document.getElementById('semantic-loading-indicator');
+    if (existingIndicator) {
+      existingIndicator.remove();
     }
 
-    // Add pagination controls if there are multiple pages
-    if (this.semanticWordsState.totalPages > 1) {
-      const controlsDiv = document.createElement('div');
-      controlsDiv.className = 'semantic-pagination-controls flex justify-between items-center mt-4 p-2 bg-slate-50 rounded-lg';
+    const loadingDiv = document.createElement('div');
+    loadingDiv.id = 'semantic-loading-indicator';
+    loadingDiv.className = 'flex justify-center items-center py-4 text-slate-500';
+    loadingDiv.innerHTML = `
+      <div class="rounded-full h-6 w-6 border-2 border-slate-400 flex items-center justify-center">
+        <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+        </svg>
+      </div>
+      <span class="ml-2 text-sm text-slate-400">Scroll for more words</span>
+    `;
 
-      controlsDiv.innerHTML = `
-        <div class="flex items-center space-x-2">
-          <button id="semantic-prev-page" class="px-3 py-1 text-sm bg-white border border-slate-300 rounded hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            ${this.semanticWordsState.currentPage === 0 ? 'disabled' : ''}>
-            Previous
-          </button>
-          <span class="text-sm text-slate-600">
-            Page ${this.semanticWordsState.currentPage + 1} of ${this.semanticWordsState.totalPages}
-          </span>
-          <button id="semantic-next-page" class="px-3 py-1 text-sm bg-white border border-slate-300 rounded hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            ${!this.semanticWordsState.hasMore || this.semanticWordsState.currentPage >= this.semanticWordsState.totalPages - 1 ? 'disabled' : ''}>
-            Next
-          </button>
-        </div>
-        <div class="text-xs text-slate-500">
-          ${this.semanticWordsState.results.length} results for "${this.semanticWordsState.searchQuery}"
-        </div>
+    associatedList.appendChild(loadingDiv);
+  }
+
+  /**
+   * Update loading indicator based on current state
+   */
+  private updateLoadingIndicator(): void {
+    const loadingIndicator = document.getElementById('semantic-loading-indicator');
+    if (!loadingIndicator) return;
+
+    if (this.semanticWordsState.isLoading) {
+      loadingIndicator.innerHTML = `
+        <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-slate-500"></div>
+        <span class="ml-2 text-sm text-slate-500">Loading more words...</span>
       `;
-
-      // Add event listeners
-      const prevBtn = controlsDiv.querySelector('#semantic-prev-page') as HTMLButtonElement;
-      const nextBtn = controlsDiv.querySelector('#semantic-next-page') as HTMLButtonElement;
-
-      prevBtn.addEventListener('click', () => this.previousPage());
-      nextBtn.addEventListener('click', () => this.nextPage());
-
-      associatedList.appendChild(controlsDiv);
+    } else if (!this.semanticWordsState.hasMoreToShow) {
+      loadingIndicator.innerHTML = `
+        <div class="rounded-full h-6 w-6 border-2 border-slate-300 flex items-center justify-center">
+          <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+          </svg>
+        </div>
+        <span class="ml-2 text-sm text-slate-400">All results loaded</span>
+      `;
+    } else {
+      loadingIndicator.innerHTML = `
+        <div class="rounded-full h-6 w-6 border-2 border-slate-400 flex items-center justify-center">
+          <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+          </svg>
+        </div>
+        <span class="ml-2 text-sm text-slate-400">Scroll for more words</span>
+      `;
     }
   }
 
-  /**
-   * Navigate to previous page
-   */
-  public previousPage(): void {
-    if (this.semanticWordsState.currentPage > 0) {
-      this.semanticWordsState.currentPage--;
-      this.clearAssociatedWordsList();
-      this.displayCurrentPage();
-    }
-  }
-
-  /**
-   * Navigate to next page
-   */
-  public nextPage(): void {
-    if (this.semanticWordsState.currentPage < this.semanticWordsState.totalPages - 1) {
-      this.semanticWordsState.currentPage++;
-      this.clearAssociatedWordsList();
-      this.displayCurrentPage();
-    }
-  }
 
   /**
    * Clear the associated words list
@@ -162,6 +262,7 @@ export class SemanticWordsManager {
     const associatedList = document.getElementById('associated-list');
     if (associatedList) {
       associatedList.innerHTML = '';
+      associatedList.scrollTop = 0;
     }
   }
 
@@ -190,14 +291,21 @@ export class SemanticWordsManager {
    * Clear semantic search results
    */
   public clearResults(): void {
+    // Clean up observer
+    if (this.semanticWordsState.scrollObserver) {
+      this.semanticWordsState.scrollObserver.disconnect();
+      this.semanticWordsState.scrollObserver = null;
+    }
+
     this.semanticWordsState = {
-      results: [],
-      currentPage: 0,
-      pageSize: SEMANTIC_WORDS_PAGE_SIZE,
-      totalPages: 0,
+      allResults: [],
+      displayedResults: [],
+      displayOffset: 0,
+      incrementSize: SEMANTIC_WORDS_INCREMENT_SIZE,
       isLoading: false,
-      hasMore: false,
-      searchQuery: ''
+      hasMoreToShow: false,
+      searchQuery: '',
+      scrollObserver: null
     };
 
     this.clearAssociatedWordsList();
@@ -215,6 +323,29 @@ export class SemanticWordsManager {
    * Check if there are semantic search results
    */
   public hasResults(): boolean {
-    return this.semanticWordsState.results.length > 0;
+    return this.semanticWordsState.allResults.length > 0;
+  }
+
+  /**
+   * Manual trigger for loading more results (fallback if IntersectionObserver fails)
+   */
+  public triggerLoadMore(): void {
+    console.log('🔧 Manual trigger for load more results');
+    if (this.semanticWordsState.hasMoreToShow && !this.semanticWordsState.isLoading) {
+      this.loadMoreResults();
+    }
+  }
+
+  /**
+   * Get current loading state for debugging
+   */
+  public getLoadingState(): any {
+    return {
+      hasMoreToShow: this.semanticWordsState.hasMoreToShow,
+      isLoading: this.semanticWordsState.isLoading,
+      displayOffset: this.semanticWordsState.displayOffset,
+      totalResults: this.semanticWordsState.allResults.length,
+      displayedCount: this.semanticWordsState.displayedResults.length
+    };
   }
 }

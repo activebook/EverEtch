@@ -105,7 +105,7 @@ export class SemanticSearchManager {
 
     // Clear results if disabled
     if (!enabled) {
-      this.semanticWordsManager.clearResults();
+      this.clearSearchResults();
     }
   }
 
@@ -143,7 +143,7 @@ export class SemanticSearchManager {
         // this.toastManager.showSuccess(`Found ${result.results.length} similar words for "${query}"`);
       } else {
         this.toastManager.showInfo(`No similar words found for "${query}"`);
-        this.semanticWordsManager.clearResults();
+        this.clearSearchResults();
       }
 
     } catch (error) {
