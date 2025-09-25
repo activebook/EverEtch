@@ -530,6 +530,7 @@ export class SemanticSettingsModalHandler extends ModalHandler {
           enabled: true
         }
       };
+      //console.log('Updating profile with embedding configuration:', updatedProfile);
 
       // Start batch processing
       this.isProcessing = true;

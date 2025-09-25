@@ -606,7 +606,7 @@ ipcMain.handle('export-profile', async () => {
     }
 
     // Use the import/export service to handle the export
-    return await importExportService.exportProfileToLocal(result.filePath);
+    return importExportService.exportProfileToLocal(result.filePath);
 
   } catch (error) {
     console.error('Error exporting profile:', error);
@@ -878,9 +878,10 @@ ipcMain.handle('start-semantic-batch-processing', async (event, config: any) => 
     // Update profile with embedding configuration
     const currentProfile = await profileManager.getCurrentProfile();
 
+    console.debug('🔧 Starting semantic batch processing...');
+
     // Properly merge embedding_config to preserve existing structure
     const updatedProfile = { ...currentProfile };
-    console.debug('🔧 Starting semantic batch processing with config:', config);
 
     if (config.embedding_config) {
       updatedProfile.embedding_config = {
@@ -892,7 +893,7 @@ ipcMain.handle('start-semantic-batch-processing', async (event, config: any) => 
 
     const updateResult = await profileManager.updateProfileConfig(currentProfile!.name, updatedProfile);
     if (!updateResult) {
-      console.error('Failed to update profile config');
+      console.error('❌ Failed to update profile config');
       return {
         success: false,
         message: 'Failed to update profile configuration'
@@ -904,6 +905,7 @@ ipcMain.handle('start-semantic-batch-processing', async (event, config: any) => 
       {
         batchSize: config.batch_size || 10,
         onProgress: (processed, total) => {
+          //console.debug(`📊 Progress update: ${processed}/${total}`);
           // Send progress updates to renderer
           mainWindow.webContents.send('semantic-batch-progress', {
             processed,
@@ -911,17 +913,19 @@ ipcMain.handle('start-semantic-batch-processing', async (event, config: any) => 
           });
         },
         onComplete: (result) => {
+          console.debug('📋 Batch processing complete');
           // Send completion updates to renderer
           mainWindow.webContents.send('semantic-batch-complete', result);
         }
       }
     );
+
     return {
       success: result.success,
       message: result.error,
     };
   } catch (error) {
-    console.error('Failed to start semantic search processing:', error);
+    console.error('❌ Failed to start semantic search processing:', error);
     return {
       success: false,
       message: `Processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`

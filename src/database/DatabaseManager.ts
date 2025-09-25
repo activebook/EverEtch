@@ -569,6 +569,8 @@ export class DatabaseManager {
     }
 
     try {
+      console.debug(`🔄 DatabaseManager.setProfileConfig called for profile: ${config.name}`);
+
       const id = 'profile_config';
       const now = new Date().toISOString();
 
@@ -581,7 +583,7 @@ export class DatabaseManager {
       this.db.prepare('INSERT OR REPLACE INTO documents (id, type, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?)').run(id, 'profile_config', JSON.stringify(configDoc), now, now);
       return configDoc;
     } catch (error) {
-      console.error('Error setting profile config:', error);
+      console.error('❌ Error setting profile config:', error);
       throw error;
     }
   }
@@ -600,6 +602,34 @@ export class DatabaseManager {
         this.vectorDb = null; // Reset even on error to ensure clean state
         console.debug('Database close attempted on already closed connection');
       }
+    }
+  }
+
+  /**
+   * Flush all pending changes to disk by checkpointing WAL and committing transactions
+   * This ensures the database file contains the latest data before export
+   */
+  flushToDisk(): void {
+    if (!this.db) {
+      return;
+    }
+
+    try {
+      console.log(`🔄 Flushing database changes to disk...`);
+
+      // Checkpoint WAL to ensure all changes are in main database file
+      const checkpointResult = this.db.pragma('wal_checkpoint(TRUNCATE)');
+      console.log(`📁 WAL checkpoint result:`, checkpointResult);
+
+      // Force sync to disk to ensure all changes are persisted
+      this.db.pragma('synchronous = FULL');
+      this.db.prepare('SELECT 1').get();
+
+      console.log(`✅ Database flushed to disk successfully`);
+
+    } catch (error) {
+      console.error(`❌ Error flushing database to disk:`, error);
+      throw error;
     }
   }
 
@@ -704,32 +734,27 @@ export class DatabaseManager {
     }
 
     try {
-      console.log(`🔄 Starting transaction: Delete word "${wordId}"`);
+      console.debug(`🗑️ Starting transaction: Delete word "${wordId}"`);
 
       // Execute transaction
       const result = this.db.transaction(() => {
-        // Step 1: Delete word document using existing synchronous method
-        console.log(`🔄 Transaction: Deleting word "${wordId}"`);
-
+        // Step 1: Delete word document using existing synchronous method      
         const deleteResult = this.deleteWord(wordId);
         if (!deleteResult) {
           throw new Error(`Word with ID ${wordId} not found`);
         }
 
-        console.log(`✅ Word deleted: ${wordId}`);
-
-        // Step 2: Clean up embedding in vector database if enabled        
-        console.log(`💾 Cleaning up embedding for word: ${wordId}`);
+        // Step 2: Clean up embedding in vector database if enabled
+        console.debug(`🗑️ Cleaning up embedding for word: ${wordId}`);
         // We don't need to check whether embedding exists or not
         // bacause the word can be added without embedding
         // so just delete related word if existed
         this.vectorDb!.deleteEmbedding(wordId);
-        console.log(`✅ Embedding cleaned up for word: ${wordId}`);
 
         return deleteResult;
       })();
 
-      console.log(`🎉 Transaction completed successfully for word deletion: ${wordId}`);
+      console.debug(`🗑️ Transaction completed successfully for word deletion: ${wordId}`);
       return result;
 
     } catch (error) {
@@ -774,32 +799,29 @@ export class DatabaseManager {
     let wordDoc: WordDocument | null = null;
 
     try {
-      console.log(`🔄 Starting transaction: Add word "${wordData.word}" with embedding`);
+      console.debug(`✏️ Starting transaction: Add word "${wordData.word}" with embedding`);
 
       // Execute transaction
       const result = this.db.transaction(() => {
         // Step 1: Use synchronous addWord logic within transaction
-        console.log(`🔄 Transaction: Adding/updating word "${wordData.word}"`);
-
         // Use the synchronous addWord method (handles both create and update)
         wordDoc = this.addWord(wordData);
 
         // Step 2: Store embedding in vector database
         if (wordDoc) {
-          console.log(`💾 Storing embedding for word: ${wordDoc.word}`);
+          console.debug(`✏️ Storing embedding for word: ${wordDoc.word}`);
           this.vectorDb!.storeEmbedding({
             word_id: wordDoc.id,
             embedding: embedding,
             model_used: profile.embedding_config!.model
           });
           wordDoc.embedding = embedding;
-          console.log(`✅ Embedding stored for word: ${wordDoc.word}`);
         }
 
         return wordDoc;
       })();
 
-      console.log(`🎉 Transaction completed successfully for word: ${wordData.word}`);
+      console.debug(`✏️ Transaction completed successfully for word: ${wordData.word}`);
       return result;
 
     } catch (error) {
@@ -844,37 +866,32 @@ export class DatabaseManager {
     let wordDoc: WordDocument | null = null;
 
     try {
-      console.log(`🔄 Starting transaction: Update word "${wordId}"`);
+      console.debug(`🔄 Starting transaction: Update word "${wordId}"`);
 
       // Execute transaction
       const result = this.db.transaction(() => {
         // Step 1: Update word document using existing synchronous method
-        console.log(`🔄 Transaction: Updating word "${wordId}"`);
-
         // Use the synchronous updateWord method
         wordDoc = this.updateWord(wordId, wordData);
         if (!wordDoc) {
           throw new Error(`Word with ID ${wordId} not found`);
         }
 
-        console.log(`✅ Word updated: ${wordId}`);
-
         // Step 2: Update embedding in vector database (always done in transaction)
         if (wordDoc) {
-          console.log(`💾 Updating embedding for word: ${wordDoc.word}`);
+          console.debug(`🔄 Updating embedding for word: ${wordDoc.word}`);
           this.vectorDb!.storeEmbedding({
             word_id: wordId,
             embedding: embedding,
             model_used: profile.embedding_config!.model
           });
           wordDoc.embedding = embedding;
-          console.log(`✅ Embedding updated for word: ${wordDoc.word}`);
         }
 
         return wordDoc;
       })();
 
-      console.log(`🎉 Transaction completed successfully for word: ${wordId}`);
+      console.debug(`🔄 Transaction completed successfully for word: ${wordId}`);
       return result;
 
     } catch (error) {

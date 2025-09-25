@@ -137,9 +137,9 @@ export class ImportExportService {
   }
 
   /**
-   * Export current profile to a file
-   */
-  async exportProfileToLocal(targetPath: string): Promise<ExportResult> {
+    * Export current profile to a file
+    */
+  exportProfileToLocal(targetPath: string): ExportResult {
     try {
       const currentProfile = this.profileManager.getLastOpenedProfile();
       if (!currentProfile) {
@@ -154,9 +154,15 @@ export class ImportExportService {
         throw new Error('Current profile database not found');
       }
 
+      console.debug(`📁 Source path: ${sourcePath}`);
+      console.debug(`📁 Target path: ${targetPath}`);
+
+      // Flush database to disk to ensure all changes are persisted before export
+      console.debug(`🔄 Flushing database to disk before export...`);
+      this.dbManager.flushToDisk();
+
       // Copy the database file
       fs.copyFileSync(sourcePath, targetPath);
-
       return {
         success: true,
         message: `Profile "${currentProfile}" exported successfully to ${targetPath}`,
@@ -164,7 +170,7 @@ export class ImportExportService {
       };
 
     } catch (error) {
-      console.error('Error exporting profile:', error);
+      console.error('❌ Error exporting profile:', error);
       return {
         success: false,
         message: `Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -286,6 +292,10 @@ export class ImportExportService {
       if (!fileInfo) {
         throw new Error('Database file not found');
       }
+
+      // Flush database to disk to ensure all changes are persisted before export
+      console.debug(`🔄 Flushing database to disk before export...`);
+      this.dbManager.flushToDisk();
 
       const fileBuffer = await this.readDatabaseFile(fileInfo.filePath);
       const fileName = this.generateFileName(currentProfile);
