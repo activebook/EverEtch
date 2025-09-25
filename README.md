@@ -39,6 +39,16 @@ Just enter any word and get instant meanings, examples, and related words all po
 - Find words instantly by typing any part of the word
 - Click on tags or related words to discover more
 
+### Smart Semantic Search
+- **Meaning-Based Search**: Find words related by meaning, not just spelling
+- Type any word or concept to discover similar terms
+- Great for expanding vocabulary and finding synonyms
+- Works with your existing word collections
+- Enable in settings to start using this AI-powered feature
+
+![UI Screenshot](screenshots/UI_SEMANTIC.png)
+![UI Screenshot](screenshots/UI_SEMANTIC_SET.png)
+
 ### Importing Words
 - Click the "Import Words" button in the header
 - Select a text file (.txt, .md, or .csv) containing words

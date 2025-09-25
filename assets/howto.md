@@ -52,6 +52,13 @@ gregarious
 - Real-time suggestions appear as you type
 - Click suggestions to view existing words
 
+### Smart Semantic Search
+- **Meaning-based discovery**: Find words by concept, not just spelling
+- Type any word or idea to discover semantically similar terms
+- Great for vocabulary expansion and finding synonyms
+- Enable in **Settings** to activate this AI-powered feature
+- Works with your existing word collections
+
 ### Explore
 - Click **tags** to find related words
 - Use **synonyms/antonyms** to discover new vocabulary
@@ -191,4 +198,4 @@ You are a helpful assistant that explains word meanings clearly for language lea
 
 **Remember**: Small, consistent sessions beat cramming!
 
-*EverEtch v1.4.8*
+*EverEtch v1.5.5*
