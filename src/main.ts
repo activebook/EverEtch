@@ -903,7 +903,7 @@ ipcMain.handle('start-semantic-batch-processing', async (event, config: any) => 
     // Start batch processing
     const result = await semanticBatchService.startBatchProcessing(
       {
-        batchSize: config.batch_size || 10,
+        batchSize: updatedProfile.embedding_config!.batch_size || 10,
         onProgress: (processed, total) => {
           //console.debug(`📊 Progress update: ${processed}/${total}`);
           // Send progress updates to renderer

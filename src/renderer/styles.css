@@ -204,6 +204,14 @@
     width: 0%;
 }
 
+/* Semantic batch action button */
+/* preserve button text formatting */
+#semantic-batch-action-btn {
+  white-space: pre;
+  width: 180px;
+  display: inline-block;
+}
+
 .markdown-details pre code {
     @apply bg-transparent border-none p-0;
 }
