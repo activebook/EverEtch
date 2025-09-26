@@ -17,7 +17,7 @@
     "encrypt-credentials": "node encrypt.ts",
     "dist": "npm run build && electron-builder",
     "dist:win": "npm run build && electron-builder --win",
-    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:mac": "npm run build && electron-builder --mac --x64",
     "dist:linux": "npm run build && electron-builder --linux",
     "dist:all": "npm run build && electron-builder --win --mac --linux"
   },
@@ -53,10 +53,13 @@
     "sqlite3": "^5.1.6",
     "undici": "^7.15.0"
   },
+  "arch": [
+    "x64"
+  ],
   "build": {
     "asar": true,
     "asarUnpack": [
-      "node_modules/sqlite-vec-darwin-x64/**/*"
+      "node_modules/sqlite-vec/**/*"
     ],
     "appId": "com.activebook.everetch",
     "productName": "EverEtch",
@@ -105,8 +108,7 @@
         {
           "target": "nsis",
           "arch": [
-            "x64",
-            "ia32"
+            "x64"
           ]
         }
       ],
