@@ -94,7 +94,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   // Semantic Batch&Search operations
-  startSemanticBatchProcessing: (config: any) => ipcRenderer.invoke('start-semantic-batch-processing', config),
+  startSemanticBatchProcessing: (config: any, updateExisting: boolean) => ipcRenderer.invoke('start-semantic-batch-processing', config, updateExisting),
   cancelSemanticBatchProcessing: () => ipcRenderer.invoke('cancel-semantic-batch-processing'),
   updateSemanticConfig: (config: { id: string; name: string; embedding_config: { 
     provider: string; model: string; endpoint: string; api_key: string; batch_size: number; similarity_threshold: number; }; }) => ipcRenderer.invoke('update-semantic-config', config),

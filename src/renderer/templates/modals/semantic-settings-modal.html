@@ -12,7 +12,7 @@
                 </h3>
             </div>
 
-            <div class="p-4 space-y-4">
+            <div class="px-4 py-2 space-y-2">
                 <!-- Compact Status Indicator -->
                 <div id="semantic-search-status" class="p-2 bg-blue-50/80 rounded-lg border border-blue-200/60">
                     <div class="flex items-center">
@@ -123,8 +123,17 @@
                             <input type="number" id="batch-size" disabled min="1" max="100" value="10"
                                 class="w-full px-2 py-1.5 border border-amber-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-amber-50/80 backdrop-blur-sm text-slate-700 text-sm">
                             <div class="mt-1 text-xs text-slate-500">Higher = faster processing, may hit API rate limits</div>
-                        </div>
 
+                            <div class="py-2">
+                                <label class="flex items-center space-x-2 cursor-pointer">
+                                    <input type="checkbox" id="update-existing-semantic-embeddings"
+                                        class="w-3 h-3 text-amber-600 bg-amber-50 border-amber-200 rounded focus:ring-orange-500 focus:ring-2">
+                                    <span class="text-xs font-medium text-amber-700">Update</span>
+                                </label>
+                                <div class="mt-1 text-xs text-slate-500 italic">* Update existing embeddings</div>
+                            </div>
+                        </div>
+                        
                         <div>
                             <label for="similarity-threshold" class="block text-xs font-medium text-slate-700 mb-1">Similarity Threshold</label>
                             <input type="range" id="similarity-threshold" disabled min="0" max="1" step="0.05" value="0.5"
@@ -152,12 +161,15 @@
                     class="px-3 py-1.5 bg-slate-500 hover:bg-slate-600 text-white rounded-lg transition-all duration-200 hover:shadow-lg font-medium text-sm">
                     Cancel
                 </button>
-                <div class="flex space-x-2">
+                <div class="flex space-x-2">                    
+                    <!--
                     <button id="semantic-batch-stop-btn"
                         class="hidden px-4 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all duration-200 hover:shadow-lg font-medium text-sm">
                         Stop
                     </button>
-                    <button id="semantic-batch-start-btn"
+                    -->
+                    <!-- Only Keep Start Button -->
+                    <button id="semantic-batch-action-btn"
                         class="px-4 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all duration-200 hover:shadow-lg font-medium text-sm">
                         Start Semantic Search
                     </button>

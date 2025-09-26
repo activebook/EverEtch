@@ -241,42 +241,58 @@ export class VectorDatabaseManager {
   }
 
   /**
-   * Batch store multiple word embeddings efficiently
-   */
-  batchStoreEmbeddings(embeddings: Array<SemanticEmbedding>): void {
-    if (!this.db || !this.isConnectionValid()) {
-      throw new Error('Database not initialized or connection closed');
-    }
+    * Batch store multiple word embeddings efficiently
+    */
+   batchStoreEmbeddings(embeddings: Array<SemanticEmbedding>): void {
+     if (!this.db || !this.isConnectionValid()) {
+       throw new Error('Database not initialized or connection closed');
+     }
 
-    if (embeddings.length === 0) {
-      console.log('ℹ️ No embeddings to store in batch');
-      return; // Nothing to do
-    }
+     if (embeddings.length === 0) {
+       console.log('ℹ️ No embeddings to store in batch');
+       return; // Nothing to do
+     }
 
-    try {
-      console.log(`💾 Starting batch store of ${embeddings.length} embeddings`);
-      console.log(`📋 Word IDs: ${embeddings.map(e => e.word_id).join(', ')}`);
+     try {
+       console.log(`💾 Starting batch store of ${embeddings.length} embeddings`);
+       console.log(`📋 Word IDs: ${embeddings.map(e => e.word_id).join(', ')}`);
 
-      // Use a transaction for better performance and atomicity
-      const transaction = this.db.transaction((embeddings: SemanticEmbedding[]) => {
-        const embeddingStmt = this.db!.prepare(`
-          INSERT OR REPLACE INTO word_embeddings (word_id, embedding, model_used)
-          VALUES (?, ?, ?)
-        `);
+       // Use a transaction for better performance and atomicity
+       const transaction = this.db.transaction((embeddings: SemanticEmbedding[]) => {
+         // Prepare statements for DELETE and INSERT
+         /*
+          More efficient: Only does 1 operation when record doesn't exist, 2 operations when it does exist
+          No redundant work: Unlike INSERT OR IGNORE + UPDATE which always does 2 operations
+          Cleaner logic: DELETE does nothing if no record exists, INSERT always adds/updates
+          Works with virtual tables: Compatible with sqlite-vec's virtual table constraints
+         */
+         const deleteStmt = this.db!.prepare(`
+           DELETE FROM word_embeddings WHERE word_id = ? AND model_used = ?
+         `);
 
-        for (const { word_id, embedding, model_used } of embeddings) {
-          embeddingStmt.run(word_id, JSON.stringify(embedding), model_used);
-          console.debug(`✅ Embedding stored for word ${word_id} using model ${model_used}`);
-        }
-      });
+         const insertStmt = this.db!.prepare(`
+           INSERT INTO word_embeddings (word_id, embedding, model_used)
+           VALUES (?, ?, ?)
+         `);
 
-      transaction(embeddings);
-      console.log(`✅ Successfully stored ${embeddings.length} embeddings in batch`);
-    } catch (error) {
-      console.error('❌ Error batch storing embeddings:', error);
-      throw error;
-    }
-  }
+         for (const { word_id, embedding, model_used } of embeddings) {
+           // Delete existing record (if any)
+           deleteStmt.run(word_id, model_used);
+
+           // Insert new record
+           insertStmt.run(word_id, JSON.stringify(embedding), model_used);
+
+           console.debug(`✅ Embedding stored for word ${word_id} using model ${model_used}`);
+         }
+       });
+
+       transaction(embeddings);
+       console.log(`✅ Successfully stored ${embeddings.length} embeddings in batch`);
+     } catch (error) {
+       console.error('❌ Error batch storing embeddings:', error);
+       throw error;
+     }
+   }
 
   /**
    * Get embedding for a word by model

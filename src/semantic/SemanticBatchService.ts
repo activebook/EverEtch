@@ -5,6 +5,7 @@ import { EmbeddingModelClient, EmbeddingResult } from '../ai/EmbeddingModelClien
 
 export interface BatchProcessingOptions {
   batchSize?: number;
+  updateExisting?: boolean;
   onProgress?: (processed: number, total: number, currentBatch: number, totalBatches: number) => void;
   onComplete?: (results: BatchProcessingResult) => void;
   signal?: AbortSignal;
@@ -79,7 +80,7 @@ export class SemanticBatchService {
 
       // Check if word needs processing (more efficient than getEmbedding)
       const exists = this.dbManager.embeddingExists(wordData.id, profile.embedding_config!.model);
-      if (exists) {
+      if (exists && !options.updateExisting) {
         console.log(`⏭️ Skipping word ${wordData.id} - embedding already exists`);
         result.processed++;
         continue; // Skip this word
