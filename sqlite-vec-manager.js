@@ -233,4 +233,12 @@ FROM word_embeddings;
 *The key insight: sqlite-vec stores embeddings in optimized binary format,
 not JSON strings. Use vec_to_json() to convert them to readable format!
 
+-- Export to a file for analysis
+.output embeddings_dump.txt -- output to file
+
+SELECT word_id, model_used, vec_to_json(embedding) as json_embedding FROM word_embeddings LIMIT 10;
+
+.output stdout -- redirect back to stdout
+
+
 */
