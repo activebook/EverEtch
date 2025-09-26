@@ -385,17 +385,18 @@ export class SemanticSettingsModalHandler extends ModalHandler {
   /**
    * Get configuration from form
    */
-  private getConfigurationFromForm(): any {
+  private getConfigurationFromForm(): {embedding_config:any, updateExisting:boolean} {
     const providerSelect = document.getElementById('embedding-provider') as HTMLSelectElement;
     const modelInput = document.getElementById('embedding-model') as HTMLInputElement;
     const endpointInput = document.getElementById('embedding-endpoint') as HTMLInputElement;
     const apiKeyInput = document.getElementById('embedding-api-key') as HTMLInputElement;
     const batchSizeInput = document.getElementById('batch-size') as HTMLInputElement;
     const thresholdSlider = document.getElementById('similarity-threshold') as HTMLInputElement;
+    const updateExistingCheckbox = document.getElementById('update-existing-semantic-embeddings') as HTMLInputElement;
 
     if (!providerSelect || !modelInput || !endpointInput || !apiKeyInput || !batchSizeInput || !thresholdSlider) {
       this.showError('Form elements not found');
-      return null;
+      return {embedding_config:null, updateExisting:false};
     }
 
     return {
@@ -406,8 +407,8 @@ export class SemanticSettingsModalHandler extends ModalHandler {
         api_key: apiKeyInput.value.trim(),
         batch_size: parseInt(batchSizeInput.value) || 10,
         similarity_threshold: parseFloat(thresholdSlider.value) || 0.5
-      }
-    };
+      }, updateExisting: updateExistingCheckbox.checked
+    } ;
   }
 
   /**
@@ -656,8 +657,8 @@ export class SemanticSettingsModalHandler extends ModalHandler {
       }
 
       // Get configuration from form
-      const config = this.getConfigurationFromForm();
-      if (!config) {
+      const {embedding_config, updateExisting} = this.getConfigurationFromForm();
+      if (!embedding_config) {
         return;
       }
 
@@ -673,7 +674,7 @@ export class SemanticSettingsModalHandler extends ModalHandler {
         ...currentProfile,
         embedding_config: {
           ...currentProfile.embedding_config,
-          ...config.embedding_config,
+          ...embedding_config,
           enabled: true
         }
       };
@@ -687,7 +688,7 @@ export class SemanticSettingsModalHandler extends ModalHandler {
       this.showProgressSection();
 
       // do nothing because handle complete func will deal with it
-      await window.electronAPI.startSemanticBatchProcessing(updatedProfile);
+      await window.electronAPI.startSemanticBatchProcessing(updatedProfile, updateExisting);
 
     } catch (error) {
       console.error('Error starting semantic search:', error);

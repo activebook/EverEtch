@@ -201,5 +201,8 @@ node sqlite-vec-manager.js ./your-database.db allinfo
 # Show statistics
 node sqlite-vec-manager.js ./your-database.db stats
 
+# Install sqlite-vec
+sqlite3 ./your-database.db
+.load /Users/mac/Github/EverEtch/node_modules/sqlite-vec-darwin-x64/vec0.dylib
 
 */

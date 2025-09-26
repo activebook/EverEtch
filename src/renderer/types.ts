@@ -310,7 +310,7 @@ declare global {
             onProtocolSwitchProfile: (callback: (profileName: string) => void) => void;
 
             // Semantic Search operations
-            startSemanticBatchProcessing: (config: any) => Promise<{ success: boolean; message: string; }>;
+            startSemanticBatchProcessing: (config: any, updateExisting: boolean) => Promise<{ success: boolean; message: string; }>;
             cancelSemanticBatchProcessing: () => Promise<{ success: boolean; message: string; }>;
             updateSemanticConfig: (config: { id: string; name: string; embedding_config: {
               provider: string; model: string; endpoint: string; api_key: string; batch_size: number; similarity_threshold: number; }; }) => Promise<{ success: boolean; message: string; }>;

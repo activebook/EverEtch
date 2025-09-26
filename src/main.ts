@@ -873,7 +873,7 @@ ipcMain.handle('mark-model-used', async (event, name: string) => {
 
 // Semantic Search IPC handlers
 
-ipcMain.handle('start-semantic-batch-processing', async (event, config: any) => {
+ipcMain.handle('start-semantic-batch-processing', async (event, config: any, updateExisting: boolean) => {
   try {
     // Update profile with embedding configuration
     const currentProfile = await profileManager.getCurrentProfile();
@@ -904,6 +904,7 @@ ipcMain.handle('start-semantic-batch-processing', async (event, config: any) => 
     const result = await semanticBatchService.startBatchProcessing(
       {
         batchSize: updatedProfile.embedding_config!.batch_size || 10,
+        updateExisting: updateExisting, // Pass the flag as separate parameter
         onProgress: (processed, total) => {
           //console.debug(`📊 Progress update: ${processed}/${total}`);
           // Send progress updates to renderer
