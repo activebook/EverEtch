@@ -419,6 +419,285 @@ ORDER BY distance ASC
 LIMIT ?
 ```
 
+### Semantic Dimensions Operations
+
+**Vector Similarity Calculations:**
+```typescript
+class EmbeddingVector {
+  /**
+   * Calculate cosine similarity between two embeddings
+   * Used for semantic search and similarity comparison
+   */
+  static cosineSimilarity(a: number[], b: number[]): number {
+    if (a.length !== b.length) {
+      throw new Error('Embeddings must have the same dimensions');
+    }
+
+    let dotProduct = 0;
+    let normA = 0;
+    let normB = 0;
+
+    for (let i = 0; i < a.length; i++) {
+      dotProduct += a[i] * b[i];
+      normA += a[i] * a[i];
+      normB += b[i] * b[i];
+    }
+
+    if (normA === 0 || normB === 0) return 0;
+    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+  }
+
+  /**
+   * Calculate Euclidean distance between two embeddings
+   * Alternative distance metric for similarity comparison
+   */
+  static euclideanDistance(a: number[], b: number[]): number {
+    if (a.length !== b.length) {
+      throw new Error('Embeddings must have the same dimensions');
+    }
+
+    let sum = 0;
+    for (let i = 0; i < a.length; i++) {
+      const diff = a[i] - b[i];
+      sum += diff * diff;
+    }
+
+    return Math.sqrt(sum);
+  }
+}
+```
+
+**Vector Normalization and Standardization:**
+```typescript
+class EmbeddingVector {
+  /**
+   * Normalize embedding vector to unit length
+   * Essential for accurate cosine similarity calculations
+   */
+  static normalizeEmbedding(embedding: number[]): number[] {
+    const magnitude = Math.sqrt(embedding.reduce((sum, val) => sum + val * val, 0));
+
+    if (magnitude === 0) return embedding;
+    return embedding.map(val => val / magnitude);
+  }
+
+  /**
+   * Fast normalization with loop unrolling for performance
+   * Optimized for large 2048-dimensional vectors
+   */
+  static normalizeEmbeddingFast(embedding: number[]): number[] {
+    const n = embedding.length;
+    if (n === 0) return embedding;
+
+    // Calculate sum of squares with 8x unrolling for performance
+    let sum = 0;
+    let i = 0;
+    const unroll = 8;
+    const limit = n - (n % unroll);
+
+    for (; i < limit; i += unroll) {
+      const a0 = embedding[i]; const a1 = embedding[i + 1];
+      const a2 = embedding[i + 2]; const a3 = embedding[i + 3];
+      const a4 = embedding[i + 4]; const a5 = embedding[i + 5];
+      const a6 = embedding[i + 6]; const a7 = embedding[i + 7];
+      sum += a0 * a0 + a1 * a1 + a2 * a2 + a3 * a3 +
+             a4 * a4 + a5 * a5 + a6 * a6 + a7 * a7;
+    }
+    for (; i < n; i++) {
+      const v = embedding[i];
+      sum += v * v;
+    }
+
+    if (sum === 0) return embedding;
+    const inv = 1 / Math.sqrt(sum);
+
+    // Normalize in-place with unrolling
+    i = 0;
+    for (; i < limit; i += unroll) {
+      embedding[i] *= inv; embedding[i + 1] *= inv;
+      embedding[i + 2] *= inv; embedding[i + 3] *= inv;
+      embedding[i + 4] *= inv; embedding[i + 5] *= inv;
+      embedding[i + 6] *= inv; embedding[i + 7] *= inv;
+    }
+    for (; i < n; i++) embedding[i] *= inv;
+
+    return embedding;
+  }
+}
+```
+
+**Dimension Manipulation Operations:**
+```typescript
+class EmbeddingVector {
+  /**
+   * Pad embedding to target dimensions with zeros
+   * Used when embedding models have different output dimensions
+   */
+  static padTo(embedding: number[], targetDim: number): number[] {
+    const current = embedding.length;
+    if (current >= targetDim) return embedding;
+
+    const out = new Array(targetDim);
+    // Copy existing values
+    for (let i = 0; i < current; i++) out[i] = embedding[i];
+    // Zero-fill tail
+    for (let i = current; i < targetDim; i++) out[i] = 0;
+    return out;
+  }
+
+  /**
+   * Area-preserving downsampling to target dimensions
+   * Maintains semantic information when reducing dimensions
+   */
+  static downsampleOverlap(embedding: number[], targetDim: number): number[] {
+    const srcN = embedding.length;
+    if (srcN <= targetDim) return EmbeddingVector.padTo(embedding, targetDim);
+
+    const ratio = srcN / targetDim;
+    const out = new Array(targetDim).fill(0);
+
+    let srcIdx = 0;
+    let srcRemain = 1;
+    for (let t = 0; t < targetDim; t++) {
+      let remain = ratio;
+      let acc = 0;
+
+      while (remain > 0) {
+        const take = Math.min(srcRemain, remain);
+        acc += embedding[srcIdx] * take;
+        remain -= take;
+        srcRemain -= take;
+
+        if (srcRemain === 0) {
+          srcIdx++;
+          srcRemain = 1;
+        }
+      }
+
+      out[t] = acc / ratio;
+    }
+
+    return out;
+  }
+
+  /**
+   * Normalize embedding to exactly 2048 dimensions
+   * Standardizes all embeddings to consistent dimensionality
+   */
+  static normalizeTo2048(embedding: number[]): number[] {
+    const currentDim = embedding.length;
+    if (currentDim === 2048) return embedding;
+    if (currentDim < 2048) return EmbeddingVector.padTo(embedding, 2048);
+
+    return EmbeddingVector.downsampleOverlap(embedding, 2048);
+  }
+}
+```
+
+**Semantic Search Operations:**
+```typescript
+class VectorDatabaseManager {
+  /**
+   * Perform semantic search using vector similarity
+   * Uses sqlite-vec's optimized cosine distance calculation
+   */
+  semanticSearch(queryEmbedding: number[], limit: number = 50, threshold: number = 0.5): SemanticWordItem[] {
+    const sqlQuery = `
+      SELECT
+        we.word_id,
+        d.data,
+        vec_distance_cosine(we.embedding, ?) AS distance
+      FROM word_embeddings we
+      JOIN documents d ON we.word_id = d.id
+      WHERE d.type = 'word'
+      AND vec_distance_cosine(we.embedding, ?) <= ?
+      ORDER BY distance ASC
+      LIMIT ?
+    `;
+
+    const rows = this.db.prepare(sqlQuery).all(
+      JSON.stringify(queryEmbedding),
+      JSON.stringify(queryEmbedding),
+      (1 - threshold),
+      limit
+    ) as any[];
+
+    return rows.map((row: any) => ({
+      word_item: {
+        id: row.word_id,
+        word: JSON.parse(row.data).word,
+        one_line_desc: JSON.parse(row.data).one_line_desc || '',
+        remark: JSON.parse(row.data).remark
+      },
+      similarity: 1.0 - row.distance  // Convert distance to similarity
+    }));
+  }
+}
+```
+
+**Batch Processing Operations:**
+```typescript
+class SemanticBatchService {
+  /**
+   * Process embeddings in configurable batches for optimal performance
+   */
+  async startBatchProcessing(options: BatchProcessingOptions = {}): Promise<BatchProcessingResult> {
+    const finalOptions: BatchProcessingOptions = {
+      batchSize: 10,  // Process 10 words at a time
+      ...options,
+      signal: this.abortController.signal
+    };
+
+    // Process words in batches with progress tracking
+    const batchSize = finalOptions.batchSize || 10;
+    const totalBatches = Math.ceil(totalWords / batchSize);
+
+    for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+      const startIndex = batchIndex * batchSize;
+      const batch = this.dbManager.getWordDocumentsPaginated(startIndex, batchSize);
+
+      // Generate embeddings for batch
+      const batchResult = await this.processBatch(batch.words, currentProfile, finalOptions);
+
+      // Report progress
+      if (finalOptions.onProgress) {
+        finalOptions.onProgress(totalProcessed, totalWords, batchIndex + 1, totalBatches);
+      }
+    }
+  }
+}
+```
+
+**Multi-Model Dimension Support:**
+```typescript
+class EmbeddingModelClient {
+  /**
+   * Support for different embedding models with varying dimensions
+   */
+  private async generateOpenAIEmbedding(text: string | string[], profile: ProfileConfig) {
+    const response = await openai.embeddings.create({
+      model: profile.embedding_config!.model,
+      input: text,
+      encoding_format: 'float',
+      dimensions: MAX_EMBEDDING_DIMENSIONS,  // 2048 dimensions
+    });
+
+    // Normalize to consistent 2048 dimensions
+    if (Array.isArray(text)) {
+      const embeddings = response.data.map(item => item.embedding);
+      const dimedEmbeddings = embeddings.map(item => EmbeddingVector.normalizeTo2048(item));
+      const normalizedEmbeddings = dimedEmbeddings.map(emb => EmbeddingVector.normalizeEmbeddingFast(emb));
+      return { embeddings: normalizedEmbeddings, model_used: profile.embedding_config!.model, tokens_used };
+    } else {
+      const embedding = response.data[0].embedding;
+      const dimedEmbedding = EmbeddingVector.normalizeTo2048(embedding);
+      const normalizedEmbedding = EmbeddingVector.normalizeEmbeddingFast(dimedEmbedding);
+      return { embedding: normalizedEmbedding, model_used: profile.embedding_config!.model, tokens_used };
+    }
+  }
+}
+```
+
 ## Google Drive Integration
 
 ### OAuth2 Authentication Flow
