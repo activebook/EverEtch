@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import { GoogleGenAI } from '@google/genai';
 import { ProfileConfig } from '../database/DatabaseManager.js';
 import { WordDocument } from '../database/DatabaseManager.js';
+import { EmbeddingVector } from '../utils/EmbeddingVector.js';
 
 export interface EmbeddingResult {
   embedding: number[];
@@ -14,6 +15,8 @@ export interface BatchEmbeddingResult {
   model_used: string;
   tokens_used: number;
 }
+
+const MAX_EMBEDDING_DIMENSIONS = 2048;
 
 /**
  * Client for generating text embeddings using various AI models
@@ -70,7 +73,7 @@ export class EmbeddingModelClient {
         model: profile.embedding_config!.model,
         input: text,
         encoding_format: 'float',
-        dimensions: 2048,
+        dimensions: MAX_EMBEDDING_DIMENSIONS,
       });
 
       const tokens_used = response.usage?.total_tokens || 0;
@@ -78,8 +81,10 @@ export class EmbeddingModelClient {
       // Handle both single and batch inputs
       if (Array.isArray(text)) {
         const embeddings = response.data.map(item => item.embedding);
+        // Normalize embeddings to ensure consistent dimensionality
+        const dimedEmbeddings = embeddings.map(item => EmbeddingVector.normalizeTo2048(item));
         // Normalize embeddings for accurate cosine similarity
-        const normalizedEmbeddings = embeddings.map(emb => EmbeddingModelClient.normalizeEmbeddingFast(emb));
+        const normalizedEmbeddings = dimedEmbeddings.map(emb => EmbeddingVector.normalizeEmbeddingFast(emb));
         return {
           embeddings: normalizedEmbeddings,
           model_used: profile.embedding_config!.model,
@@ -87,8 +92,10 @@ export class EmbeddingModelClient {
         };
       } else {
         const embedding = response.data[0].embedding;
+        // Normalize embeddings to ensure consistent dimensionality
+        const dimedEmbedding = EmbeddingVector.normalizeTo2048(embedding);
         // Normalize embedding for accurate cosine similarity
-        const normalizedEmbedding = EmbeddingModelClient.normalizeEmbeddingFast(embedding);
+        const normalizedEmbedding = EmbeddingVector.normalizeEmbeddingFast(dimedEmbedding);
         return {
           embedding: normalizedEmbedding,
           model_used: profile.embedding_config!.model,
@@ -121,7 +128,7 @@ export class EmbeddingModelClient {
     try {
       const config = {
         taskType: 'SEMANTIC_SIMILARITY',
-        outputDimensionality: 2048,
+        outputDimensionality: MAX_EMBEDDING_DIMENSIONS,
       };
 
       // Handle both single text and array of texts
@@ -141,10 +148,12 @@ export class EmbeddingModelClient {
       );
 
       // Handle both single and batch inputs
-      if (Array.isArray(text)) {
+      if (Array.isArray(text)) {        
         const embeddings = response.embeddings.map(item => item.values!);
+        // Normalize embeddings to ensure consistent dimensionality
+        const dimedEmbeddings = embeddings.map(item => EmbeddingVector.normalizeTo2048(item));
         // Normalize embeddings for accurate cosine similarity
-        const normalizedEmbeddings = embeddings.map(emb => EmbeddingModelClient.normalizeEmbeddingFast(emb));
+        const normalizedEmbeddings = dimedEmbeddings.map(emb => EmbeddingVector.normalizeEmbeddingFast(emb));
         return {
           embeddings: normalizedEmbeddings,
           model_used: profile.embedding_config!.model,
@@ -155,8 +164,10 @@ export class EmbeddingModelClient {
         if (!embedding) {
           throw new Error('Embedding values are undefined');
         }
+        // Normalize embeddings to ensure consistent dimensionality
+        const dimedEmbedding = EmbeddingVector.normalizeTo2048(embedding);
         // Normalize embedding for accurate cosine similarity
-        const normalizedEmbedding = EmbeddingModelClient.normalizeEmbeddingFast(embedding);
+        const normalizedEmbedding = EmbeddingVector.normalizeEmbeddingFast(dimedEmbedding);
         return {
           embedding: normalizedEmbedding,
           model_used: profile.embedding_config!.model,
@@ -263,150 +274,5 @@ export class EmbeddingModelClient {
     }
 
     return textParts.join('\n ');
-  }
-
-  /**
-   * Calculate cosine similarity between two embeddings
-   */
-  static cosineSimilarity(a: number[], b: number[]): number {
-    if (a.length !== b.length) {
-      throw new Error('Embeddings must have the same dimensions');
-    }
-
-    let dotProduct = 0;
-    let normA = 0;
-    let normB = 0;
-
-    for (let i = 0; i < a.length; i++) {
-      dotProduct += a[i] * b[i];
-      normA += a[i] * a[i];
-      normB += b[i] * b[i];
-    }
-
-    if (normA === 0 || normB === 0) {
-      return 0;
-    }
-
-    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
-  }
-
-  /**
-   * Calculate Euclidean distance between two embeddings
-   */
-  static euclideanDistance(a: number[], b: number[]): number {
-    if (a.length !== b.length) {
-      throw new Error('Embeddings must have the same dimensions');
-    }
-
-    let sum = 0;
-    for (let i = 0; i < a.length; i++) {
-      const diff = a[i] - b[i];
-      sum += diff * diff;
-    }
-
-    return Math.sqrt(sum);
-  }
-
-  /**
-   * Normalize an embedding vector to unit length
-   */
-  static normalizeEmbedding(embedding: number[]): number[] {
-    const magnitude = Math.sqrt(embedding.reduce((sum, val) => sum + val * val, 0));
-
-    if (magnitude === 0) {
-      return embedding;
-    }
-
-    return embedding.map(val => val / magnitude);
-  }
-
-  /**
-   * Normalize an embedding vector to unit length (Fast version)
-   * Always use this method for large embeddings
-   * @param embedding 
-   */
-  static normalizeEmbeddingFast(embedding: number[]): number[] {
-    const n = embedding.length;
-    if (n === 0) return embedding;
-
-    // accumulate sum of squares with 8x unrolling
-    let sum = 0;
-    let i = 0;
-    const unroll = 8;
-    const limit = n - (n % unroll);
-
-    for (; i < limit; i += unroll) {
-      const a0 = embedding[i]; const a1 = embedding[i + 1];
-      const a2 = embedding[i + 2]; const a3 = embedding[i + 3];
-      const a4 = embedding[i + 4]; const a5 = embedding[i + 5];
-      const a6 = embedding[i + 6]; const a7 = embedding[i + 7];
-      sum += a0 * a0 + a1 * a1 + a2 * a2 + a3 * a3 + a4 * a4 + a5 * a5 + a6 * a6 + a7 * a7;
-    }
-    for (; i < n; i++) {
-      const v = embedding[i];
-      sum += v * v;
-    }
-
-    if (sum === 0) return embedding;
-    const inv = 1 / Math.sqrt(sum);
-
-    // normalize in-place, unrolled
-    i = 0;
-    for (; i < limit; i += unroll) {
-      embedding[i] *= inv;
-      embedding[i + 1] *= inv;
-      embedding[i + 2] *= inv;
-      embedding[i + 3] *= inv;
-      embedding[i + 4] *= inv;
-      embedding[i + 5] *= inv;
-      embedding[i + 6] *= inv;
-      embedding[i + 7] *= inv;
-    }
-    for (; i < n; i++) embedding[i] *= inv;
-
-    return embedding;
-  }
-
-
-  /**
-   * Normalize an embedding vector to unit length (Optimized version)
-   * More efficient for 2048-dimensional vectors with manual loops
-   */
-  static normalizeEmbeddingOptimized(embedding: number[]): number[] {
-    // Use more efficient magnitude calculation
-    let sumOfSquares = 0;
-    for (let i = 0; i < embedding.length; i++) {
-      sumOfSquares += embedding[i] * embedding[i];
-    }
-
-    const magnitude = Math.sqrt(sumOfSquares);
-
-    if (magnitude === 0) {
-      return embedding;
-    }
-
-    // Pre-create result array for better performance
-    const normalized: number[] = new Array(embedding.length);
-    for (let i = 0; i < embedding.length; i++) {
-      normalized[i] = embedding[i] / magnitude;
-    }
-
-    return normalized;
-  }
-
-  /**
-   * Get embedding dimensions for different models
-   */
-  static getEmbeddingDimensions(modelName: string): number {
-    const dimensions: Record<string, number> = {
-      // OpenAI models
-      'text-embedding-ada-002': 1536,
-      'text-embedding-3-small': 1536,
-      'text-embedding-3-large': 3072,
-      // Google models
-      'gemini-embedding-001': 768,
-    };
-
-    return dimensions[modelName] || 768; // Default to Google dimensions
   }
 }

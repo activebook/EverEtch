@@ -205,4 +205,32 @@ node sqlite-vec-manager.js ./your-database.db stats
 sqlite3 ./your-database.db
 .load /Users/mac/Github/EverEtch/node_modules/sqlite-vec-darwin-x64/vec0.dylib
 
+-- Check vector properties using sqlite-vec functions
+SELECT 
+  word_id,
+  model_used,
+  vec_length(embedding) as vector_dimensions
+FROM word_embeddings 
+LIMIT 5;
+
+-- See the actual float values (sqlite-vec format)
+SELECT 
+  word_id,
+  model_used,
+  vec_to_json(embedding) as json_embedding  -- Convert to JSON for viewing
+FROM word_embeddings 
+ORDER BY word_id
+LIMIT 1;
+
+-- Get vector statistics
+SELECT 
+  COUNT(*) as total_vectors,
+  AVG(vec_length(embedding)) as avg_dimensions,
+  MIN(vec_length(embedding)) as min_dimensions,
+  MAX(vec_length(embedding)) as max_dimensions
+FROM word_embeddings;
+
+*The key insight: sqlite-vec stores embeddings in optimized binary format,
+not JSON strings. Use vec_to_json() to convert them to readable format!
+
 */
