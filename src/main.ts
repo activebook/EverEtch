@@ -57,6 +57,8 @@ Utils.setDebugMode(false);
 Utils.clearDebugLog();
 Utils.logToFile('EverEtch app starting up');
 
+// set a user-visible name so userData/Application Support uses the capitalized form in dev
+app.setName('EverEtch');
 
 async function createWindow() {
   try {

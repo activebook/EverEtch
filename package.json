@@ -1,6 +1,6 @@
 {
   "name": "everetch",
-  "version": "1.5.7",
+  "version": "1.5.8",
   "type": "module",
   "description": "A slim word memo application",
   "main": "lib/main.js",

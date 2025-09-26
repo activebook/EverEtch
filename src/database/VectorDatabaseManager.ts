@@ -108,18 +108,35 @@ export class VectorDatabaseManager {
       return this.cachedDylibPath;
     }
 
+    // Determine platform-specific package name
+    let platformPackage = '';
+    switch (process.platform) {
+      case 'darwin': // macOS
+        platformPackage = process.arch === 'arm64' ? 'sqlite-vec-darwin-arm64' : 'sqlite-vec-darwin-x64';
+        break;
+      case 'linux': // Linux
+        platformPackage = process.arch === 'arm64' ? 'sqlite-vec-linux-arm64' : 'sqlite-vec-linux-x64';
+        break;
+      case 'win32': // Windows
+        platformPackage = 'sqlite-vec-windows-x64'; // Currently only x64 supported
+        break;
+      default:
+        console.log(`⚠️ Unsupported platform: ${process.platform}`);
+        return null;
+    }
+
     const appPath = app.getAppPath();
     const possiblePaths: string[] = [];
 
     // 1. Resources directory (asarUnpack location) - primary location for dylib files
     if (appPath.includes('.asar')) {
       const resourcesPath = path.dirname(appPath);
-      possiblePaths.push(path.join(resourcesPath, 'app.asar.unpacked', 'node_modules', 'sqlite-vec-darwin-x64', filename));
+      possiblePaths.push(path.join(resourcesPath, 'app.asar.unpacked', 'node_modules', platformPackage, filename));
     }
 
     // 2. Direct app directory (development fallback)
     if (!appPath.includes('.asar')) {
-      possiblePaths.push(path.join(appPath, 'node_modules', 'sqlite-vec-darwin-x64', filename));
+      possiblePaths.push(path.join(appPath, 'node_modules', platformPackage, filename));
     }
 
     // Note: Skip ASAR location entirely for dylib files since they cannot be loaded from ASAR
