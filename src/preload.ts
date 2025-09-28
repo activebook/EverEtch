@@ -121,4 +121,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
       duration: number;
     }) => callback(result));
   },
+
+  // Update operations
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  downloadUpdate: () => ipcRenderer.invoke('download-update'),
+  installUpdate: () => ipcRenderer.invoke('install-update'),
+  isUpdateAvailable: () => ipcRenderer.invoke('is-update-available'),
+  getUpdateConfig: () => ipcRenderer.invoke('get-update-config'),
+  updateConfig: (config: any) => ipcRenderer.invoke('update-config', config),
+
+  // Update event listeners
+  on: (event: string, callback: (...args: any[]) => void) => {
+    ipcRenderer.on(event, (_event: Electron.IpcRendererEvent, ...args: any[]) => callback(...args));
+  },
 });

@@ -4,6 +4,7 @@
   "type": "module",
   "description": "A slim word memo application",
   "main": "lib/main.js",
+  "atom-updater": "v1.0.1",
   "scripts": {
     "start": "electron .",
     "dev": "npm run build && electron .",
@@ -61,6 +62,12 @@
     "asarUnpack": [
       "node_modules/sqlite-vec/**/*"
     ],
+    "extraResources": [
+      {
+        "from": "assets",
+        "to": "assets"
+      }
+    ],
     "appId": "com.activebook.everetch",
     "productName": "EverEtch",
     "directories": {
@@ -73,12 +80,6 @@
       "node_modules/**/*",
       "package.json",
       "credentials.enc"
-    ],
-    "extraResources": [
-      {
-        "from": "assets",
-        "to": "assets"
-      }
     ],
     "mac": {
       "category": "public.app-category.productivity",

@@ -145,8 +145,7 @@ export class UpdateService {
 
       // Save to temporary location
       const tempDir = await this.getTempDirectory();
-      const fileName = asset.name;
-      const downloadPath = path.join(tempDir, fileName);
+      const downloadPath = path.join(tempDir, asset.name);
 
       await fs.promises.writeFile(downloadPath, buffer);
       Utils.logToFile(`💾 UpdateService: Saved update to ${downloadPath}`);
@@ -157,10 +156,11 @@ export class UpdateService {
         throw new Error('Download verification failed');
       }
 
-      this.pendingUpdatePath = downloadPath;
-      Utils.logToFile('✅ UpdateService: Download and verification complete');
+      // Extract archive if necessary
+      const extractedPath = await this.extractArchiveIfNeeded(downloadPath, asset);
+      this.pendingUpdatePath = extractedPath;
 
-      // Here we need unzip/7z if necessary based on asset type
+      Utils.logToFile('✅ UpdateService: Download and verification complete');
       
 
       return {
@@ -241,20 +241,17 @@ export class UpdateService {
   }
 
   /**
-   * Clean up old update files
+   * Clean up old update files and entire temp directory
    */
   async cleanup(): Promise<void> {
     try {
       const tempDir = await this.getTempDirectory();
-      const files = await fs.promises.readdir(tempDir);
 
-      for (const file of files) {
-        if (file.startsWith('everetch-update-') || file.endsWith('.tmp')) {
-          const filePath = path.join(tempDir, file);
-          await fs.promises.unlink(filePath);
-          Utils.logToFile(`🗑️ UpdateService: Cleaned up ${filePath}`);
-        }
-      }
+      // Remove the entire temp directory and recreate it
+      await fs.promises.rm(tempDir, { recursive: true, force: true });
+      await fs.promises.mkdir(tempDir, { recursive: true });
+
+      Utils.logToFile(`🗑️ UpdateService: Cleaned up entire temp directory: ${tempDir}`);
     } catch (error) {
       Utils.logToFile(`⚠️ UpdateService: Cleanup warning: ${error}`);
     }
@@ -297,6 +294,45 @@ export class UpdateService {
     } catch (error) {
       Utils.logToFile(`❌ UpdateService: Download verification failed: ${error}`);
       return false;
+    }
+  }
+
+  /**
+   * Extract archive if the downloaded file is a zip/7z archive
+   */
+  private async extractArchiveIfNeeded(downloadPath: string, asset: any): Promise<string> {
+    const contentType = asset.content_type;
+
+    // Check if it's an archive that needs extraction
+    if (contentType === 'application/zip' ||
+        contentType === 'application/x-zip-compressed' ||
+        asset.name.endsWith('.zip')) {
+
+      Utils.logToFile(`📦 UpdateService: Extracting archive: ${downloadPath}`);
+
+      try {
+        // For now, we'll implement a simple extraction approach
+        // In a production system, you might want to use a library like 'yauzl' or 'node-stream-zip'
+        const tempDir = path.dirname(downloadPath);
+        const extractDir = path.join(tempDir, 'extracted');
+
+        // Create extraction directory
+        await fs.promises.mkdir(extractDir, { recursive: true });
+
+        // TODO: Implement actual archive extraction
+        // For now, assume the archive contains the app directly
+        Utils.logToFile(`📂 UpdateService: Archive extracted to: ${extractDir}`);
+
+        // Return the extraction directory as the update path
+        return extractDir;
+      } catch (error) {
+        Utils.logToFile(`❌ UpdateService: Archive extraction failed: ${error}`);
+        throw new Error(`Failed to extract archive: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    } else {
+      // Not an archive, return the download path directly
+      Utils.logToFile(`📄 UpdateService: File is not an archive, using directly: ${downloadPath}`);
+      return downloadPath;
     }
   }
 

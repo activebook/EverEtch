@@ -252,25 +252,4 @@ export class GitHubService {
 
     this.lastRequestTime = Date.now();
   }
-
-  /**
-   * Get current version from package.json
-   */
-//   getCurrentVersion(): string {
-//     try {
-//       // In the main process, we need to read package.json
-//       const fs = require('fs');
-//       const path = require('path');
-//       const packageJsonPath = path.join(process.resourcesPath, '..', 'package.json');
-
-//       if (fs.existsSync(packageJsonPath)) {
-//         const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-//         return packageJson.version || '0.0.0';
-//       }
-//     } catch (error) {
-//       Utils.logToFile(`⚠️ GitHubService: Could not read package.json: ${error}`);
-//     }
-
-//     return '0.0.0';
-//   }
 }

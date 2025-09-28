@@ -13,6 +13,7 @@ import { EmbeddingModelClient } from './ai/EmbeddingModelClient.js';
 import { GoogleAuthService } from './service/google/GoogleAuthService.js';
 import { GoogleDriveService } from './service/google/GoogleDriveService.js';
 import { ImportExportService } from './service/common/ImportExportService.js';
+import { UpdateService } from './service/common/UpdateService.js';
 import { SemanticBatchService } from './semantic/SemanticBatchService.js';
 import { SemanticSearchService } from './semantic/SemanticSearchService.js';
 import { marked } from 'marked';
@@ -33,6 +34,7 @@ let storeManager: StoreManager;
 let googleAuthService: GoogleAuthService;
 let googleDriveService: GoogleDriveService;
 let importExportService: ImportExportService;
+let updateService: UpdateService;
 let semanticBatchService: SemanticBatchService;
 let semanticSearchService: SemanticSearchService;
 let queuedProtocolAction: { type: string, data: any } | null = null; // Store queued protocol actions
@@ -86,16 +88,39 @@ async function createWindow() {
     googleAuthService = new GoogleAuthService(mainWindow, storeManager);
     googleDriveService = new GoogleDriveService(googleAuthService);
     importExportService = new ImportExportService(dbManager, profileManager);
+    updateService = new UpdateService();
     semanticBatchService = new SemanticBatchService(dbManager, profileManager);
     semanticSearchService = new SemanticSearchService(dbManager, profileManager);
 
     mainWindow.loadFile(path.join(__dirname, 'renderer/index.html'));
 
     // Apply saved window bounds
-    adjustMainWindow(() => {
+    adjustMainWindow(async () => {
       // Callback function after window is ready
       // Set up proxy environment variables
       SysProxy.apply();
+
+      // Initialize update service after app is ready
+      try {
+        await updateService.initialize();
+        Utils.logToFile('🔄 Main: Update service initialized');
+
+        // Check for updates after a short delay
+        setTimeout(async () => {
+          try {
+            const versionInfo = await updateService.checkForUpdates();
+            if (versionInfo.hasUpdate) {
+              Utils.logToFile(`🎉 Main: Update available: ${versionInfo.current} → ${versionInfo.latest}`);
+              // Notify renderer about available update
+              mainWindow.webContents.send('update-available', versionInfo);
+            }
+          } catch (error) {
+            Utils.logToFile(`⚠️ Main: Update check failed: ${error}`);
+          }
+        }, 3000); // Check after 3 seconds
+      } catch (error) {
+        Utils.logToFile(`⚠️ Main: Update service initialization failed: ${error}`);
+      }
     }, () => { });
 
     if (process.env.NODE_ENV === 'development') {
@@ -1067,5 +1092,75 @@ ipcMain.handle('generate-word-embedding', async (event, wordData: { word: string
   } catch (error) {
     console.error('❌ Main process: Error generating embedding:', error);
     throw new Error(`Embedding generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+});
+
+// Update service IPC handlers
+ipcMain.handle('check-for-updates', async () => {
+  try {
+    const versionInfo = await updateService.checkForUpdates();
+    return { success: true, versionInfo };
+  } catch (error) {
+    console.error('Failed to check for updates:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+});
+
+ipcMain.handle('download-update', async () => {
+  try {
+    const progress = await updateService.downloadUpdate();
+    return { success: true, progress };
+  } catch (error) {
+    console.error('Failed to download update:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+});
+
+ipcMain.handle('install-update', async () => {
+  try {
+    const result = await updateService.installUpdate();
+    return result;
+  } catch (error) {
+    console.error('Failed to install update:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+});
+
+ipcMain.handle('is-update-available', async () => {
+  try {
+    const isReady = updateService.isUpdateReady();
+    return { success: true, available: isReady };
+  } catch (error) {
+    console.error('Failed to check update availability:', error);
+    return { success: false, available: false };
+  }
+});
+
+ipcMain.handle('get-update-config', () => {
+  try {
+    const config = updateService.getConfig();
+    return { success: true, config };
+  } catch (error) {
+    console.error('Failed to get update config:', error);
+    return { success: false, config: null };
+  }
+});
+
+ipcMain.handle('update-config', async (event, config: any) => {
+  try {
+    await updateService.updateConfig(config);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to update config:', error);
+    return { success: false };
   }
 });

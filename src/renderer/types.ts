@@ -327,6 +327,17 @@ declare global {
               duration: number;
             }) => void) => void;
 
+            // Update operations
+            checkForUpdates: () => Promise<{ success: boolean; versionInfo?: { current: string; latest: string; hasUpdate: boolean; release?: any; }; error?: string; }>;
+            downloadUpdate: () => Promise<{ success: boolean; progress?: any; error?: string; }>;
+            installUpdate: () => Promise<{ success: boolean; error?: string; }>;
+            isUpdateAvailable: () => Promise<{ success: boolean; available: boolean; }>;
+            getUpdateConfig: () => Promise<{ success: boolean; config?: any; }>;
+            updateConfig: (config: any) => Promise<{ success: boolean; }>;
+
+            // Generic event listener for updates
+            on: (event: string, callback: (...args: any[]) => void) => void;
+
             removeAllListeners: (event: string) => void;
         };
     }
