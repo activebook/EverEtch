@@ -14,7 +14,7 @@ export interface GitHubAsset {
   id: number;
   name: string;
   size: number;
-  download_url: string;
+  browser_download_url: string;
   content_type: string;
   checksum?: string; // We'll need to handle this separately
 }
@@ -111,7 +111,7 @@ export class GitHubService {
       // Create AbortController for cancellation support
       this.abortController = new AbortController();
       
-      const response = await fetch(asset.download_url, {
+      const response = await fetch(asset.browser_download_url, {
         headers: {
           'User-Agent': 'EverEtch-AutoUpdater/1.0',
           'Accept': 'application/octet-stream'
