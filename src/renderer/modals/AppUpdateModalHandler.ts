@@ -242,6 +242,12 @@ export class AppUpdateModalHandler extends ModalHandler {
      * Setup event handlers for the app update modal
      */
     protected setupModalEvent(): void {
+        // Setup close button event
+        const closeBtn = document.getElementById('close-app-update-modal') as HTMLButtonElement;
+        if (closeBtn) {
+            closeBtn.onclick = () => this.hide();
+        }
+
         // Event handlers are set up in setModalState method
         // This ensures they're updated based on current state
         window.electronAPI.onUpdateAvailable((versionInfo: { current: string; latest: string; hasUpdate: boolean; }) => {

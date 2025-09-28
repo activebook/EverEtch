@@ -55,7 +55,7 @@ try {
 }
 
 // Test logging functionality
-Utils.setDebugMode(false);
+Utils.setDebugMode(true);
 Utils.clearDebugLog();
 Utils.logToFile('EverEtch app starting up');
 

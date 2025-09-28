@@ -219,33 +219,69 @@ export class GitHubService {
    * Find the appropriate update asset for the current platform
    */
   findUpdateAsset(release: GitHubRelease): GitHubAsset {
-    const platform = this.getPlatformIdentifier();
-    Utils.logToFile(`🔍 GitHubService: Looking for ${platform} asset in ${release.assets.length} assets`);
+    const platforms = this.getPlatformIdentifiers();
+    const platformSet = new Set(platforms.map(p => p.toLowerCase()));
+    Utils.logToFile(`🔍 GitHubService: Looking for ${process.platform} asset in ${release.assets.length} assets`);
 
-    // Look for platform-specific assets
+    // Look for platform-specific assets using the pre-built set for fast lookup
     for (const asset of release.assets) {
-      if (asset.name.includes(platform)) {
-        Utils.logToFile(`✅ GitHubService: Found matching asset: ${asset.name}`);
-        return asset;
+      const assetName = asset.name.toLowerCase();
+      // Check if any platform identifier from the set is in the asset name
+      for (const platform of platformSet) {
+        if (assetName.includes(platform)) {
+          Utils.logToFile(`✅ GitHubService: Found matching asset: ${asset.name}`);
+          return asset;
+        }
       }
     }
 
-    throw new Error(`No suitable asset found for platform: ${platform}`);
+    throw new Error(`No suitable asset found for platform: ${process.platform}`);
   }
 
   /**
    * Get platform identifier for asset matching
    */
-  private getPlatformIdentifier(): string {
+  private getPlatformIdentifiers(): string[] {
     switch (process.platform) {
       case 'darwin':
-        return process.arch === 'arm64' ? 'darwin-arm64' : 'darwin-x64';
+        if (process.arch === 'arm64') {
+          return ['darwin-arm64', 'darwin-universal', 'mac'];
+        } else {
+          return ['darwin-x64', 'darwin-x86_64', 'darwin-universal', 'mac']; 
+        }
       case 'win32':
-        return process.arch === 'x64' ? 'win32-x64' : 'win32-ia32';
+        if (process.arch === 'x64') {
+          return ['win32-x64', 'win32-x86_64', 'Windows-x64', 'Windows-x86_64', 'Windows'];
+        } else if (process.arch === 'arm64') {
+          return ['win32-arm64', 'Windows-arm64'];
+        } else {
+          return ['win32-ia32', 'win32-i386', 'Windows_i386', 'Windows'];
+        }
       case 'linux':
-        return process.arch === 'x64' ? 'linux-x64' : 'linux-arm64';
+        if (process.arch === 'x64') {
+          return ['linux-x64', 'linux-x86_64', 'linux'];
+        } else if (process.arch === 'arm64') {
+          return ['linux-arm64', 'linux'];
+        } else if (process.arch === 'arm') {
+          return ['linux-arm', 'linux'];
+        } else {
+          return ['linux-i386', 'linux'];
+        }
       default:
-        return 'unknown';
+        Utils.logToFile(`⚠️ GitHubService: Unsupported platform ${process.platform} with arch ${process.arch}`);
+        // Try to provide some fallback identifiers based on architecture
+        switch (process.arch) {
+          case 'x64':
+            return ['x64', 'x86_64'];
+          case 'arm64':
+            return ['arm64'];
+          case 'arm':
+            return ['arm'];
+          case 'ia32':
+            return ['i386', 'i686'];
+          default:
+            return [process.arch];
+        }
     }
   }
 

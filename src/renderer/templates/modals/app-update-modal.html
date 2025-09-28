@@ -3,9 +3,20 @@
     <div class="flex items-center justify-center min-h-screen p-4">
         <div class="bg-amber-50/95 backdrop-blur-md rounded-2xl shadow-2xl max-w-md w-full border border-amber-200/60">
             <div
-                class="p-5 border-b border-amber-200/60 bg-gradient-to-r from-amber-25/40 to-amber-50/60 rounded-t-2xl">
-                <h3 class="text-lg font-semibold text-slate-800 flex items-center">
-                    <svg class="w-5 h-5 mr-2 text-amber-600" viewBox="0 0 0.45 0.45" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M.057.219c0 .091.066.154.141.166a.016.016 0 1 1-.005.031.2.2 0 0 1-.167-.197c0-.046.021-.082.045-.11A.4.4 0 0 1 .125.061H.076a.015.015 0 0 1 0-.03h.09a.015.015 0 0 1 .015.015v.09a.015.015 0 0 1-.03 0V.081Q.124.101.095.13a.13.13 0 0 0-.038.089M.39.231A.17.17 0 0 0 .252.065.016.016 0 1 1 .258.034a.2.2 0 0 1 .164.197.17.17 0 0 1-.045.11.4.4 0 0 1-.054.048h.049a.015.015 0 1 1 0 .03h-.09A.015.015 0 0 1 .267.404v-.09a.015.015 0 1 1 .03 0v.055Q.324.349.353.32A.13.13 0 0 0 .391.231" fill="#000"/></svg>
+                class="relative p-5 border-b border-amber-200/60 bg-gradient-to-r from-amber-25/40 to-amber-50/60 rounded-t-2xl">
+                <button id="close-app-update-modal" title="Close"
+                    class="absolute top-4 right-3 p-1 text-slate-500 hover:text-slate-700 transition-colors duration-200">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+                <h3 class="text-lg font-semibold text-slate-800 flex items-center">                    
+                    <!--
+                    <svg class="w-5 h-5 mr-2 text-amber-600" fill="none" stroke="currentColor" 
+                    xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" xml:space="preserve"><path d="M16.52 4.231a.4.4 0 0 0-.348.72A9.66 9.66 0 0 1 21.6 13.6c0 5.293-4.307 9.6-9.6 9.6s-9.6-4.307-9.6-9.6c0-3.574 2.035-6.89 5.2-8.528V8.4a.4.4 0 0 0 .22.358A.4.4 0 0 0 8 8.8a.4.4 0 0 0 .238-.079l6-4.457a.4.4 0 0 0 .161-.342.4.4 0 0 0-.196-.324l-6-3.543a.4.4 0 0 0-.402-.003.4.4 0 0 0-.202.347v3.798a.4.4 0 0 0-.122.034C3.907 5.958 1.6 9.636 1.6 13.6 1.6 19.335 6.266 24 12 24s10.4-4.665 10.4-10.4c0-3.965-2.308-7.643-5.88-9.369"/></svg>
+                    -->
+                    <svg class="w-5 h-5 mr-2 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 0.48 0.48" xmlns="http://www.w3.org/2000/svg"><path d="M.45.18V.053L.399.104A.21.21 0 1 0 .448.27H.406A.169.169 0 1 1 .37.134L.323.18Z"/></svg>
                     Check for Updates
                 </h3>
             </div>
