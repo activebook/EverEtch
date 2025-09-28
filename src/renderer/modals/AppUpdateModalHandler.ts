@@ -61,7 +61,7 @@ export class AppUpdateModalHandler extends ModalHandler {
             const result = await window.electronAPI.checkForUpdates();
 
             if (!result.success) {
-                throw new Error(result.error || 'Failed to check for updates');
+                throw new Error(result.message || 'Failed to check for updates');
             }
         } catch (error) {
             const msg = 'Error checking for updates:' + error;

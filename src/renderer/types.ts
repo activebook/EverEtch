@@ -107,10 +107,15 @@ export interface ExportResult extends ApiResult {
 export interface ImportResult extends ApiResult {
     profileName?: string;
 }
-export interface DownloadResult extends ApiResult {
+export interface DownloadUpdateResult extends ApiResult {
     progress?: {
         downloaded: number;
         total: number;
+    }
+}
+export interface CheckUpdateResult extends ApiResult {
+    versionInfo?: {
+        current: string; latest: string; hasUpdate: boolean;
     }
 }
 
@@ -288,7 +293,7 @@ declare global {
             loadModelMemos: () => Promise<ModelMemo[]>;
             loadChatModelMemos: () => Promise<ModelMemo[]>;
             loadEmbeddingModelMemos: () => Promise<ModelMemo[]>;
-            addModelMemo: (memo: Omit<ModelMemo, 'name'|'createdAt'|'type'>) => Promise<ModelResult>;
+            addModelMemo: (memo: Omit<ModelMemo, 'name' | 'createdAt' | 'type'>) => Promise<ModelResult>;
             getModelMemo: (name: string) => Promise<ModelResult>;
             deleteModelMemo: (name: string) => Promise<ModelDeleteResult>;
             markModelUsed: (name: string) => Promise<boolean>;
@@ -318,24 +323,27 @@ declare global {
             // Semantic Search operations
             startSemanticBatchProcessing: (config: any, updateExisting: boolean) => Promise<{ success: boolean; message: string; }>;
             cancelSemanticBatchProcessing: () => Promise<{ success: boolean; message: string; }>;
-            updateSemanticConfig: (config: { id: string; name: string; embedding_config: {
-              provider: string; model: string; endpoint: string; api_key: string; batch_size: number; similarity_threshold: number; }; }) => Promise<{ success: boolean; message: string; }>;
+            updateSemanticConfig: (config: {
+                id: string; name: string; embedding_config: {
+                    provider: string; model: string; endpoint: string; api_key: string; batch_size: number; similarity_threshold: number;
+                };
+            }) => Promise<{ success: boolean; message: string; }>;
             performSemanticSearch: (query: string, limit?: number) => Promise<{ success: boolean; message: string; results: any[] }>;
 
             // Semantic Search event listeners
             onSemanticBatchProgress: (callback: (progress: { processed: number; total: number; }) => void) => void;
             onSemanticBatchComplete: (callback: (result: {
-              success: boolean;
-              totalWords: number;
-              processed: number;
-              failed: number;
-              error: string;
-              duration: number;
+                success: boolean;
+                totalWords: number;
+                processed: number;
+                failed: number;
+                error: string;
+                duration: number;
             }) => void) => void;
 
             // Update operations
-            checkForUpdates: () => Promise<{ success: boolean; versionInfo?: { current: string; latest: string; hasUpdate: boolean; }; error?: string; }>;
-            downloadUpdate: () => Promise<DownloadResult>;
+            checkForUpdates: () => Promise<CheckUpdateResult>;
+            downloadUpdate: () => Promise<DownloadUpdateResult>;
             cancelUpdate: () => Promise<ApiResult>;
             installUpdate: () => Promise<ApiResult>;
 
@@ -350,12 +358,12 @@ declare global {
 
 // In a .d.ts file or at the top of your file
 declare global {
-  interface HTMLButtonElement {
-    _listenerAdded?: boolean;
-  }
-  interface HTMLElement {
-    _listenerAdded?: boolean;
-  }
+    interface HTMLButtonElement {
+        _listenerAdded?: boolean;
+    }
+    interface HTMLElement {
+        _listenerAdded?: boolean;
+    }
 }
 
 
