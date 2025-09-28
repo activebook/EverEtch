@@ -1,6 +1,7 @@
 import { UIUtils } from '../utils/UIUtils.js';
 import { ToastManager } from '../components/ToastManager.js';
 import { ModalHandler } from './ModalHandler.js';
+import { formatFileSize } from '../utils/Common.js';
 
 /**
  * Enum for app update modal states
@@ -9,6 +10,7 @@ export enum UpdateModalState {
     CHECKING = 'checking',
     AVAILABLE = 'available',
     DOWNLOADING = 'downloading',
+    CANCELLED = 'cancelled',
     ERROR = 'error',
     NONE = 'none'
 }
@@ -29,15 +31,16 @@ export class AppUpdateModalHandler extends ModalHandler {
 
         try {
             // Reset checking state
-            this.setModalState(UpdateModalState.CHECKING, 'Checking for updates...');
+            this.updateMessage('Checking for updates...');
+            this.setModalState(UpdateModalState.CHECKING);
             // Show modal first, then check for updates (callback will update UI)
             this.showModal('app-update-modal');
             // Check for updates (callback will handle the response)
-            this.checkForUpdates();   
+            this.checkForUpdates();
         } catch (error) {
             console.error('Error showing app update modal:', error);
             this.showError('Failed to check for updates');
-        }        
+        }
     }
 
     /**
@@ -52,7 +55,8 @@ export class AppUpdateModalHandler extends ModalHandler {
      */
     private async checkForUpdates(): Promise<void> {
         try {
-            this.setModalState(UpdateModalState.CHECKING, 'Checking for updates...');
+            this.updateMessage('Checking for updates...');
+            this.setModalState(UpdateModalState.CHECKING);
 
             const result = await window.electronAPI.checkForUpdates();
 
@@ -60,29 +64,30 @@ export class AppUpdateModalHandler extends ModalHandler {
                 throw new Error(result.error || 'Failed to check for updates');
             }
         } catch (error) {
-            console.error('Error checking for updates:', error);
-            this.setModalState(UpdateModalState.ERROR, 'Failed to check for updates. Please try again.');
+            const msg = 'Error checking for updates:' + error;
+            this.updateMessage(msg);
+            this.setModalState(UpdateModalState.ERROR);
         }
     }
 
     /**
      * Start downloading the update
      */
-    private async startDownload(): Promise<void> {        
+    private async startDownload(): Promise<void> {
         if (this.downloading) return;
         try {
-            this. downloading = true;
-            this.setModalState(UpdateModalState.DOWNLOADING, 'Starting download...');
+            this.downloading = true;
+            this.updateMessage('Starting download...');
+            this.setModalState(UpdateModalState.DOWNLOADING);
 
             const result = await window.electronAPI.downloadUpdate();
 
             if (!result.success) {
-                throw new Error(result.error || 'Failed to download update');
+                throw new Error(result.message || 'Failed to download update');
             }
 
-            if (result.progress.downloaded === result.progress.total && result.progress.total === 0) {
+            if (result.progress?.downloaded === result.progress?.total && result.progress?.total === 0) {
                 // User cancel immediately
-                this.hide();
                 return;
             }
 
@@ -91,8 +96,9 @@ export class AppUpdateModalHandler extends ModalHandler {
             // await this.installUpdate();
 
         } catch (error) {
-            console.error('Error downloading update:', error);
-            this.setModalState(UpdateModalState.ERROR, 'Failed to download update. Please try again.');
+            const msg = 'Error downloading update:'+ error;
+            this.updateMessage(msg);
+            this.setModalState(UpdateModalState.ERROR);
         } finally {
             this.downloading = false;
         }
@@ -104,15 +110,15 @@ export class AppUpdateModalHandler extends ModalHandler {
     private async installUpdate(): Promise<void> {
         try {
             // Use downloading state to show progress during install
-            this.setModalState(UpdateModalState.DOWNLOADING, 'Installing update...');
+            this.setModalState(UpdateModalState.DOWNLOADING);
 
             const result = await window.electronAPI.installUpdate();
 
             if (!result.success) {
-                throw new Error(result.error || 'Failed to install update');
+                throw new Error(result.message || 'Failed to install update');
             }
 
-            
+
 
             // Close modal after a short delay
             setTimeout(() => {
@@ -120,13 +126,25 @@ export class AppUpdateModalHandler extends ModalHandler {
             }, 2000);
 
         } catch (error) {
-            console.error('Error installing update:', error);
-            this.setModalState(UpdateModalState.ERROR, 'Failed to install update. Please try again.');
+            const msg = 'Error installing update:' + error;
+            this.updateMessage(msg);
+            this.setModalState(UpdateModalState.ERROR);
         }
     }
 
     /**
-     * Update download progress display using callback message
+     * Update the main message in the modal
+     */
+    private updateMessage(message: string) {
+        // Update message
+        const messageText = document.getElementById('update-message-text') as HTMLElement;
+        if (messageText) {
+            messageText.textContent = message;
+        }
+    }
+
+    /**
+     * Update download progress display with detailed progress information
      */
     private updateDownloadProgress(progress: { downloaded: number; total: number; message: string; }): void {
         const percentage = progress.total > 0 ? Math.round((progress.downloaded / progress.total) * 100) : 0;
@@ -137,17 +155,18 @@ export class AppUpdateModalHandler extends ModalHandler {
             progressBar.style.width = `${percentage}%`;
         }
 
-        // Update progress text with callback message
+        // Format file sizes for better readability
+        const downloadedFormatted = formatFileSize(progress.downloaded);
+        const totalFormatted = formatFileSize(progress.total);
+
+        // Update progress info with detailed message
         const progressText = document.getElementById('update-progress-text') as HTMLElement;
         if (progressText) {
-            progressText.textContent = `${progress.message} ${percentage}%`;
+            progressText.textContent = `${percentage}% (${downloadedFormatted}/${totalFormatted})`;
         }
 
-        // Update details with callback message
-        const detailsText = document.getElementById('update-details-text') as HTMLElement;
-        if (detailsText) {
-            detailsText.textContent = progress.message;
-        }
+        // Update details with more detailed information
+        this.updateMessage(progress.message);
     }
 
     private hideDownloadProgress() {
@@ -167,21 +186,21 @@ export class AppUpdateModalHandler extends ModalHandler {
     /**
      * Set modal state and update UI accordingly
      */
-    private setModalState(state: UpdateModalState, message: string): void {
-        // Update message
-        const messageText = document.getElementById('update-message-text') as HTMLElement;
-        if (messageText) {
-            messageText.textContent = message;
-        }
+    private setModalState(state: UpdateModalState): void {
 
         // Show/hide sections based on state
         const actionBtn = document.getElementById('update-action-btn') as HTMLButtonElement;
 
-        // Reset visibility - hide progress sections by default
-        this.hideDownloadProgress();
-
         switch (state) {
+            case UpdateModalState.CANCELLED:
+                // Show available message with Update button
+                if (actionBtn) {
+                    actionBtn.textContent = 'Update';
+                    actionBtn.onclick = () => this.startDownload();
+                }
+                break;
             case UpdateModalState.AVAILABLE:
+                this.hideDownloadProgress();
                 // Show available message with Update button
                 if (actionBtn) {
                     actionBtn.textContent = 'Update';
@@ -208,6 +227,7 @@ export class AppUpdateModalHandler extends ModalHandler {
 
             case UpdateModalState.CHECKING:
             case UpdateModalState.NONE:
+                this.hideDownloadProgress();
                 // No update available, show Cancel button
                 if (actionBtn) {
                     actionBtn.textContent = 'Cancel';
@@ -228,13 +248,14 @@ export class AppUpdateModalHandler extends ModalHandler {
             const result = await window.electronAPI.cancelUpdate();
 
             if (result.success) {
-                // Do nothing, because download would receive cancel
+                this.setModalState(UpdateModalState.CANCELLED);
             } else {
-                this.setModalState(UpdateModalState.ERROR, 'Failed to cancel download. Please try again.');
+                this.setModalState(UpdateModalState.ERROR);
             }
         } catch (error) {
-            console.error('Error cancelling download:', error);
-            this.setModalState(UpdateModalState.ERROR, 'Failed to cancel download. Please try again.');
+            const msg = 'Error cancelling download:' + error;
+            this.updateMessage(msg);
+            this.setModalState(UpdateModalState.ERROR);
         }
     }
 
@@ -255,13 +276,15 @@ export class AppUpdateModalHandler extends ModalHandler {
                 const msg = `No update available.
                 Current version: ${versionInfo.current} is the latest.
                 `
-                this.setModalState(UpdateModalState.NONE, msg);
+                this.updateMessage(msg);
+                this.setModalState(UpdateModalState.NONE);
                 return;
             }
             const msg = `A new version is available. 
             EverEtch ${versionInfo.current} → ${versionInfo.latest}
             Would you like to update now?`
-            this.setModalState(UpdateModalState.AVAILABLE, msg);
+            this.updateMessage(msg);
+            this.setModalState(UpdateModalState.AVAILABLE);
         });
 
         window.electronAPI.onUpdateDownloadProgress((progress: { downloaded: number; total: number; message: string; }) => {

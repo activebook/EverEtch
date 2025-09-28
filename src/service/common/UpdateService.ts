@@ -19,13 +19,12 @@ export class UpdateService {
   private versionInfo: VersionInfo | null = null;
   private pendingUpdatePath: string | null = null;
   private isDownloading = false;
-  private downloadProgress: DownloadProgress | null = null;
 
   // Update messages 
   private readonly UPDATE_DOWNLOADING = 'Downloading package...';
   private readonly UPDATE_VERIFYING = 'Verifying checksum...';
   private readonly UPDATE_EXTRACTING = 'Extracting package...';
-  private readonly UPDATE_CANCELLING = 'Cancelling...';
+  private readonly UPDATE_CANCELLED = 'Download Cancelled.';
 
   constructor() {
     this.githubService = new GitHubService();
@@ -48,7 +47,6 @@ export class UpdateService {
       this.versionInfo = null;
       this.pendingUpdatePath = null;
       this.isDownloading = false;
-      this.downloadProgress = null;
       this.isInitialized = true;
       Utils.logToFile('✅ UpdateService: Initialization complete');
       return true;
@@ -120,23 +118,19 @@ export class UpdateService {
       // Find the appropriate asset
       const asset = this.githubService.findUpdateAsset(release);
 
-      // Set up download progress tracking
-      this.downloadProgress = {
-        downloaded: 0,
-        total: asset.size
-      };
-
       // Download the asset with progress tracking and cancellation support
       const buffer = await this.githubService.downloadAsset(
         asset,
         (progress) => {
           // Update download progress
-          onProgress(progress.downloaded, progress.total, this.UPDATE_DOWNLOADING)
+          onProgress(progress.downloaded, progress.total, this.UPDATE_DOWNLOADING);
         }
       );
+
       if (!buffer) {
         // Download was aborted
-        onProgress(0, 0, this.UPDATE_CANCELLING);
+        onProgress(0, 0, this.UPDATE_CANCELLED);
+        Utils.logToFile('🛑 UpdateService: Download was cancelled by user');
         return {
           downloaded: 0,
           total: 0,
@@ -213,13 +207,6 @@ export class UpdateService {
   }
 
   /**
-   * Get download progress (for UI updates)
-   */
-  getDownloadProgress(): DownloadProgress | null {
-    return this.downloadProgress;
-  }
-
-  /**
    * Check if an update is ready to install
    */
   isUpdateReady(): boolean {
@@ -232,7 +219,6 @@ export class UpdateService {
   async cancelDownload(): Promise<void> {
     this.githubService.cancelDownloadAsset();
     this.isDownloading = false;
-    this.downloadProgress = null;
     Utils.logToFile('🛑 UpdateService: Download cancelled');
   }
 

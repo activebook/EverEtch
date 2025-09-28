@@ -107,6 +107,12 @@ export interface ExportResult extends ApiResult {
 export interface ImportResult extends ApiResult {
     profileName?: string;
 }
+export interface DownloadResult extends ApiResult {
+    progress?: {
+        downloaded: number;
+        total: number;
+    }
+}
 
 // Google Drive file interface
 export interface DriveFile {
@@ -328,10 +334,10 @@ declare global {
             }) => void) => void;
 
             // Update operations
-            checkForUpdates: () => Promise<{ success: boolean; versionInfo?: { current: string; latest: string; hasUpdate: boolean; release?: any; }; error?: string; }>;
-            downloadUpdate: () => Promise<{ success: boolean; progress?: any; error?: string; }>;
-            cancelUpdate: () => Promise<{ success: boolean; error?: string; }>;
-            installUpdate: () => Promise<{ success: boolean; error?: string; }>;
+            checkForUpdates: () => Promise<{ success: boolean; versionInfo?: { current: string; latest: string; hasUpdate: boolean; }; error?: string; }>;
+            downloadUpdate: () => Promise<DownloadResult>;
+            cancelUpdate: () => Promise<ApiResult>;
+            installUpdate: () => Promise<ApiResult>;
 
             // Update event listeners
             onUpdateAvailable: (callback: (versionInfo: { current: string; latest: string; hasUpdate: boolean }) => void) => void;

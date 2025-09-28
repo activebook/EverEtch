@@ -173,7 +173,6 @@ export class GitHubService {
   cancelDownloadAsset(): void {
     if (this.abortController) {
       this.abortController.abort();
-      this.abortController = null;
     }
   }
 

@@ -11,12 +11,12 @@
                             d="M6 18L18 6M6 6l12 12"></path>
                     </svg>
                 </button>
-                <h3 class="text-lg font-semibold text-slate-800 flex items-center">                    
-                    <!--
-                    <svg class="w-5 h-5 mr-2 text-amber-600" fill="none" stroke="currentColor" 
-                    xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" xml:space="preserve"><path d="M16.52 4.231a.4.4 0 0 0-.348.72A9.66 9.66 0 0 1 21.6 13.6c0 5.293-4.307 9.6-9.6 9.6s-9.6-4.307-9.6-9.6c0-3.574 2.035-6.89 5.2-8.528V8.4a.4.4 0 0 0 .22.358A.4.4 0 0 0 8 8.8a.4.4 0 0 0 .238-.079l6-4.457a.4.4 0 0 0 .161-.342.4.4 0 0 0-.196-.324l-6-3.543a.4.4 0 0 0-.402-.003.4.4 0 0 0-.202.347v3.798a.4.4 0 0 0-.122.034C3.907 5.958 1.6 9.636 1.6 13.6 1.6 19.335 6.266 24 12 24s10.4-4.665 10.4-10.4c0-3.965-2.308-7.643-5.88-9.369"/></svg>
-                    -->
-                    <svg class="w-5 h-5 mr-2 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 0.48 0.48" xmlns="http://www.w3.org/2000/svg"><path d="M.45.18V.053L.399.104A.21.21 0 1 0 .448.27H.406A.169.169 0 1 1 .37.134L.323.18Z"/></svg>
+                <h3 class="text-lg font-semibold text-slate-800 flex items-center">                                        
+                    <svg class="w-5 h-5 mr-2 text-amber-500" fill="none" stroke="currentColor"
+                        viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
                     Check for Updates
                 </h3>
             </div>
@@ -30,22 +30,17 @@
 
                 <!-- Progress Bar Section (default hidden) -->
                 <div id="update-progress-section" class="hidden">
-                    <div class="w-full bg-slate-200 rounded-full h-2 mb-3">
+                    <div class="w-full bg-amber-200 rounded-full h-3 mb-6">
                         <div id="update-progress-bar"
-                             class="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                             class="bg-amber-500 h-3 rounded-full transition-all duration-300"
                              style="width: 0%">
                         </div>
                     </div>
                     <div class="text-center">
-                        <p id="update-progress-text" class="text-xs text-slate-500">
+                        <p id="update-progress-text" class="text-sm text-slate-600">
                             Downloading update... 0%
                         </p>
                     </div>
-                </div>
-
-                <!-- Download Details Section (default hidden) -->
-                <div id="update-details-section" class="hidden text-xs text-slate-500">
-                    <p id="update-details-text" class="text-center">Preparing download...</p>
                 </div>
             </div>
             <div
