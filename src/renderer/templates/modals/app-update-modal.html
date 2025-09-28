@@ -1,0 +1,53 @@
+<!-- App Update Modal -->
+<div id="app-update-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden z-50">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl max-w-md w-full border border-white/20">
+            <div
+                class="p-5 border-b border-slate-200/60 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 rounded-t-2xl">
+                <h3 class="text-lg font-semibold text-slate-800 flex items-center">
+                    <img src="assets/icons/icon_64x64.png" alt="EverEtch" class="w-6 h-6 mr-2">
+                    App Update Available
+                </h3>
+            </div>
+            <div class="p-5 space-y-4">
+                <!-- Message Info Section (default visible) -->
+                <div id="update-message-info" class="text-center">
+                    <p id="update-message-text" class="text-sm text-slate-600">
+                        A new version of EverEtch is available. Would you like to update now?
+                    </p>
+                </div>
+
+                <!-- Progress Bar Section (default hidden) -->
+                <div id="update-progress-section" class="hidden">
+                    <div class="w-full bg-slate-200 rounded-full h-2 mb-3">
+                        <div id="update-progress-bar"
+                             class="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                             style="width: 0%">
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <p id="update-progress-text" class="text-xs text-slate-500">
+                            Downloading update... 0%
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Download Details Section (default hidden) -->
+                <div id="update-details-section" class="hidden text-xs text-slate-500">
+                    <p id="update-details-text" class="text-center">Preparing download...</p>
+                </div>
+            </div>
+            <div
+                class="p-5 border-t border-slate-200/60 flex justify-center space-x-3 bg-slate-50/50 rounded-b-2xl">
+                <button id="start-update-btn"
+                    class="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all duration-200 hover:shadow-lg font-medium text-sm min-w-[100px]">
+                    Start Update
+                </button>
+                <button id="cancel-update-btn" hidden
+                    class="px-6 py-2 bg-slate-500 hover:bg-slate-600 text-white rounded-lg transition-all duration-200 hover:shadow-lg font-medium text-sm min-w-[100px]">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

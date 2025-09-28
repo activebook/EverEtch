@@ -78,19 +78,6 @@ export class UpdateNotificationService {
   }
 
   /**
-   * Check if update is available
-   */
-  async isUpdateAvailable(): Promise<boolean> {
-    try {
-      const result = await window.electronAPI.isUpdateAvailable();
-      return result.available;
-    } catch (error) {
-      console.error('Failed to check update availability:', error);
-      return false;
-    }
-  }
-
-  /**
    * Show update notification toast
    */
   showUpdateNotification(updateInfo: UpdateInfo): void {
@@ -233,16 +220,7 @@ export class UpdateNotificationService {
    * Set up IPC event listeners
    */
   private setupIPCListeners(): void {
-    // Listen for update availability from main process
-    if (window.electronAPI) {
-      window.electronAPI.on('update-available', (updateInfo: UpdateInfo) => {
-        if (this.updateAvailableCallback) {
-          this.updateAvailableCallback(updateInfo);
-        } else {
-          this.showUpdateNotification(updateInfo);
-        }
-      });
-    }
+   
   }
 }
 

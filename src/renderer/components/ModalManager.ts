@@ -4,6 +4,7 @@ import { GoogleDriveManager } from '../services/GoogleDriveManager.js';
 import { WordImportService } from '../services/WordImportService.js';
 import { UIUtils } from '../utils/UIUtils.js';
 import { ModelMemoService } from '../services/ModelMemoService.js';
+import { AppUpdateModalHandler } from '../modals/AppUpdateModalHandler.js';
 import { HelpModalHandler } from '../modals/HelpModalHandler.js';
 import { ProfileAddModalHandler } from '../modals/ProfileAddModalHandler.js';
 import { ProfileSetModalHandler } from '../modals/ProfileSetModalHandler.js';
@@ -26,6 +27,7 @@ export class ModalManager {
   private uiUtils: UIUtils;
 
   // Modal handlers
+  private appUpdateModalHandler: AppUpdateModalHandler;
   private helpModalHandler: HelpModalHandler;
   private profileAddModalHandler: ProfileAddModalHandler;
   private profileSetModalHandler: ProfileSetModalHandler;
@@ -53,6 +55,8 @@ export class ModalManager {
     this.uiUtils = uiUtils;
 
     // Initialize modal utilities and handlers
+    this.appUpdateModalHandler = new AppUpdateModalHandler(this.uiUtils, this.toastManager);
+
     this.helpModalHandler = new HelpModalHandler(this.uiUtils, this.toastManager);
 
     this.profileAddModalHandler = new ProfileAddModalHandler(
@@ -134,6 +138,10 @@ export class ModalManager {
   // Howto modal methods - delegated to HelpModalHandler
   async showHowtoModal(): Promise<void> {
     await this.helpModalHandler.show();
+  }
+
+  async showAppUpdateModal(): Promise<void> {
+    await this.appUpdateModalHandler.show();
   }
 
   // Import/Export modal methods

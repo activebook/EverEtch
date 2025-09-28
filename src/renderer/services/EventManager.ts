@@ -190,6 +190,14 @@ export class EventManager {
       });
     }
 
+    // App update button
+    const appUpdateBtn = document.getElementById('app-update-btn') as HTMLButtonElement;
+    if (appUpdateBtn) {
+      appUpdateBtn.addEventListener('click', () => {
+        this.modalManager.showAppUpdateModal();
+      });
+    }
+
     // More button and inline actions
     const moreBtn = document.getElementById('more-btn') as HTMLButtonElement;
     const inlineActions = document.getElementById('inline-actions') as HTMLElement;
