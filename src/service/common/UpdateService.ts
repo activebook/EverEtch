@@ -5,6 +5,7 @@ import { app } from 'electron';
 import { Utils } from '../../utils/Utils.js';
 import { GitHubService, GitHubRelease, GitHubAsset, VersionInfo } from './GitHubService.js';
 import { AtomUpdaterManager, UpdateResult } from './AtomUpdaterManager.js';
+import * as Seven from '7zip-min';
 
 export interface DownloadProgress {
   downloaded: number;
@@ -131,12 +132,15 @@ export class UpdateService {
       if (!buffer) {
         // Download was aborted
         onProgress(0, 0, this.UPDATE_CANCELLED);
-        Utils.logToFile('🛑 UpdateService: Download was cancelled by user');
+        Utils.logToFile('� UpdateService: Download was cancelled by user');
         return {
           downloaded: 0,
           total: 0,
         };
       }
+
+      // Clean up old files before saving new one
+      await this.cleanup();
 
       // Save to temporary location
       const tempDir = await this.getTempDirectory();
@@ -281,6 +285,97 @@ export class UpdateService {
   }
 
   /**
+   * Check if file is an archive that needs extraction
+   */
+  private isArchiveFile(filePath: string, contentType: string): boolean {
+    const archiveExtensions = ['.zip', '.7z', '.rar', '.tar', '.gz', '.bz2', '.xz'];
+    const archiveTypes = [
+      'application/zip',
+      'application/x-zip-compressed',
+      'application/x-7z-compressed',
+      'application/x-rar-compressed',
+      'application/x-tar',
+      'application/gzip',
+      'application/x-bzip2',
+      'application/x-xz'
+    ];
+
+    const ext = path.extname(filePath).toLowerCase();
+    return archiveExtensions.includes(ext) || archiveTypes.includes(contentType);
+  }
+
+  /**
+   * Extract archive using 7zip-min
+   */
+  private async extractWith7zip(archivePath: string, extractDir: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      // First, list archive contents to understand structure
+      Seven.list(archivePath, (err, result) => {
+        if (err) {
+          reject(new Error(`Failed to read archive: ${err.message}`));
+          return;
+        }
+
+        const fileCount = result ? result.length : 0;
+        Utils.logToFile(`📋 UpdateService: Archive contains ${fileCount} files`);
+
+        // Extract all files to destination
+        Seven.unpack(archivePath, extractDir, async (err) => {
+          if (err) {
+            reject(new Error(`Failed to extract archive: ${err.message}`));
+            return;
+          }
+
+          Utils.logToFile(`✅ UpdateService: Archive extracted successfully`);
+
+          try {
+            // Get the extracted file/dir name - find the extracted item in extractDir
+            const extractedItems = await fs.promises.readdir(extractDir);
+
+            if (extractedItems.length === 0) {
+              reject(new Error('No files were extracted from the archive'));
+              return;
+            }
+
+            // If there's only one item, return its path
+            if (extractedItems.length === 1) {
+              const extractedPath = path.join(extractDir, extractedItems[0]);
+              Utils.logToFile(`📁 UpdateService: Found extracted item: ${extractedPath}`);
+              resolve(extractedPath);
+              return;
+            }
+
+            /**
+             * Multiple items scenario
+             * In windows, the extracted folder is named after the archive
+             * So what should we do? maybe return the folder path
+             */
+
+            // If there are multiple items, look for a directory (likely the main extracted folder)
+            for (const item of extractedItems) {
+              const itemPath = path.join(extractDir, item);
+              const stats = await fs.promises.stat(itemPath);
+              if (stats.isDirectory()) {
+                Utils.logToFile(`📁 UpdateService: Found extracted directory: ${itemPath}`);
+                resolve(itemPath);
+                return;
+              }
+            }
+
+            // If no directory found, return the first file
+            const firstItemPath = path.join(extractDir, extractedItems[0]);
+            Utils.logToFile(`📄 UpdateService: Returning first extracted item: ${firstItemPath}`);
+            resolve(firstItemPath);
+
+          } catch (error) {
+            reject(new Error(`Failed to find extracted content: ${error instanceof Error ? error.message : 'Unknown error'}`));
+          }
+        });
+      });
+    });
+  }
+
+  /**
    * Verify downloaded file integrity
    */
   private async verifyDownload(filePath: string, asset: GitHubAsset): Promise<boolean> {
@@ -334,33 +429,28 @@ export class UpdateService {
   }
 
   /**
-   * Extract archive if the downloaded file is a zip/7z archive
+   * Extract archive if the downloaded file is an archive
    */
   private async extractArchiveIfNeeded(downloadPath: string, asset: any): Promise<string> {
     const contentType = asset.content_type;
 
     // Check if it's an archive that needs extraction
-    if (contentType === 'application/zip' ||
-      contentType === 'application/x-zip-compressed' ||
-      asset.name.endsWith('.zip')) {
-
+    if (this.isArchiveFile(downloadPath, contentType)) {
       Utils.logToFile(`📦 UpdateService: Extracting archive: ${downloadPath}`);
 
       try {
-        // For now, we'll implement a simple extraction approach
-        // In a production system, you might want to use a library like 'yauzl' or 'node-stream-zip'
         const tempDir = path.dirname(downloadPath);
         const extractDir = path.join(tempDir, 'extracted');
 
         // Create extraction directory
         await fs.promises.mkdir(extractDir, { recursive: true });
 
-        // TODO: Implement actual archive extraction
-        // For now, assume the archive contains the app directly
-        Utils.logToFile(`📂 UpdateService: Archive extracted to: ${extractDir}`);
+        // Extract using 7zip-min
+        const extractPath = await this.extractWith7zip(downloadPath, extractDir);
 
-        // Return the extraction directory as the update path
-        return extractDir;
+        Utils.logToFile(`📂 UpdateService: Archive extracted to: ${extractDir}`);
+        return extractPath;
+
       } catch (error) {
         Utils.logToFile(`❌ UpdateService: Archive extraction failed: ${error}`);
         throw new Error(`Failed to extract archive: ${error instanceof Error ? error.message : 'Unknown error'}`);
