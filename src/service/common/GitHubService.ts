@@ -16,7 +16,7 @@ export interface GitHubAsset {
   size: number;
   browser_download_url: string;
   content_type: string;
-  checksum?: string; // We'll need to handle this separately
+  digest?: string; // this is the checksum
 }
 
 export interface VersionInfo {

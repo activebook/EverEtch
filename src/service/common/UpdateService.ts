@@ -1,8 +1,9 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import * as crypto from 'crypto';
 import { app } from 'electron';
 import { Utils } from '../../utils/Utils.js';
-import { GitHubService, GitHubRelease, VersionInfo } from './GitHubService.js';
+import { GitHubService, GitHubRelease, GitHubAsset, VersionInfo } from './GitHubService.js';
 import { AtomUpdaterManager, UpdateResult } from './AtomUpdaterManager.js';
 
 export interface DownloadProgress {
@@ -244,16 +245,45 @@ export class UpdateService {
    */
   private async getTempDirectory(): Promise<string> {
     const userDataPath = app.getPath('userData');
-    const tempDir = path.join(userDataPath, 'updates', 'temp');
+    const tempDir = path.join(userDataPath, 'temp');
 
     await fs.promises.mkdir(tempDir, { recursive: true });
     return tempDir;
   }
 
   /**
+   * Parse digest string in format "algorithm:hash"
+   */
+  private parseDigest(digest: string): { algorithm: string; hash: string } | null {
+    const parts = digest.split(':');
+    if (parts.length !== 2) {
+      Utils.logToFile(`⚠️ UpdateService: Invalid digest format: ${digest}`);
+      return null;
+    }
+    return {
+      algorithm: parts[0].toLowerCase(),
+      hash: parts[1].toLowerCase()
+    };
+  }
+
+  /**
+   * Calculate SHA-256 hash of file using streaming for memory efficiency
+   */
+  private async calculateFileHash(filePath: string): Promise<string> {
+    const hash = crypto.createHash('sha256');
+    const stream = fs.createReadStream(filePath);
+
+    return new Promise((resolve, reject) => {
+      stream.on('data', chunk => hash.update(chunk));
+      stream.on('end', () => resolve(hash.digest('hex')));
+      stream.on('error', reject);
+    });
+  }
+
+  /**
    * Verify downloaded file integrity
    */
-  private async verifyDownload(filePath: string, asset: any): Promise<boolean> {
+  private async verifyDownload(filePath: string, asset: GitHubAsset): Promise<boolean> {
     try {
       Utils.logToFile(`🔍 UpdateService: Verifying download: ${filePath}`);
 
@@ -268,10 +298,34 @@ export class UpdateService {
         throw new Error(`File size mismatch: expected ${asset.size}, got ${stats.size}`);
       }
 
-      // TODO: Add SHA-256 checksum verification when available
-      // For now, we'll rely on file size verification
 
-      Utils.logToFile('✅ UpdateService: Download verification passed');
+      // SHA-256 checksum verification when available
+      if (asset.digest) {
+        const parsed = this.parseDigest(asset.digest);
+        if (!parsed) {
+          throw new Error(`Invalid digest format: ${asset.digest}`);
+        }
+
+        if (parsed.algorithm === 'sha256') {
+          Utils.logToFile('🔐 UpdateService: Performing SHA-256 verification');
+
+          const actualHash = await this.calculateFileHash(filePath);
+
+          // Timing-safe comparison to prevent timing attacks
+          if (!crypto.timingSafeEqual(
+            Buffer.from(actualHash, 'hex'),
+            Buffer.from(parsed.hash, 'hex')
+          )) {
+            throw new Error('SHA-256 checksum verification failed');
+          }
+
+          Utils.logToFile('✅ UpdateService: SHA-256 verification passed');
+        } else {
+          Utils.logToFile(`⚠️ UpdateService: Unsupported hash algorithm: ${parsed.algorithm}, using size verification only`);
+        }
+      } else {
+        Utils.logToFile('⚠️ UpdateService: No digest available, using size verification only');
+      }
       return true;
     } catch (error) {
       Utils.logToFile(`❌ UpdateService: Download verification failed: ${error}`);
