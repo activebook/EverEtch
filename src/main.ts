@@ -100,27 +100,11 @@ async function createWindow() {
       // Set up proxy environment variables
       SysProxy.apply();
 
-      // Initialize update service after app is ready
-      try {
-        await updateService.initialize();
-        Utils.logToFile('🔄 Main: Update service initialized');
+      // Check for updates after a short delay
+      setTimeout(async () => {
+        // checkAppUpdate();
+      }, 3000); // Check after 3 seconds
 
-        // Check for updates after a short delay
-        setTimeout(async () => {
-          try {
-            const versionInfo = await updateService.checkForUpdates();
-            if (versionInfo.hasUpdate) {
-              Utils.logToFile(`🎉 Main: Update available: ${versionInfo.current} → ${versionInfo.latest}`);
-              // Notify renderer about available update
-              mainWindow.webContents.send('update-available', versionInfo);
-            }
-          } catch (error) {
-            Utils.logToFile(`⚠️ Main: Update check failed: ${error}`);
-          }
-        }, 3000); // Check after 3 seconds
-      } catch (error) {
-        Utils.logToFile(`⚠️ Main: Update service initialization failed: ${error}`);
-      }
     }, () => { });
 
     if (process.env.NODE_ENV === 'development') {
@@ -1096,10 +1080,24 @@ ipcMain.handle('generate-word-embedding', async (event, wordData: { word: string
 });
 
 // Update service IPC handlers
-ipcMain.handle('check-for-updates', async () => {
+
+async function checkAppUpdate() {
   try {
     const versionInfo = await updateService.checkForUpdates();
-    return { success: true, versionInfo };
+    if (versionInfo.hasUpdate) {
+      Utils.logToFile(`🎉 Main: Update available: ${versionInfo.current} → ${versionInfo.latest}`);
+      // Notify renderer about available update
+      mainWindow.webContents.send('update-available', { "current": versionInfo.current, "latest": versionInfo.latest });
+    }
+  } catch (error) {
+    Utils.logToFile(`⚠️ Main: Update check failed: ${error}`);
+  }
+}
+
+ipcMain.handle('check-for-updates', async () => {
+  try {
+    await checkAppUpdate();
+    return { success: true };
   } catch (error) {
     console.error('Failed to check for updates:', error);
     return {
@@ -1111,7 +1109,17 @@ ipcMain.handle('check-for-updates', async () => {
 
 ipcMain.handle('download-update', async () => {
   try {
-    const progress = await updateService.downloadUpdate();
+    const progress = await updateService.downloadUpdate((downloaded, total, message) => {
+      // Send progress updates to renderer
+      mainWindow.webContents.send('update-download-progress', {
+        downloaded: downloaded,
+        total: total,
+        message: message
+      });
+    });
+    // Send final progress update to renderer
+    // if progress.downloaded == 0 and progress.total == 0
+    // it means user cancelled the download
     return { success: true, progress };
   } catch (error) {
     console.error('Failed to download update:', error);
@@ -1145,22 +1153,3 @@ ipcMain.handle('is-update-available', async () => {
   }
 });
 
-ipcMain.handle('get-update-config', () => {
-  try {
-    const config = updateService.getConfig();
-    return { success: true, config };
-  } catch (error) {
-    console.error('Failed to get update config:', error);
-    return { success: false, config: null };
-  }
-});
-
-ipcMain.handle('update-config', async (event, config: any) => {
-  try {
-    await updateService.updateConfig(config);
-    return { success: true };
-  } catch (error) {
-    console.error('Failed to update config:', error);
-    return { success: false };
-  }
-});

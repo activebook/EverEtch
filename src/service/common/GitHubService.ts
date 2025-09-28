@@ -32,6 +32,7 @@ export class GitHubService {
   private readonly REPO = 'everetch';
   private readonly RATE_LIMIT_DELAY = 1000; // 1 second between requests
   private lastRequestTime = 0;
+  private abortController: AbortController | null = null;
 
   constructor() {
     Utils.logToFile('🔗 GitHubService: Initialized');
@@ -98,12 +99,18 @@ export class GitHubService {
   }
 
   /**
-   * Download a release asset
+   * Download a release asset with progress tracking and cancellation support
    */
-  async downloadAsset(asset: GitHubAsset): Promise<Buffer> {
+  async downloadAsset(
+    asset: GitHubAsset,
+    onProgress?: (progress: { downloaded: number; total: number; }) => void
+  ): Promise<Buffer|null> {
     Utils.logToFile(`⬇️ GitHubService: Downloading asset: ${asset.name} (${asset.size} bytes)`);
 
     try {
+      // Create AbortController for cancellation support
+      this.abortController = new AbortController();
+      
       const response = await fetch(asset.download_url, {
         headers: {
           'User-Agent': 'EverEtch-AutoUpdater/1.0',
@@ -115,12 +122,58 @@ export class GitHubService {
         throw new Error(`Download failed: ${response.status} ${response.statusText}`);
       }
 
-      const buffer = Buffer.from(await response.arrayBuffer());
+      const contentLength = parseInt(response.headers.get('content-length') || '0');
+      const totalBytes = contentLength || asset.size;
+      let downloadedBytes = 0;
+      const chunks: Buffer[] = [];
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('Response body is not readable');
+      }
+
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) break;
+
+        // Check for abort signal after each chunk
+        if (this.abortController.signal?.aborted) {
+          Utils.logToFile('🛑 GitHubService: Download aborted by user');
+          return null; // Exit if aborted
+        }
+
+        chunks.push(Buffer.from(value));
+        downloadedBytes += value.length;
+
+        // Report progress
+        if (onProgress && totalBytes > 0) {
+          const percentage = Math.round((downloadedBytes / totalBytes) * 100);
+          onProgress({
+            downloaded: downloadedBytes,
+            total: totalBytes
+          });
+        }
+      }
+
+      const buffer = Buffer.concat(chunks);
       Utils.logToFile(`✅ GitHubService: Downloaded ${buffer.length} bytes`);
       return buffer;
     } catch (error) {
       Utils.logToFile(`❌ GitHubService: Download failed: ${error}`);
       throw error;
+    } finally {
+      this.abortController = null;
+    }
+  }
+
+  /**
+   * Cancel ongoing download processing
+   */
+  cancelDownloadAsset(): void {
+    if (this.abortController) {
+      this.abortController.abort();
+      this.abortController = null;
     }
   }
 

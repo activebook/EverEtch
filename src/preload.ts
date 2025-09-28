@@ -122,16 +122,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }) => callback(result));
   },
 
-  // Update operations
+  // Update App operations
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   downloadUpdate: () => ipcRenderer.invoke('download-update'),
   installUpdate: () => ipcRenderer.invoke('install-update'),
-  isUpdateAvailable: () => ipcRenderer.invoke('is-update-available'),
-  getUpdateConfig: () => ipcRenderer.invoke('get-update-config'),
-  updateConfig: (config: any) => ipcRenderer.invoke('update-config', config),
 
-  // Update event listeners
-  on: (event: string, callback: (...args: any[]) => void) => {
-    ipcRenderer.on(event, (_event: Electron.IpcRendererEvent, ...args: any[]) => callback(...args));
+  onUpdateAvailable: (callback: (versionInfo: { current: string; latest: string; }) => void) => {
+    ipcRenderer.on('update-available', (_event: Electron.IpcRendererEvent, versionInfo: { current: string; latest: string; }) => callback(versionInfo));
   },
+  onUpdateDownloadProgress: (callback: (progress: { downloaded: number; total: number; message: string; }) => void) => {
+    ipcRenderer.on('update-download-progress', (_event: Electron.IpcRendererEvent, progress: { downloaded: number; total: number; message: string}) => callback(progress));
+  },
+
 });

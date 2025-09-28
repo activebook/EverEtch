@@ -6,46 +6,30 @@ import { GitHubService, GitHubRelease, VersionInfo } from './GitHubService.js';
 import { AtomUpdaterManager, UpdateResult } from './AtomUpdaterManager.js';
 
 export interface DownloadProgress {
-  percentage: number;
-  bytesDownloaded: number;
-  totalBytes: number;
-  speed: number; // bytes per second
-}
-
-export interface UpdateConfig {
-  enabled: boolean;
-  autoCheck: boolean;
-  autoDownload: boolean;
-  autoInstall: boolean;
-  channel: 'stable' | 'beta' | 'alpha';
+  downloaded: number;
+  total: number;
 }
 
 export class UpdateService {
   private githubService: GitHubService;
   private atomUpdaterManager: AtomUpdaterManager;
-  private config: UpdateConfig;
   private isInitialized = false;
-  private currentDownload: { abort?: () => void } | null = null;
 
   // Update state
+  private versionInfo: VersionInfo | null = null;
   private pendingUpdatePath: string | null = null;
   private isDownloading = false;
   private downloadProgress: DownloadProgress | null = null;
 
+  // Update messages 
+  private readonly UPDATE_DOWNLOADING = 'Downloading package...';
+  private readonly UPDATE_VERIFYING = 'Verifying checksum...';
+  private readonly UPDATE_EXTRACTING = 'Extracting package...';
+  private readonly UPDATE_CANCELLING = 'Cancelling...';
+
   constructor() {
     this.githubService = new GitHubService();
     this.atomUpdaterManager = new AtomUpdaterManager();
-
-    // Default configuration
-    this.config = {
-      enabled: true,
-      autoCheck: true,
-      autoDownload: false,
-      autoInstall: false,
-      channel: 'stable'
-    };
-
-    Utils.logToFile('🔄 UpdateService: Initialized');
   }
 
   /**
@@ -61,9 +45,10 @@ export class UpdateService {
         Utils.logToFile('⚠️ UpdateService: Atom-updater not ready, updates will not work');
       }
 
-      // Load configuration
-      await this.loadConfig();
-
+      this.versionInfo = null;
+      this.pendingUpdatePath = null;
+      this.isDownloading = false;
+      this.downloadProgress = null;
       this.isInitialized = true;
       Utils.logToFile('✅ UpdateService: Initialization complete');
       return true;
@@ -85,19 +70,23 @@ export class UpdateService {
       await this.initialize();
     }
 
+    if (this.versionInfo) {
+      return this.versionInfo;
+    }
+
     try {
       const currentVersion = this.getCurrentVersion();
       Utils.logToFile(`🔍 UpdateService: Checking for updates (current: ${currentVersion})`);
 
-      const versionInfo = await this.githubService.getRemoteVersionInfo(currentVersion);
+      this.versionInfo = await this.githubService.getRemoteVersionInfo(currentVersion);
 
-      if (versionInfo.hasUpdate) {
-        Utils.logToFile(`🎉 UpdateService: Update available: ${currentVersion} → ${versionInfo.latest}`);
+      if (this.versionInfo.hasUpdate) {
+        Utils.logToFile(`🎉 UpdateService: Update available: ${currentVersion} → ${this.versionInfo.latest}`);
       } else {
         Utils.logToFile('✅ UpdateService: No updates available');
       }
 
-      return versionInfo;
+      return this.versionInfo;
     } catch (error) {
       Utils.logToFile(`❌ UpdateService: Update check failed: ${error}`);
       return {
@@ -111,37 +100,48 @@ export class UpdateService {
   /**
    * Download an update in the background
    */
-  async downloadUpdate(release?: GitHubRelease): Promise<DownloadProgress> {
+  async downloadUpdate(onProgress: (downloaded: number, total: number, message: string) => void): Promise<DownloadProgress> {
     if (this.isDownloading) {
       throw new Error('Download already in progress');
     }
 
     try {
       this.isDownloading = true;
+
       Utils.logToFile('⬇️ UpdateService: Starting download');
 
       // Get release info if not provided
-      if (!release) {
-        const versionInfo = await this.checkForUpdates();
-        if (!versionInfo.hasUpdate || !versionInfo.release) {
-          throw new Error('No update available');
-        }
-        release = versionInfo.release;
+      const versionInfo = await this.checkForUpdates();
+      if (!versionInfo.hasUpdate || !versionInfo.release) {
+        throw new Error('No update available');
       }
+      const release: GitHubRelease = versionInfo.release;
 
       // Find the appropriate asset
       const asset = this.githubService.findUpdateAsset(release);
 
       // Set up download progress tracking
       this.downloadProgress = {
-        percentage: 0,
-        bytesDownloaded: 0,
-        totalBytes: asset.size,
-        speed: 0
+        downloaded: 0,
+        total: asset.size
       };
 
-      // Download the asset
-      const buffer = await this.githubService.downloadAsset(asset);
+      // Download the asset with progress tracking and cancellation support
+      const buffer = await this.githubService.downloadAsset(
+        asset,
+        (progress) => {
+          // Update download progress
+          onProgress(progress.downloaded, progress.total, this.UPDATE_DOWNLOADING)
+        }
+      );
+      if (!buffer) {
+        // Download was aborted
+        onProgress(0, 0, this.UPDATE_CANCELLING);
+        return {
+          downloaded: 0,
+          total: 0,
+        };
+      }
 
       // Save to temporary location
       const tempDir = await this.getTempDirectory();
@@ -151,23 +151,22 @@ export class UpdateService {
       Utils.logToFile(`💾 UpdateService: Saved update to ${downloadPath}`);
 
       // Verify the download
+      onProgress(buffer.length, buffer.length, this.UPDATE_VERIFYING);
       const isValid = await this.verifyDownload(downloadPath, asset);
       if (!isValid) {
         throw new Error('Download verification failed');
       }
 
       // Extract archive if necessary
+      onProgress(buffer.length, buffer.length, this.UPDATE_EXTRACTING);
       const extractedPath = await this.extractArchiveIfNeeded(downloadPath, asset);
       this.pendingUpdatePath = extractedPath;
 
       Utils.logToFile('✅ UpdateService: Download and verification complete');
-      
 
       return {
-        percentage: 100,
-        bytesDownloaded: buffer.length,
-        totalBytes: buffer.length,
-        speed: 0
+        downloaded: buffer.length,
+        total: buffer.length
       };
 
     } catch (error) {
@@ -175,7 +174,6 @@ export class UpdateService {
       throw error;
     } finally {
       this.isDownloading = false;
-      this.currentDownload = null;
     }
   }
 
@@ -232,9 +230,7 @@ export class UpdateService {
    * Cancel current download
    */
   async cancelDownload(): Promise<void> {
-    if (this.currentDownload && this.currentDownload.abort) {
-      this.currentDownload.abort();
-    }
+    this.githubService.cancelDownloadAsset();
     this.isDownloading = false;
     this.downloadProgress = null;
     Utils.logToFile('🛑 UpdateService: Download cancelled');
@@ -305,8 +301,8 @@ export class UpdateService {
 
     // Check if it's an archive that needs extraction
     if (contentType === 'application/zip' ||
-        contentType === 'application/x-zip-compressed' ||
-        asset.name.endsWith('.zip')) {
+      contentType === 'application/x-zip-compressed' ||
+      asset.name.endsWith('.zip')) {
 
       Utils.logToFile(`📦 UpdateService: Extracting archive: ${downloadPath}`);
 
@@ -334,33 +330,5 @@ export class UpdateService {
       Utils.logToFile(`📄 UpdateService: File is not an archive, using directly: ${downloadPath}`);
       return downloadPath;
     }
-  }
-
-  /**
-   * Load update configuration
-   */
-  private async loadConfig(): Promise<void> {
-    try {
-      // For now, use default config
-      // TODO: Load from user settings or config file
-      Utils.logToFile('⚙️ UpdateService: Configuration loaded');
-    } catch (error) {
-      Utils.logToFile(`⚠️ UpdateService: Could not load config: ${error}`);
-    }
-  }
-
-  /**
-   * Get update configuration
-   */
-  getConfig(): UpdateConfig {
-    return { ...this.config };
-  }
-
-  /**
-   * Update configuration
-   */
-  async updateConfig(newConfig: Partial<UpdateConfig>): Promise<void> {
-    this.config = { ...this.config, ...newConfig };
-    Utils.logToFile('⚙️ UpdateService: Configuration updated');
   }
 }
