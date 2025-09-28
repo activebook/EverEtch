@@ -1087,7 +1087,10 @@ async function checkAppUpdate() {
     if (versionInfo.hasUpdate) {
       Utils.logToFile(`🎉 Main: Update available: ${versionInfo.current} → ${versionInfo.latest}`);
       // Notify renderer about available update
-      mainWindow.webContents.send('update-available', { "current": versionInfo.current, "latest": versionInfo.latest });
+      mainWindow.webContents.send('update-available', { "current": versionInfo.current, "latest": versionInfo.latest, "hasUpdate": versionInfo.hasUpdate });
+    } else {
+      // Notify renderer about no update
+      mainWindow.webContents.send('update-available', { "current": versionInfo.current, "latest": versionInfo.latest, "hasUpdate": versionInfo.hasUpdate });
     }
   } catch (error) {
     Utils.logToFile(`⚠️ Main: Update check failed: ${error}`);
@@ -1128,6 +1131,11 @@ ipcMain.handle('download-update', async () => {
       error: error instanceof Error ? error.message : 'Unknown error'
     };
   }
+});
+
+ipcMain.handle('cancel-update', async () => {
+  await updateService.cancelDownload();
+  return { success: true };
 });
 
 ipcMain.handle('install-update', async () => {

@@ -330,10 +330,11 @@ declare global {
             // Update operations
             checkForUpdates: () => Promise<{ success: boolean; versionInfo?: { current: string; latest: string; hasUpdate: boolean; release?: any; }; error?: string; }>;
             downloadUpdate: () => Promise<{ success: boolean; progress?: any; error?: string; }>;
+            cancelUpdate: () => Promise<{ success: boolean; error?: string; }>;
             installUpdate: () => Promise<{ success: boolean; error?: string; }>;
 
             // Update event listeners
-            onUpdateAvailable: (callback: (versionInfo: { current: string; latest: string; }) => void) => void;
+            onUpdateAvailable: (callback: (versionInfo: { current: string; latest: string; hasUpdate: boolean }) => void) => void;
             onUpdateDownloadProgress: (callback: (progress: { downloaded: number; total: number; message: string; }) => void) => void;
 
             removeAllListeners: (event: string) => void;

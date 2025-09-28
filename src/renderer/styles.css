@@ -212,6 +212,12 @@
   display: inline-block;
 }
 
+#update-action-btn {
+  white-space: pre;
+  width: 100px;
+  display: inline-block;
+}
+
 .markdown-details pre code {
     @apply bg-transparent border-none p-0;
 }
@@ -269,10 +275,12 @@
     color: #78350f; /* slightly darker on hover */
 }
 
-
-
 .markdown-details hr {
     @apply border-amber-200 my-6;
+}
+
+.multiline-message {
+    white-space: pre-line;
 }
 
 /* Custom animations */

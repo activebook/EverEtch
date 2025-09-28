@@ -1,19 +1,19 @@
 <!-- App Update Modal -->
 <div id="app-update-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden z-50">
     <div class="flex items-center justify-center min-h-screen p-4">
-        <div class="bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl max-w-md w-full border border-white/20">
+        <div class="bg-amber-50/95 backdrop-blur-md rounded-2xl shadow-2xl max-w-md w-full border border-amber-200/60">
             <div
-                class="p-5 border-b border-slate-200/60 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 rounded-t-2xl">
+                class="p-5 border-b border-amber-200/60 bg-gradient-to-r from-amber-25/40 to-amber-50/60 rounded-t-2xl">
                 <h3 class="text-lg font-semibold text-slate-800 flex items-center">
-                    <img src="assets/icons/icon_64x64.png" alt="EverEtch" class="w-6 h-6 mr-2">
-                    App Update Available
+                    <svg class="w-5 h-5 mr-2 text-amber-600" viewBox="0 0 0.45 0.45" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M.057.219c0 .091.066.154.141.166a.016.016 0 1 1-.005.031.2.2 0 0 1-.167-.197c0-.046.021-.082.045-.11A.4.4 0 0 1 .125.061H.076a.015.015 0 0 1 0-.03h.09a.015.015 0 0 1 .015.015v.09a.015.015 0 0 1-.03 0V.081Q.124.101.095.13a.13.13 0 0 0-.038.089M.39.231A.17.17 0 0 0 .252.065.016.016 0 1 1 .258.034a.2.2 0 0 1 .164.197.17.17 0 0 1-.045.11.4.4 0 0 1-.054.048h.049a.015.015 0 1 1 0 .03h-.09A.015.015 0 0 1 .267.404v-.09a.015.015 0 1 1 .03 0v.055Q.324.349.353.32A.13.13 0 0 0 .391.231" fill="#000"/></svg>
+                    Check for Updates
                 </h3>
             </div>
             <div class="p-5 space-y-4">
                 <!-- Message Info Section (default visible) -->
-                <div id="update-message-info" class="text-center">
-                    <p id="update-message-text" class="text-sm text-slate-600">
-                        A new version of EverEtch is available. Would you like to update now?
+                <div class="text-center">
+                    <p id="update-message-text" class="text-sm text-slate-600 whitespace-pre-line">
+                        Checking for updates...
                     </p>
                 </div>
 
@@ -38,14 +38,10 @@
                 </div>
             </div>
             <div
-                class="p-5 border-t border-slate-200/60 flex justify-center space-x-3 bg-slate-50/50 rounded-b-2xl">
-                <button id="start-update-btn"
-                    class="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all duration-200 hover:shadow-lg font-medium text-sm min-w-[100px]">
-                    Start Update
-                </button>
-                <button id="cancel-update-btn" hidden
-                    class="px-6 py-2 bg-slate-500 hover:bg-slate-600 text-white rounded-lg transition-all duration-200 hover:shadow-lg font-medium text-sm min-w-[100px]">
-                    Cancel
+                class="p-5 border-t border-amber-200/60 flex justify-center space-x-3 bg-amber-50/50 rounded-b-2xl">
+                <button id="update-action-btn"
+                    class="px-6 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all duration-200 hover:shadow-lg font-medium text-sm min-w-[100px]">
+                    Update
                 </button>
             </div>
         </div>
