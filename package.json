@@ -1,18 +1,19 @@
 {
   "name": "everetch",
-  "version": "1.5.8",
+  "version": "1.6.0",
   "type": "module",
   "description": "A slim word memo application",
   "main": "lib/main.js",
   "scripts": {
     "start": "electron .",
     "dev": "npm run build && electron .",
-    "build": "tsc && npm run build-css && npm run copy-html && npm run copy-templates && npm run inject-version && npm run encrypt-credentials",
+    "build": "tsc && npm run build-css && npm run copy-html && npm run copy-templates && npm run fix-7zip && npm run inject-version && npm run encrypt-credentials",
     "watch": "tsc --watch",
     "build-css": "postcss ./src/renderer/styles.css -o ./lib/renderer/styles.css",
     "dev-css": "postcss ./src/renderer/styles.css -o ./lib/renderer/styles.css --watch",
     "copy-html": "mkdir -p lib/renderer && cp src/renderer/index.html lib/renderer/ && sed -i '' 's|../../lib/renderer/|./|g' lib/renderer/index.html",
     "copy-templates": "mkdir -p lib/renderer && cp -r src/renderer/templates lib/renderer/",
+    "fix-7zip": "cp -r src/7zip-bin/index.js node_modules/7zip-bin/index.js",
     "inject-version": "node inject-version.ts",
     "encrypt-credentials": "node encrypt.ts",
     "dist": "npm run build && electron-builder",
@@ -24,7 +25,16 @@
   "keywords": [
     "electron",
     "word-memo",
-    "sqlite"
+    "sqlite",
+    "vocabulary",
+    "glossary",
+    "better-sqlite3",
+    "markdown",
+    "tailwindcss",
+    "typescript",
+    "openai",
+    "chatgpt",
+    "genai"
   ],
   "author": "",
   "license": "GPL-3.0-only",
@@ -34,7 +44,7 @@
     "@types/better-sqlite3": "^7.6.9",
     "@types/node": "^20.19.13",
     "@types/showdown": "^2.0.6",
-    "electron": "^37.4.0",
+    "electron": "^37.6.0",
     "electron-builder": "^26.0.12",
     "eslint": "^9.35.0",
     "postcss": "^8.5.6",
@@ -43,7 +53,9 @@
     "typescript": "^5.9.2"
   },
   "dependencies": {
+    "@activebook/atom-updater": "^2.0.1",
     "@google/genai": "^1.19.0",
+    "7zip-min": "^2.1.0",
     "better-sqlite3": "^12.4.1",
     "electron-store": "^10.1.0",
     "googleapis": "^159.0.0",
@@ -61,6 +73,12 @@
     "asarUnpack": [
       "node_modules/sqlite-vec/**/*"
     ],
+    "extraResources": [
+      {
+        "from": "assets",
+        "to": "assets"
+      }
+    ],
     "appId": "com.activebook.everetch",
     "productName": "EverEtch",
     "directories": {
@@ -73,12 +91,6 @@
       "node_modules/**/*",
       "package.json",
       "credentials.enc"
-    ],
-    "extraResources": [
-      {
-        "from": "assets",
-        "to": "assets"
-      }
     ],
     "mac": {
       "category": "public.app-category.productivity",

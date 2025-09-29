@@ -9,6 +9,68 @@ export class Utils {
   private static debug = false;
 
   /**
+   * Get the app bundle root path for the current platform
+   * @returns The app bundle root path
+   */
+  static getAppRootPath(): string | null {
+    // In dev, there is no “install root” bundle/folder in the packaged sense.
+    // if (process.env.ELECTRON_RUN_AS_NODE || (app && app.isReady() === false && (process as any).defaultApp)) {
+    //   return null;
+    // }
+
+    if (process.platform === 'darwin') {
+      // Resolve symlinks first.
+      const resources = fs.realpathSync(process.resourcesPath);
+      // .../MyApp.app/Contents/Resources -> .../MyApp.app
+      const bundle = path.resolve(resources, '..', '..');
+      // Validate bundle structure.
+      const infoPlist = path.join(bundle, 'Contents', 'Info.plist');
+      if (fs.existsSync(infoPlist)) return path.dirname(bundle);
+
+      // Fallback: ascend to nearest ancestor ending with .app that contains Contents/Info.plist.
+      let dir = path.dirname(resources);
+      while (dir !== path.dirname(dir)) {
+        if (dir.endsWith('.app')) {
+          const candidate = dir;
+          const info = path.join(candidate, 'Contents', 'Info.plist');
+          if (fs.existsSync(info)) return path.dirname(candidate);
+        }
+        dir = path.dirname(dir);
+      }
+      return null;
+    }
+
+    // Windows and Linux: prefer app.getPath('exe'), then dirname.
+    const exe = fs.realpathSync(app.getPath('exe'));
+    let root = path.dirname(exe);
+
+    // Optional: normalize known updater/helper cases (Squirrel, custom helpers).
+    // Example: if exe is Update.exe, the app exe is typically ../app-*/YourApp.exe
+    if (process.platform === 'win32') {
+      const parent = path.dirname(root);
+      // Try to locate the newest app-* folder containing our main exe.
+      const entries = fs.readdirSync(parent, { withFileTypes: true })
+        .filter(d => d.isDirectory() && d.name.startsWith('app-'))
+        .map(d => path.join(parent, d.name))
+        .sort() // lexicographic; adjust if you need semver compare
+      for (const dir of entries.reverse()) {
+        const maybeExe = path.join(dir, path.basename(app.getName()) + '.exe');
+        if (fs.existsSync(maybeExe)) return dir;
+      }
+      return parent; // last resort
+    }
+
+    // Linux: consider env hints (AppImage/Snap/Flatpak) when you truly need the mounted app dir.
+    if (process.platform === 'linux') {
+      if (process.env.APPDIR) return fs.realpathSync(process.env.APPDIR);
+      if (process.env.SNAP) return fs.realpathSync(process.env.SNAP);
+    }
+
+    return root;
+  }
+
+
+  /**
    * Get the user data directory path for the current platform
    * @returns The user data directory path
    */

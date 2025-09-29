@@ -37,7 +37,8 @@ export class EventManager {
     this.setupProfileEvents();
     this.setupUIEvents();
     this.setupStreamingEvents();
-    this.setupSemanticSearchEvents();    
+    this.setupSemanticSearchEvents();
+    this.setupAppUpdateEvents();
   }
 
   private setupWordInputEvents(): void {
@@ -190,6 +191,14 @@ export class EventManager {
       });
     }
 
+    // App update button
+    const appUpdateBtn = document.getElementById('app-update-btn') as HTMLButtonElement;
+    if (appUpdateBtn) {
+      appUpdateBtn.addEventListener('click', () => {
+        this.modalManager.showAppUpdateModal();
+      });
+    }
+
     // More button and inline actions
     const moreBtn = document.getElementById('more-btn') as HTMLButtonElement;
     const inlineActions = document.getElementById('inline-actions') as HTMLElement;
@@ -238,7 +247,7 @@ export class EventManager {
 
     window.electronAPI.onProtocolSwitchProfile(async (profileName: string) => {
       await this.handleProtocolSwitchProfile(profileName);
-    });    
+    });
   }
 
   // Event handler implementations
@@ -491,7 +500,7 @@ export class EventManager {
     await this.semanticSearchManager.checkSemanticSearchStatus();
   }
 
-  private setupSemanticSearchEvents(): void { 
+  private setupSemanticSearchEvents(): void {
     // Set up semantic search status change listener
     document.addEventListener('semantic-search-status-changed', (event: any) => {
       this.handleSemanticSearchStatusChange(event.detail.enabled);
@@ -511,5 +520,15 @@ export class EventManager {
 
     // Log the status change for debugging
     console.log(`📊 Semantic search UI updated: ${enabled ? 'enabled' : 'disabled'}`);
+  }
+
+  private setupAppUpdateEvents(): void {
+    window.electronAPI.onUpdateAvailable((versionInfo: { current: string; latest: string; hasUpdate: boolean; }) => {
+      if (versionInfo.hasUpdate) {
+        // Remove the listener after handling to prevent multiple triggers
+        window.electronAPI.removeAllListeners('update-available');
+        this.modalManager.showAppUpdateModal();        
+      }
+    });
   }
 }

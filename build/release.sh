@@ -195,7 +195,7 @@ elif [ "$MODE" = "release" ]; then
 
   # Zip the build files
   echo "Zipping build files from dist/mac/..."
-  ZIP_FILE="EverEtch-$VERSION-mac.7z"
+  ZIP_FILE="EverEtch-$VERSION-darwin-x64.7z"
   run_or_echo mkdir -p out
   run_or_echo cd dist/mac && 7z a "../../out/$ZIP_FILE" *.app && cd ../..
 

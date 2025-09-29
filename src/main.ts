@@ -13,6 +13,7 @@ import { EmbeddingModelClient } from './ai/EmbeddingModelClient.js';
 import { GoogleAuthService } from './service/google/GoogleAuthService.js';
 import { GoogleDriveService } from './service/google/GoogleDriveService.js';
 import { ImportExportService } from './service/common/ImportExportService.js';
+import { UpdateService } from './service/common/UpdateService.js';
 import { SemanticBatchService } from './semantic/SemanticBatchService.js';
 import { SemanticSearchService } from './semantic/SemanticSearchService.js';
 import { marked } from 'marked';
@@ -33,6 +34,7 @@ let storeManager: StoreManager;
 let googleAuthService: GoogleAuthService;
 let googleDriveService: GoogleDriveService;
 let importExportService: ImportExportService;
+let updateService: UpdateService;
 let semanticBatchService: SemanticBatchService;
 let semanticSearchService: SemanticSearchService;
 let queuedProtocolAction: { type: string, data: any } | null = null; // Store queued protocol actions
@@ -53,12 +55,15 @@ try {
 }
 
 // Test logging functionality
-Utils.setDebugMode(false);
+Utils.setDebugMode(true);
 Utils.clearDebugLog();
 Utils.logToFile('EverEtch app starting up');
 
 // set a user-visible name so userData/Application Support uses the capitalized form in dev
 app.setName('EverEtch');
+
+const appRootPath = Utils.getAppRootPath();
+Utils.logToFile('App root path:' + appRootPath);
 
 async function createWindow() {
   try {
@@ -86,16 +91,23 @@ async function createWindow() {
     googleAuthService = new GoogleAuthService(mainWindow, storeManager);
     googleDriveService = new GoogleDriveService(googleAuthService);
     importExportService = new ImportExportService(dbManager, profileManager);
+    updateService = new UpdateService();
     semanticBatchService = new SemanticBatchService(dbManager, profileManager);
     semanticSearchService = new SemanticSearchService(dbManager, profileManager);
 
     mainWindow.loadFile(path.join(__dirname, 'renderer/index.html'));
 
     // Apply saved window bounds
-    adjustMainWindow(() => {
+    adjustMainWindow(async () => {
       // Callback function after window is ready
       // Set up proxy environment variables
       SysProxy.apply();
+
+      // Check for updates after a short delay
+      setTimeout(async () => {
+        checkAppUpdate();
+      }, 3000); // Check after 3 seconds
+
     }, () => { });
 
     if (process.env.NODE_ENV === 'development') {
@@ -1069,3 +1081,64 @@ ipcMain.handle('generate-word-embedding', async (event, wordData: { word: string
     throw new Error(`Embedding generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 });
+
+// Update service IPC handlers
+
+async function checkAppUpdate() {
+  try {
+    const versionInfo = await updateService.checkForUpdates();
+    if (versionInfo.hasUpdate) {
+      Utils.logToFile(`🎉 Main: Update available: ${versionInfo.current} → ${versionInfo.latest}`);
+      // Notify renderer about available update
+      mainWindow.webContents.send('update-available', { "current": versionInfo.current, "latest": versionInfo.latest, "hasUpdate": versionInfo.hasUpdate });
+    } else {
+      // Notify renderer about no update
+      mainWindow.webContents.send('update-available', { "current": versionInfo.current, "latest": versionInfo.latest, "hasUpdate": versionInfo.hasUpdate });
+    }
+  } catch (error) {
+    Utils.logToFile(`⚠️ Main: Update check failed: ${error}`);
+  }
+}
+
+ipcMain.handle('check-for-updates', async () => {
+  try {
+    await checkAppUpdate();
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to check for updates:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+});
+
+ipcMain.handle('download-update', async () => {
+  try {
+    const progress = await updateService.downloadUpdate((downloaded, total, message) => {
+      // Send progress updates to renderer
+      mainWindow.webContents.send('update-download-progress', {
+        downloaded: downloaded,
+        total: total,
+        message: message
+      });
+    });
+    // Send final progress update to renderer
+    // if progress.downloaded == 0 and progress.total == 0
+    // it means user cancelled the download
+    return { success: true, progress };
+  } catch (error) {
+    console.error('Failed to download update:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+});
+
+ipcMain.handle('cancel-update', async () => {
+  await updateService.cancelDownload();
+  return { success: true };
+});
+
+
