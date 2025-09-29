@@ -176,14 +176,19 @@ export class UpdateService {
         this.notifyCancelled(onProgress);
         return { downloaded: 0, total: 0 };
       }
-      
+
       // Final progress update before starting the update
       onProgress(buffer.length, buffer.length, this.UPDATE_UPDATING);
-      const atomUpdaterManager = new AtomUpdaterManager();
-      await atomUpdaterManager.execute(extractedDir);
-
-      // Quit the current process and let atom-updater handle the rest update
-      app.quit();
+      
+      if (app.isPackaged) {
+        console.debug("Running from dist/production, start updating...");
+        const atomUpdaterManager = new AtomUpdaterManager();
+        await atomUpdaterManager.execute(extractedDir);
+        // Quit the current process and let atom-updater handle the rest update
+        app.quit();
+      } else {
+        console.debug("Running in development, skip updating...");
+      }
 
       return {
         downloaded: buffer.length,
@@ -285,8 +290,8 @@ export class UpdateService {
   }
 
   /**
-   * Extract archive using 7zip-min
-   */
+    * Extract archive using 7zip-min
+    */
   private async extractWith7zip(archivePath: string, extractDir: string): Promise<void> {
     return new Promise((resolve, reject) => {
       // First, list archive contents to understand structure
