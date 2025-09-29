@@ -179,7 +179,7 @@ export class UpdateService {
 
       // Final progress update before starting the update
       onProgress(buffer.length, buffer.length, this.UPDATE_UPDATING);
-      
+      // Check if we're running from a packaged app, aka dist mode
       if (app.isPackaged) {
         console.debug("Running from dist/production, start updating...");
         const atomUpdaterManager = new AtomUpdaterManager();
@@ -187,6 +187,8 @@ export class UpdateService {
         // Quit the current process and let atom-updater handle the rest update
         app.quit();
       } else {
+        // In development mode, skip the actual update
+        // We cannot replace Electron.app itself!
         console.debug("Running in development, skip updating...");
       }
 
