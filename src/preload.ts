@@ -126,7 +126,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   downloadUpdate: () => ipcRenderer.invoke('download-update'),
   cancelUpdate: () => ipcRenderer.invoke('cancel-update'),
-  installUpdate: () => ipcRenderer.invoke('install-update'),
 
   onUpdateAvailable: (callback: (versionInfo: { current: string; latest: string; hasUpdate: boolean; }) => void) => {
     ipcRenderer.on('update-available', (_event: Electron.IpcRendererEvent, versionInfo: { current: string; latest: string; hasUpdate: boolean }) => callback(versionInfo));

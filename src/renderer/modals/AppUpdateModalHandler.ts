@@ -91,44 +91,12 @@ export class AppUpdateModalHandler extends ModalHandler {
                 return;
             }
 
-
-            // Download completed successfully - install immediately
-            // await this.installUpdate();
-
         } catch (error) {
             const msg = 'Error downloading update:'+ error;
             this.updateMessage(msg);
             this.setModalState(UpdateModalState.ERROR);
         } finally {
             this.downloading = false;
-        }
-    }
-
-    /**
-     * Install the downloaded update
-     */
-    private async installUpdate(): Promise<void> {
-        try {
-            // Use downloading state to show progress during install
-            this.setModalState(UpdateModalState.DOWNLOADING);
-
-            const result = await window.electronAPI.installUpdate();
-
-            if (!result.success) {
-                throw new Error(result.message || 'Failed to install update');
-            }
-
-
-
-            // Close modal after a short delay
-            setTimeout(() => {
-                this.hide();
-            }, 2000);
-
-        } catch (error) {
-            const msg = 'Error installing update:' + error;
-            this.updateMessage(msg);
-            this.setModalState(UpdateModalState.ERROR);
         }
     }
 

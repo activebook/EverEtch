@@ -4,7 +4,7 @@ import * as crypto from 'crypto';
 import { app } from 'electron';
 import { Utils } from '../../utils/Utils.js';
 import { GitHubService, GitHubRelease, GitHubAsset, VersionInfo } from './GitHubService.js';
-import { AtomUpdaterManager, UpdateResult } from './AtomUpdaterManager.js';
+import { AtomUpdaterManager } from './AtomUpdaterManager.js';
 import * as Seven from '7zip-min';
 
 export interface DownloadProgress {
@@ -14,23 +14,21 @@ export interface DownloadProgress {
 
 export class UpdateService {
   private githubService: GitHubService;
-  private atomUpdaterManager: AtomUpdaterManager;
   private isInitialized = false;
 
   // Update state
   private versionInfo: VersionInfo | null = null;
-  private pendingUpdatePath: string | null = null;
   private isDownloading = false;
 
   // Update messages 
   private readonly UPDATE_DOWNLOADING = 'Downloading package...';
   private readonly UPDATE_VERIFYING = 'Verifying checksum...';
   private readonly UPDATE_EXTRACTING = 'Extracting package...';
+  private readonly UPDATE_UPDATING = 'Start Updating...';
   private readonly UPDATE_CANCELLED = 'Download Cancelled.';
 
   constructor() {
     this.githubService = new GitHubService();
-    this.atomUpdaterManager = new AtomUpdaterManager();
   }
 
   /**
@@ -40,14 +38,8 @@ export class UpdateService {
     try {
       Utils.logToFile('🔄 UpdateService: Starting initialization');
 
-      // Initialize atom-updater manager
-      const updaterReady = await this.atomUpdaterManager.initialize();
-      if (!updaterReady) {
-        Utils.logToFile('⚠️ UpdateService: Atom-updater not ready, updates will not work');
-      }
-
+      // Initialize atom-updater manager    
       this.versionInfo = null;
-      this.pendingUpdatePath = null;
       this.isDownloading = false;
       this.isInitialized = true;
       Utils.logToFile('✅ UpdateService: Initialization complete');
@@ -97,6 +89,11 @@ export class UpdateService {
     }
   }
 
+  private notifyCancelled(onProgress: (downloaded: number, total: number, message: string) => void) {
+    onProgress(0, 0, this.UPDATE_CANCELLED);
+    Utils.logToFile('🚫 UpdateService: Download was cancelled by user');
+  }
+
   /**
    * Download an update in the background
    */
@@ -131,23 +128,30 @@ export class UpdateService {
 
       if (!buffer) {
         // Download was aborted
-        onProgress(0, 0, this.UPDATE_CANCELLED);
-        Utils.logToFile('� UpdateService: Download was cancelled by user');
-        return {
-          downloaded: 0,
-          total: 0,
-        };
+        this.notifyCancelled(onProgress);
+        return { downloaded: 0, total: 0 };
       }
 
       // Clean up old files before saving new one
       await this.cleanup();
 
+      if (!this.isDownloading) {
+        // Download was aborted
+        this.notifyCancelled(onProgress);
+        return { downloaded: 0, total: 0 };
+      }
+
       // Save to temporary location
       const tempDir = await this.getTempDirectory();
       const downloadPath = path.join(tempDir, asset.name);
-
       await fs.promises.writeFile(downloadPath, buffer);
       Utils.logToFile(`💾 UpdateService: Saved update to ${downloadPath}`);
+
+      if (!this.isDownloading) {
+        // Download was aborted
+        this.notifyCancelled(onProgress);
+        return { downloaded: 0, total: 0 };
+      }
 
       // Verify the download
       onProgress(buffer.length, buffer.length, this.UPDATE_VERIFYING);
@@ -156,12 +160,30 @@ export class UpdateService {
         throw new Error('Download verification failed');
       }
 
+      if (!this.isDownloading) {
+        // Download was aborted
+        this.notifyCancelled(onProgress);
+        return { downloaded: 0, total: 0 };
+      }
+
       // Extract archive if necessary
       onProgress(buffer.length, buffer.length, this.UPDATE_EXTRACTING);
-      const extractedPath = await this.extractArchiveIfNeeded(downloadPath, asset);
-      this.pendingUpdatePath = extractedPath;
-
+      const extractedDir = await this.extractArchiveIfNeeded(downloadPath, asset);
       Utils.logToFile('✅ UpdateService: Download and verification complete');
+
+      if (!this.isDownloading) {
+        // Download was aborted
+        this.notifyCancelled(onProgress);
+        return { downloaded: 0, total: 0 };
+      }
+      
+      // Final progress update before starting the update
+      onProgress(buffer.length, buffer.length, this.UPDATE_UPDATING);
+      const atomUpdaterManager = new AtomUpdaterManager();
+      await atomUpdaterManager.execute(extractedDir);
+
+      // Quit the current process and let atom-updater handle the rest update
+      app.quit();
 
       return {
         downloaded: buffer.length,
@@ -174,48 +196,6 @@ export class UpdateService {
     } finally {
       this.isDownloading = false;
     }
-  }
-
-  /**
-   * Install the downloaded update
-   */
-  async installUpdate(): Promise<UpdateResult> {
-    if (!this.pendingUpdatePath) {
-      throw new Error('No update downloaded');
-    }
-
-    if (!fs.existsSync(this.pendingUpdatePath)) {
-      throw new Error('Update file not found');
-    }
-
-    try {
-      Utils.logToFile(`🚀 UpdateService: Installing update: ${this.pendingUpdatePath}`);
-
-      // Execute atomic update using atom-updater
-      const result = await this.atomUpdaterManager.executeAtomicUpdate(this.pendingUpdatePath);
-
-      if (result.success) {
-        Utils.logToFile('✅ UpdateService: Update installation initiated');
-        this.pendingUpdatePath = null; // Clear pending update
-      } else {
-        Utils.logToFile(`❌ UpdateService: Update installation failed: ${result.error}`);
-      }
-
-      return result;
-    } catch (error) {
-      Utils.logToFile(`❌ UpdateService: Installation error: ${error}`);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      };
-    }
-  }
-
-  /**
-   * Check if an update is ready to install
-   */
-  isUpdateReady(): boolean {
-    return this.pendingUpdatePath !== null && fs.existsSync(this.pendingUpdatePath);
   }
 
   /**
@@ -307,7 +287,7 @@ export class UpdateService {
   /**
    * Extract archive using 7zip-min
    */
-  private async extractWith7zip(archivePath: string, extractDir: string): Promise<string> {
+  private async extractWith7zip(archivePath: string, extractDir: string): Promise<void> {
     return new Promise((resolve, reject) => {
       // First, list archive contents to understand structure
       Seven.list(archivePath, (err, result) => {
@@ -327,49 +307,7 @@ export class UpdateService {
           }
 
           Utils.logToFile(`✅ UpdateService: Archive extracted successfully`);
-
-          try {
-            // Get the extracted file/dir name - find the extracted item in extractDir
-            const extractedItems = await fs.promises.readdir(extractDir);
-
-            if (extractedItems.length === 0) {
-              reject(new Error('No files were extracted from the archive'));
-              return;
-            }
-
-            // If there's only one item, return its path
-            if (extractedItems.length === 1) {
-              const extractedPath = path.join(extractDir, extractedItems[0]);
-              Utils.logToFile(`📁 UpdateService: Found extracted item: ${extractedPath}`);
-              resolve(extractedPath);
-              return;
-            }
-
-            /**
-             * Multiple items scenario
-             * In windows, the extracted folder is named after the archive
-             * So what should we do? maybe return the folder path
-             */
-
-            // If there are multiple items, look for a directory (likely the main extracted folder)
-            for (const item of extractedItems) {
-              const itemPath = path.join(extractDir, item);
-              const stats = await fs.promises.stat(itemPath);
-              if (stats.isDirectory()) {
-                Utils.logToFile(`📁 UpdateService: Found extracted directory: ${itemPath}`);
-                resolve(itemPath);
-                return;
-              }
-            }
-
-            // If no directory found, return the first file
-            const firstItemPath = path.join(extractDir, extractedItems[0]);
-            Utils.logToFile(`📄 UpdateService: Returning first extracted item: ${firstItemPath}`);
-            resolve(firstItemPath);
-
-          } catch (error) {
-            reject(new Error(`Failed to find extracted content: ${error instanceof Error ? error.message : 'Unknown error'}`));
-          }
+          resolve();
         });
       });
     });
@@ -446,10 +384,10 @@ export class UpdateService {
         await fs.promises.mkdir(extractDir, { recursive: true });
 
         // Extract using 7zip-min
-        const extractPath = await this.extractWith7zip(downloadPath, extractDir);
+        await this.extractWith7zip(downloadPath, extractDir);
 
         Utils.logToFile(`📂 UpdateService: Archive extracted to: ${extractDir}`);
-        return extractPath;
+        return extractDir;
 
       } catch (error) {
         Utils.logToFile(`❌ UpdateService: Archive extraction failed: ${error}`);

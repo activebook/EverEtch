@@ -105,7 +105,7 @@ async function createWindow() {
 
       // Check for updates after a short delay
       setTimeout(async () => {
-        // checkAppUpdate();
+        checkAppUpdate();
       }, 3000); // Check after 3 seconds
 
     }, () => { });
@@ -1141,26 +1141,4 @@ ipcMain.handle('cancel-update', async () => {
   return { success: true };
 });
 
-ipcMain.handle('install-update', async () => {
-  try {
-    const result = await updateService.installUpdate();
-    return result;
-  } catch (error) {
-    console.error('Failed to install update:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    };
-  }
-});
-
-ipcMain.handle('is-update-available', async () => {
-  try {
-    const isReady = updateService.isUpdateReady();
-    return { success: true, available: isReady };
-  } catch (error) {
-    console.error('Failed to check update availability:', error);
-    return { success: false, available: false };
-  }
-});
 

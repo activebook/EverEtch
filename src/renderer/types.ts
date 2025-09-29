@@ -345,7 +345,6 @@ declare global {
             checkForUpdates: () => Promise<CheckUpdateResult>;
             downloadUpdate: () => Promise<DownloadUpdateResult>;
             cancelUpdate: () => Promise<ApiResult>;
-            installUpdate: () => Promise<ApiResult>;
 
             // Update event listeners
             onUpdateAvailable: (callback: (versionInfo: { current: string; latest: string; hasUpdate: boolean }) => void) => void;
