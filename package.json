@@ -44,6 +44,7 @@
     "typescript": "^5.9.2"
   },
   "dependencies": {
+    "@activebook/atom-updater": "^2.0.1",
     "@google/genai": "^1.19.0",
     "7zip-min": "^2.1.0",
     "better-sqlite3": "^12.4.1",
