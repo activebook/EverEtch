@@ -241,4 +241,13 @@ SELECT word_id, model_used, vec_to_json(embedding) as json_embedding FROM word_e
 .output stdout -- redirect back to stdout
 
 
+
+sqlite3 compile error:
+NODE_MODULE_VERSION 127. This version of Node.js requires
+NODE_MODULE_VERSION 136. Please try re-compiling or re-installing
+the module (for instance, using `npm rebuild` or `npm install`).
+
+npm rebuild better-sqlite3 --runtime=electron --target=37.6.0 --dist-url=https://electronjs.org/headers
+
+
 */

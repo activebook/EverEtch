@@ -35,7 +35,7 @@
     "@types/better-sqlite3": "^7.6.9",
     "@types/node": "^20.19.13",
     "@types/showdown": "^2.0.6",
-    "electron": "^37.4.0",
+    "electron": "^37.6.0",
     "electron-builder": "^26.0.12",
     "eslint": "^9.35.0",
     "postcss": "^8.5.6",

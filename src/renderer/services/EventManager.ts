@@ -525,7 +525,9 @@ export class EventManager {
   private setupAppUpdateEvents(): void {
     window.electronAPI.onUpdateAvailable((versionInfo: { current: string; latest: string; hasUpdate: boolean; }) => {
       if (!versionInfo.hasUpdate) {
-        this.modalManager.showAppUpdateModal();
+        // Remove the listener after handling to prevent multiple triggers
+        window.electronAPI.removeAllListeners('update-available');
+        this.modalManager.showAppUpdateModal();        
       }
     });
   }
