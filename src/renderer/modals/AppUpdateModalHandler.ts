@@ -101,15 +101,15 @@ export class AppUpdateModalHandler extends ModalHandler {
     }
 
     /**
-     * Update the main message in the modal
-     */
-    private updateMessage(message: string) {
-        // Update message
-        const messageText = document.getElementById('update-message-text') as HTMLElement;
-        if (messageText) {
-            messageText.textContent = message;
-        }
-    }
+      * Update the main message in the modal
+      */
+     private updateMessage(message: string) {
+         // Update message
+         const messageText = document.getElementById('update-message-text') as HTMLElement;
+         if (messageText) {
+             messageText.innerHTML = message;
+         }
+     }
 
     /**
      * Update download progress display with detailed progress information
@@ -248,9 +248,9 @@ export class AppUpdateModalHandler extends ModalHandler {
                 this.setModalState(UpdateModalState.NONE);
                 return;
             }
-            const msg = `A new version is available. 
-            EverEtch ${versionInfo.current} → ${versionInfo.latest}
-            Would you like to update now?`
+            const msg = `<span style="color: ##374151;">✨ A new version is available now! ✨</span><br>
+            <span style="color: #16a34a; font-weight: 700;">EverEtch ${versionInfo.current} → ${versionInfo.latest}</span><br>
+            <span style="color: #374151;">Would you like to update now?</span>`
             this.updateMessage(msg);
             this.setModalState(UpdateModalState.AVAILABLE);
         });
