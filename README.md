@@ -107,6 +107,19 @@ Backup and sync your word collections across devices:
 
 **Free cloud storage with your Google account!**
 
+## 🔄 Automatic Updates
+
+**EverEtch updates itself!** No need to manually download new versions.
+
+- **Smart Detection**: Checks for updates on startup
+- **One-Click Updates**: Click "Update Available" when prompted
+- **Seamless Installation**: App updates in the background
+- **No Need App Store and Win Store**: App can update itself
+
+![UI Screenshot](screenshots/UI_UPDATE.png)
+
+**Never miss new features or improvements!**
+
 ## 🛠️ For Developers
 
 ### Requirements
