@@ -62,6 +62,9 @@ Utils.logToFile('EverEtch app starting up');
 // set a user-visible name so userData/Application Support uses the capitalized form in dev
 app.setName('EverEtch');
 
+const appRootPath = Utils.getAppRootPath();
+Utils.logToFile('App root path:' + appRootPath);
+
 async function createWindow() {
   try {
     // Initialize managers first to get profile config
