@@ -111,6 +111,8 @@ Backup and sync your word collections across devices:
 
 **EverEtch updates itself!** No need to manually download new versions.
 
+*Thanks to the contribution of [@activebook/atom-updater](https://www.npmjs.com/package/@activebook/atom-updater)*
+
 - **Smart Detection**: Checks for updates on startup
 - **One-Click Updates**: Click "Update Available" when prompted
 - **Seamless Installation**: App updates in the background
